@@ -1,7 +1,8 @@
 import stripe
 from devtools import debug
+import os
 
-stripe.api_key = "sk_test_51LQ7q1DzTJHYWfEwPPpWGKBy5szd2b5O0OjbhQW9JVLAfCxPpy31zCN91pTe92zbjWmxO9OQ9xafA132bO0BkNiH00wBtBrAxI"
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 payment_intent_id = "pi_3Nk791DzTJHYWfEw02mD0ylu"
 
