@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 load_dotenv()
 
 # Initialize Firebase
-cred = credentials.Certificate(json.loads(os.environ['GOOGLE_APPLICATION_CREDENTIALS']))
+cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
 
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
