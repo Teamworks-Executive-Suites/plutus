@@ -22,12 +22,13 @@ def startup_event():
 # Stripe
 
 @app.post('/refund_deposit')
-def refund(ref: Dispute):
+def refund(data: Dispute):
    # get dispute document from firebase where ref == ref
     # get user document from firebase where user == user
-    get_dispute_from_firebase(ref)
 
-    return{"message": f'hello {ref} this test worked'}
+    get_dispute_from_firebase(data.trip_ref)
+
+    return
 
 
 # Calendar Generation

@@ -11,6 +11,7 @@ from urllib.parse import quote
 import threading
 import schedule
 import time
+import stripe
 
 # Initialize Firebase
 cred = credentials.Certificate("./teamworks_service_account.json")
@@ -18,16 +19,22 @@ cred = credentials.Certificate("./teamworks_service_account.json")
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+stripe.api_key = "sk_test_51LQ7q1DzTJHYWfEwPPpWGKBy5szd2b5O0OjbhQW9JVLAfCxPpy31zCN91pTe92zbjWmxO9OQ9xafA132bO0BkNiH00wBtBrAxI"
 
-def get_dispute_from_firebase(ref):
-    dis = db.child("disputes").child(ref).get()
+def get_dispute_from_firebase(trip_ref):
+    collection_id, document_id = trip_ref.split('/')
+    dis = db.collection("disputes").document(document_id).get()
+    debug(dis.to_dict())
+    dispute = db.child("disputes").child(trip_ref).get()
+    # payment_intent_id = db.child("disputes").child(ref).child("tripPaymentId").get()
+    # debug(payment_intent_id)
+    charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
     return dis.val()
 
 
 
 # Calendar stuff
 
-debug("create_cal_for_property")
 def create_cal_for_property(propertyRef):
     debug(propertyRef)
 
