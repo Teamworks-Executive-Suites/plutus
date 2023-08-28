@@ -4,8 +4,10 @@ import firebase_admin
 from firebase_admin import firestore, credentials
 from google.cloud.firestore_v1 import FieldFilter
 from ics import Calendar, Event
+import os
 from datetime import datetime, timedelta
 from urllib.parse import quote
+import threading
 
 # Initialize Firebase
 cred = credentials.Certificate("./teamworks_service_account.json")
@@ -17,6 +19,10 @@ db = firestore.client()
 def get_dispute_from_firebase(ref):
     dis = db.child("disputes").child(ref).get()
     return dis.val()
+
+
+
+# Calendar stuff
 
 
 def create_cal_for_property(propertyRef):
@@ -35,40 +41,35 @@ def create_cal_for_property(propertyRef):
 
     cal = Calendar()
     for trip in property_trips:
-        debug(trip.id, trip.to_dict())
-            cal_event = Event()
-            cal_event.name = f'{trip.name} | {trip.guests} guests | {property_ref.propertyName}'
-            cal_event.begin = trip.tripBeginDateTime
-            cal_event.end = trip.tripEndDateTime
-            cal_event.url = trip.url
-            cal.events.add(cal_event)
+
+        user_ref = trip.get("userRef").id
+        debug(user_ref)
+        user = db.collection("users").document(user_ref).get()
+        debug(trip.to_dict())
+        debug(f'{user.get("email")} | {property_ref.get("propertyName")}')
+
+        cal_event = Event()
+        cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
+        cal_event.begin = trip.get("tripBeginDateTime")
+        cal_event.end = trip.get("tripEndDateTime")
+
+        cal.events.add(cal_event)
+
+    # Create an .ics file
+    ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'
+    with open(ics_file_path, "w") as ics_file:
+        ics_file.writelines(cal)
+
+    return ics_file_path
 
 
-    debug("reeeeee")
-    # doc_ref = db.collection("properties").document(propertyRef)
+# On realtime updates:
+callback_done = threading.Event()
+def on_snapshot(doc_snapshot, changes, read_time):
+    for doc in doc_snapshot:
+        create_cal_for_property(doc.property_ref)
+    callback_done.set()
 
-
-    # for trip in property_trips:
-    #     debug(trip.id, trip.to_dict())
-    #
-    # # create a calendar from the trips
-    #
-    # for trip in trips:
-    #     # propertyRef = trip.propertyRef #
-    #     property = db.child("properties").get()
-    #     debug(property)
-    #     cal_event = Event()
-    #     cal_event.name = trip.name
-    #     cal_event.begin = trip.tripBeginDateTime
-    #     cal_event.end = trip.tripEndDateTime
-    #     cal_event.url = trip.url
-    #     cal.events.add(cal_event)
-
-    cal_link = "test"
-
-    return cal_link
-
-
-def nica_demo(ref):
-    trip = db.child("trips").child(ref)
-    trip.update({"guests": "7"})
+ # on change to trips
+ # for property in properties:
+ #     create_cal_for_property(property)

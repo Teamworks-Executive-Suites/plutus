@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+from starlette.responses import FileResponse
+
 from models import *
 from tasks import *
 from devtools import debug
@@ -33,3 +35,7 @@ def get_property_cal(property_ref: str):
         "propertyRef": property_ref,
         "cal_link": cal_link
     }
+
+# Serve the .ics file using FastAPI's static files
+ics_directory = "./calendars"  # Replace with your directory path
+app.mount("/calendars", FileResponse(ics_directory))
