@@ -6,7 +6,10 @@ from firebase_admin import firestore, credentials
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
 import os
+from dotenv import load_dotenv
 from datetime import datetime, timezone
+
+load_dotenv()
 
 # Initialize Firebase
 cred = credentials.Certificate(json.loads(os.environ['GOOGLE_APPLICATION_CREDENTIALS']))
