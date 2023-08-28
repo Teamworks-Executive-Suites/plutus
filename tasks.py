@@ -1,20 +1,19 @@
+import json
 import requests
 from devtools import debug
 import firebase_admin
 from firebase_admin import firestore, credentials
-from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
 import os
+from dotenv import load_dotenv
 from datetime import datetime, timezone
-from urllib.parse import quote
-import threading
-import schedule
-import time
 import stripe
 
+load_dotenv()
+
 # Initialize Firebase
-cred = credentials.Certificate("./teamworks_service_account.json")
+cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
 
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
