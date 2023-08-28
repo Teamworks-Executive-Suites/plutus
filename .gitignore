@@ -2,3 +2,5 @@
 ./teamworks_service_account.json
 
 ./venv
+
+.env
