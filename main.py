@@ -17,18 +17,18 @@ def test_post(name: Name):
 def refund(ref: Dispute):
    # get dispute document from firebase where ref == ref
     # get user document from firebase where user == user
-   get_dispute_from_firebase(ref)
+    get_dispute_from_firebase(ref)
 
-
-
-    return {"message": f'hello {ref} this test worked'}
+    return{"message": f'hello {ref} this test worked'}
 
 
 @app.get('/get_property_cal')
-def get_property_cal(propertyRef: str):
-    cal_link = create_cal_for_property(propertyRef)
+def get_property_cal(property_ref: str):
+    cal_link = create_cal_for_property(property_ref)
     # add all cal stuff
+    debug("test")
+
     return {
-        "propertyRef": propertyRef,
+        "propertyRef": property_ref,
         "cal_link": cal_link
     }
