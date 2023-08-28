@@ -25,12 +25,17 @@ def startup_event():
 # Stripe
 
 @app.post('/refund_deposit')
+<<<<<<< Updated upstream
 def refund(ref: Dispute):
    # get dispute document from firebase where ref == ref
     # get user document from firebase where user == user
     get_dispute_from_firebase(ref)
 
     return{"message": f'hello {ref} this test worked'}
+=======
+def refund(data: Dispute):
+    return get_dispute_from_firebase(data.trip_ref)
+>>>>>>> Stashed changes
 
 
 # Calendar Generation
