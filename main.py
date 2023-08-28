@@ -3,7 +3,7 @@ from models import *
 from tasks import *
 app = FastAPI()
 
-
+# Nica was here
 
 @app.get('/')
 def hello():
