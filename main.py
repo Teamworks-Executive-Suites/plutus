@@ -27,7 +27,7 @@ def refund(ref: Dispute):
 @app.get('/get_property_cal')
 def get_property_cal(propertyRef: str):
     cal_link = create_cal_for_property(propertyRef)
-
+    # add all cal stuff
     return {
         "propertyRef": propertyRef,
         "cal_link": cal_link
