@@ -1,46 +1,161 @@
-
 import requests
-import pyrebase
-import devtools
+from devtools import debug
+import firebase_admin
+from firebase_admin import firestore, credentials
+from google.cloud.firestore_v1 import FieldFilter
+from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
+import os
+from datetime import datetime, timezone
+from urllib.parse import quote
+import threading
+import schedule
+import time
 
-# Stripe Functions
+# Initialize Firebase
+cred = credentials.Certificate("./teamworks_service_account.json")
+
+app = firebase_admin.initialize_app(cred)
+db = firestore.client()
 
 
-firebaseConfig = {
-  "type": "service_account",
-  "project_id": "teamworks-3b262",
-  "private_key_id": "ede3d59c3a057c8c136e1d941390e54aca895bdb",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQC2NDzPYEubK50b\nPbhZFrUXAhDlGE3eEAvQRoQBBNszGGfQtRenbozYJ1QvCIg5oo5v43lORrnGvfQM\nRwgkVNycyW5HJtZoYgpbBFl1s4LO7pGC4LEkgeO1gedRI/BcK+zekfiMeBOXxq1i\nwWQk+MUXZEHjDhXxTSpE/yLBrszsEpV2ZpP7Uesx4KJ6BiRlIex5C4k2dNXZ3JZF\nV7iGqVmcpewMhuqnopoz8F1Bmatk8wYEJLJlQ0K+MMs0J5lWqStET+xX3qLryvuh\n8j8XNfOq2AR+DzTkfvDJ/tgiWvpNIeG+UIR3uOpG7Iw8bP1BB3Faj094Gp48VvIU\nWtc3kC9NAgMBAAECggEAANqI5poHckEEaCsdzz4+pHUA+I9oo/yN9Z1mKaDcC9n8\n+IeBebcYOu+gorGTsJ0JzxpKrsENk0UMdoQQFKcYiBwe45kmu+mQeo5jaRxpcm5z\nNfpqa6bRI8Ac6GHDX62UAa0ltAP6NLj8hhMsx/1c/Qfq+BudIwEiMtCoMsfOukdp\nxewTKM9Nz7CAe3S+Aqg6EqR8H5S7ZCEvJ1+Y7eX+c7q00WxV3tDMCfpAE4AqcZDd\nX/vkW9IsywSX2T8YOV2JpDrqGPxtGl3VMGrjLvOXsGszxWw2t9W/BIEEi5uyzQ0o\nkDuwYZJNNu71Jo4FCV5oLBcNoVlN3Z4iYKarwusvkQKBgQDyx/Rt5NOUq2CdezWv\nHTxBwPqO0pTRmFtf6RsjPHpCAmRiPDOoZLcpn0vKogx3WOutkba6wiL+kjr04n2W\nsB9XSkioA35tLAQ9MXLWpt+mMlS6XAV0VNuB0JAhCorDLu79VTThAE7OQxGuuFWY\n9gop9rHF7lnWMeqSvXJPFbSPnQKBgQDAH+tugtOyCK17YUI1VV9o4QnLb/W3lXD3\n3XcmspcvLZIpyLGPbFeSc6K8RI41ZXC86e6en+NZkCVODYLutz6+c4qEJurJaR7y\n7FPizKb5i5zaJA04SYz2SlFI5IB122iH9KySiGU+YKxlx9DdUeoxlx6CqHKbKtBs\n27l07FWHcQKBgQDY+M5/8AMPWOHtnBFsQMp7UUYboiMR9gGjg6aXJRN2LsEb8gWQ\ntwHiltSbcZuGhdeKtTEDU0EHFhTOiiQHKbu4vVCVpxmz46SeM7UYFObHly+VpWvS\nfYv3Rjeo78z3hthbW2z4sNe9Cr+g0GjfXPPUcP6Lj+qFvPKQ1fJ0r0dBGQKBgQCx\nvVX7WQEsFacZG7M60A6CYp7DHIMAIjrutG5E2LfRJ6GvEkJiY2Lo1B3berjtYTlZ\nLDpbeaPE+fvpJ8rXuaNMYmvlMnPHfX7qUgSRL6/R8X1cujmYt0K3n61veCX34tHj\n5VG6BoFTofAcAS2TcvLsidfqHJhaQNOtweDi8Ll3oQKBgQCzu2TJ/aIZBUUTz4wY\nREXjLRSz4i0ntnv8Vo4YOjh5LTij4ZNe3RzzqhKnKnf1z7ZEguDymILTTWM2hRX8\ncZqNjhaHP0cyKxxagBr80gHr4e3hxy9rmoApJzzlWNa47uzvYkjI3UrznfRYlyKm\nAmfDQ8caDr9vlQNBNaFwdY7nBw==\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-sbxn6@teamworks-3b262.iam.gserviceaccount.com",
-  "client_id": "118063635413441766689",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-sbxn6%40teamworks-3b262.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-}
-
-firebase = pyrebase.initialize_app(firebaseConfig)
-db = firebase.storage()
 def get_dispute_from_firebase(ref):
     dis = db.child("disputes").child(ref).get()
     return dis.val()
 
+
+
+# Calendar stuff
+
+debug("create_cal_for_property")
 def create_cal_for_property(propertyRef):
-    trips = db.child("trips").child(propertyRef).get()
+    debug(propertyRef)
 
-    # create a calendar from the trips
-    # trips.child("
-    # initialize calendar
-    for trip in trips:
-        # create cal event with start date = trip.tripBeginDateTime and end date = trip.tripEndDateTime
-        # add cal event to cal
-    # return cal link
-
-    # return cal_link
+    collection_id, document_id = propertyRef.split('/')
 
 
-def nica_demo(ref):
-    trip = db.child("trips").child(ref)
-    trip.update({"guests": "7"})
+    trips_ref = db.collection("trips")
+
+    # Here we get all trips with a tripTax of 6
+    # property_trips = trips_ref.where("tripTax", "==", 6).stream()
+
+    property_ref = db.collection('properties').document(document_id).get()
+    property_trips = (trips_ref
+                      .where("propertyRef", "==", property_ref.reference)
+                      .where("isExternal", "==", False)
+                      .stream()
+                      )
+
+    cal = Calendar()
+    for trip in property_trips:
+        user_ref = trip.get("userRef").id
+        debug(user_ref)
+        user = db.collection("users").document(user_ref).get()
+        debug(trip.to_dict())
+        debug(f'{user.get("email")} | {property_ref.get("propertyName")}')
+
+        cal_event = Event()
+        cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
+        cal_event.begin = trip.get("tripBeginDateTime")
+        cal_event.end = trip.get("tripEndDateTime")
+
+        cal.events.add(cal_event)
+
+    # Create an .ics file
+    ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'
+    with open(ics_file_path, "w") as ics_file:
+        ics_file.writelines(cal)
+
+    return ics_file_path
+
+
+debug("create_trips from ics")
+def create_trips_from_ics(property_ref, ics_link):
+    tz = timezone.utc
+
+    collection_id, document_id = property_ref.split('/')
+
+    property_ref = db.collection(collection_id).document(document_id).get()
+
+    response = requests.get(ics_link)
+    if response.status_code != 200:
+        return "Failed to fetch the iCalendar file."
+
+    # cal = Calendar.from_ical(response.content)
+    # trips_ref = db.collection("trips")
+
+    ics_data = response.text
+
+    cal = iCalCalendar.from_ical(ics_data)
+    trips_ref = db.collection("trips")
+
+    for event in cal.walk('VEVENT'):
+        debug(event)
+
+        # convert ical datetime to firestore datetime
+        eventstart = event.get('DTSTART').dt
+        eventend = event.get('DTEND').dt
+
+        trip_begin_datetime = datetime(eventstart.year, eventstart.month, eventstart.day, tzinfo=tz)
+        trip_end_datetime = datetime(eventend.year, eventend.month, eventend.day, tzinfo=tz)
+        debug(trip_begin_datetime)
+        debug(trip_end_datetime)
+
+        trip_data = {
+                "isExternal": True,
+                "propertyRef": property_ref.reference,
+                "tripBeginDateTime": trip_begin_datetime,
+                "tripEndDateTime": trip_end_datetime,
+            }
+        debug(trip_data)
+        trips_ref.add(trip_data)
+
+    return True
+
+debug("Starting Calendar Sync")
+def update_calendars():
+    debug("Updating Calendars")
+
+    properties_ref = db.collection("properties")
+    properties = properties_ref.stream()
+
+    for property in properties:
+
+        # Sync External Calendars
+        try:
+            external_calendar_data = property.get("externalCalendar")
+            if external_calendar_data and external_calendar_data.exists:
+                create_trips_from_ics(property.reference, external_calendar_data)
+        except KeyError:
+            pass  # Handle the case where the "externalCalendar" key doesn't exist
+
+        debug(property.reference.path)
+        # Sync Internal Calendars
+        create_cal_for_property(property.reference.path)
+
+    return True
+
+
+# On realtime updates:
+# callback_done = threading.Event()
+# def on_snapshot(doc_snapshot, changes, read_time):
+#     debug(f"Received document snapshot")
+#     for doc in doc_snapshot:
+#         debug(doc.to_dict())
+#     callback_done.set()
+
+#update every hour
+
+# def start_watch():
+#     doc_ref = db.collection("properties")
+#     query_watch = db.collection('trips').on_snapshot(on_snapshot)
+#
+#     doc_watch = doc_ref.on_snapshot(on_snapshot)
+#
+# # https://firebase.google.com/docs/firestore/query-data/listen
+# # for property in properties:
+# #     create_cal_for_property(property)
+#
+# start_watch()
+
+# add to database using calendar information

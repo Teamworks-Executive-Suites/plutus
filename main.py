@@ -1,34 +1,66 @@
 from fastapi import FastAPI
+from starlette.responses import FileResponse
+
 from models import *
 from tasks import *
+from devtools import debug
 app = FastAPI()
 
-# Nica was here
+@app.on_event("startup")
+def startup_event():
+    schedule.every().hour.do(update_calendars)
+    def run_schedule():
+        while True:
+            schedule.run_pending()
+            time.sleep(3600)
 
-@app.get('/')
-def hello():
-    return {"hello world": "this worked!"}
+    import threading
+    threading.Thread(target=run_schedule).start()
 
-@app.post('/edit')
-def test_post(name: Name):
-    return{ "message": f'hello {name} this test worked'}
+
+# Endpoints
+# Stripe
 
 @app.post('/refund_deposit')
 def refund(ref: Dispute):
    # get dispute document from firebase where ref == ref
     # get user document from firebase where user == user
-   get_dispute_from_firebase(ref)
+    get_dispute_from_firebase(ref)
+
+    return{"message": f'hello {ref} this test worked'}
 
 
-
-    return {"message": f'hello {ref} this test worked'}
-
-
+# Calendar Generation
 @app.get('/get_property_cal')
-def get_property_cal(propertyRef: str):
-    cal_link = create_cal_for_property(propertyRef)
+def get_property_cal(property_ref: str):
+    cal_link = create_cal_for_property(property_ref)
+    # add all cal stuff
+    debug("test")
 
     return {
-        "propertyRef": propertyRef,
+        "propertyRef": property_ref,
         "cal_link": cal_link
     }
+
+# Sync External Calendar
+@app.post('/cal_to_property')
+def cal_to_property(data: PropertyCal):
+    debug(data.property_ref)
+    debug(data.cal_link)
+    # add all cal stuff
+    if create_trips_from_ics(data.property_ref, data.cal_link):
+        return {
+            "propertyRef": data.property_ref,
+            "message": "Calendar successfully added to property"
+        }
+    else:
+        return {
+            "propertyRef": data.property_ref,
+            "message": "Calendar could not be added to property"
+        }
+
+
+# Static Files
+
+ics_directory = "./calendars"  # Replace with your directory path
+app.mount("/calendars", FileResponse(ics_directory))

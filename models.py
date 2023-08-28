@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from devtools import debug
 
 
 class Name(BaseModel):
@@ -9,3 +10,8 @@ class Dispute(BaseModel):
     category: str
     reason: str
     amount: float
+
+
+class PropertyCal(BaseModel):
+    property_ref: str
+    cal_link: str
