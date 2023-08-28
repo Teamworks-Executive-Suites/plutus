@@ -66,10 +66,20 @@ def create_cal_for_property(propertyRef):
 # On realtime updates:
 callback_done = threading.Event()
 def on_snapshot(doc_snapshot, changes, read_time):
+    debug(f"Received document snapshot")
     for doc in doc_snapshot:
-        create_cal_for_property(doc.property_ref)
+        debug(doc.to_dict())
     callback_done.set()
 
- # on change to trips
- # for property in properties:
- #     create_cal_for_property(property)
+def start_watch():
+    doc_ref = db.collection("properties")
+    query_watch = db.collection('trips').on_snapshot(on_snapshot)
+
+    doc_watch = doc_ref.on_snapshot(on_snapshot)
+
+# https://firebase.google.com/docs/firestore/query-data/listen
+# for property in properties:
+#     create_cal_for_property(property)
+
+start_watch()
+
