@@ -9,6 +9,8 @@ import os
 from datetime import datetime, timezone
 from urllib.parse import quote
 import threading
+import schedule
+import time
 
 # Initialize Firebase
 cred = credentials.Certificate("./teamworks_service_account.json")
@@ -25,24 +27,27 @@ def get_dispute_from_firebase(ref):
 
 # Calendar stuff
 
-
+debug("create_cal_for_property")
 def create_cal_for_property(propertyRef):
     debug(propertyRef)
+
+    collection_id, document_id = propertyRef.split('/')
+
 
     trips_ref = db.collection("trips")
 
     # Here we get all trips with a tripTax of 6
     # property_trips = trips_ref.where("tripTax", "==", 6).stream()
 
-    collection_id, document_id = propertyRef.split('/')
-
-    property_ref = db.collection(collection_id).document(document_id).get()
-    debug(property_ref.to_dict())
-    property_trips = trips_ref.where("propertyRef", "==", property_ref.reference).stream()
+    property_ref = db.collection('properties').document(document_id).get()
+    property_trips = (trips_ref
+                      .where("propertyRef", "==", property_ref.reference)
+                      .where("isExternal", "==", False)
+                      .stream()
+                      )
 
     cal = Calendar()
     for trip in property_trips:
-
         user_ref = trip.get("userRef").id
         debug(user_ref)
         user = db.collection("users").document(user_ref).get()
@@ -64,8 +69,10 @@ def create_cal_for_property(propertyRef):
     return ics_file_path
 
 
+debug("create_trips from ics")
+def create_trips_from_ics(property_ref, ics_link):
+    tz = timezone.utc
 
-def create_trips_from_ics(property_ref, ics_link, external_source):
     collection_id, document_id = property_ref.split('/')
 
     property_ref = db.collection(collection_id).document(document_id).get()
@@ -89,20 +96,42 @@ def create_trips_from_ics(property_ref, ics_link, external_source):
         eventstart = event.get('DTSTART').dt
         eventend = event.get('DTEND').dt
 
-        tz = timezone.utc
         trip_begin_datetime = datetime(eventstart.year, eventstart.month, eventstart.day, tzinfo=tz)
         trip_end_datetime = datetime(eventend.year, eventend.month, eventend.day, tzinfo=tz)
         debug(trip_begin_datetime)
         debug(trip_end_datetime)
 
-    trip_data = {
-            "externalSource": external_source,
-            "propertyRef": property_ref.reference,
-            "tripBeginDateTime": trip_begin_datetime,
-            "tripEndDateTime": trip_end_datetime,
-        }
-    debug(trip_data)
-    trips_ref.add(trip_data)
+        trip_data = {
+                "isExternal": True,
+                "propertyRef": property_ref.reference,
+                "tripBeginDateTime": trip_begin_datetime,
+                "tripEndDateTime": trip_end_datetime,
+            }
+        debug(trip_data)
+        trips_ref.add(trip_data)
+
+    return True
+
+debug("Starting Calendar Sync")
+def update_calendars():
+    debug("Updating Calendars")
+
+    properties_ref = db.collection("properties")
+    properties = properties_ref.stream()
+
+    for property in properties:
+
+        # Sync External Calendars
+        try:
+            external_calendar_data = property.get("externalCalendar")
+            if external_calendar_data and external_calendar_data.exists:
+                create_trips_from_ics(property.reference, external_calendar_data)
+        except KeyError:
+            pass  # Handle the case where the "externalCalendar" key doesn't exist
+
+        debug(property.reference.path)
+        # Sync Internal Calendars
+        create_cal_for_property(property.reference.path)
 
     return True
 
@@ -114,6 +143,8 @@ def create_trips_from_ics(property_ref, ics_link, external_source):
 #     for doc in doc_snapshot:
 #         debug(doc.to_dict())
 #     callback_done.set()
+
+#update every hour
 
 # def start_watch():
 #     doc_ref = db.collection("properties")

@@ -15,4 +15,3 @@ class Dispute(BaseModel):
 class PropertyCal(BaseModel):
     property_ref: str
     cal_link: str
-    external_source: str
