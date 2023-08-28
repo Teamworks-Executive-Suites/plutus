@@ -10,3 +10,9 @@ class Dispute(BaseModel):
     category: str
     reason: str
     amount: float
+
+
+class PropertyCal(BaseModel):
+    property_ref: str
+    cal_link: str
+    external_source: str

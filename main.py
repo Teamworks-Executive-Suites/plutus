@@ -36,6 +36,26 @@ def get_property_cal(property_ref: str):
         "cal_link": cal_link
     }
 
+@app.post('/cal_to_property')
+def cal_to_property(data: PropertyCal):
+    debug(data.property_ref)
+    debug(data.cal_link)
+    debug(data.external_source)
+    # add all cal stuff
+    if create_trips_from_ics(data.property_ref, data.cal_link, data.external_source):
+        return {
+            "propertyRef": data.property_ref,
+            "message": "Calendar successfully added to property"
+        }
+    else:
+        return {
+            "propertyRef": data.property_ref,
+            "message": "Calendar could not be added to property"
+        }
+
+
+
+
 # Serve the .ics file using FastAPI's static files
 ics_directory = "./calendars"  # Replace with your directory path
 app.mount("/calendars", FileResponse(ics_directory))

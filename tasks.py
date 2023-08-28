@@ -3,9 +3,10 @@ from devtools import debug
 import firebase_admin
 from firebase_admin import firestore, credentials
 from google.cloud.firestore_v1 import FieldFilter
+from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
 from urllib.parse import quote
 import threading
 
@@ -63,23 +64,67 @@ def create_cal_for_property(propertyRef):
     return ics_file_path
 
 
+
+def create_trips_from_ics(property_ref, ics_link, external_source):
+    collection_id, document_id = property_ref.split('/')
+
+    property_ref = db.collection(collection_id).document(document_id).get()
+
+    response = requests.get(ics_link)
+    if response.status_code != 200:
+        return "Failed to fetch the iCalendar file."
+
+    # cal = Calendar.from_ical(response.content)
+    # trips_ref = db.collection("trips")
+
+    ics_data = response.text
+
+    cal = iCalCalendar.from_ical(ics_data)
+    trips_ref = db.collection("trips")
+
+    for event in cal.walk('VEVENT'):
+        debug(event)
+
+        # convert ical datetime to firestore datetime
+        eventstart = event.get('DTSTART').dt
+        eventend = event.get('DTEND').dt
+
+        tz = timezone.utc
+        trip_begin_datetime = datetime(eventstart.year, eventstart.month, eventstart.day, tzinfo=tz)
+        trip_end_datetime = datetime(eventend.year, eventend.month, eventend.day, tzinfo=tz)
+        debug(trip_begin_datetime)
+        debug(trip_end_datetime)
+
+    trip_data = {
+            "externalSource": external_source,
+            "propertyRef": property_ref.reference,
+            "tripBeginDateTime": trip_begin_datetime,
+            "tripEndDateTime": trip_end_datetime,
+        }
+    debug(trip_data)
+    trips_ref.add(trip_data)
+
+    return True
+
+
 # On realtime updates:
-callback_done = threading.Event()
-def on_snapshot(doc_snapshot, changes, read_time):
-    debug(f"Received document snapshot")
-    for doc in doc_snapshot:
-        debug(doc.to_dict())
-    callback_done.set()
+# callback_done = threading.Event()
+# def on_snapshot(doc_snapshot, changes, read_time):
+#     debug(f"Received document snapshot")
+#     for doc in doc_snapshot:
+#         debug(doc.to_dict())
+#     callback_done.set()
 
-def start_watch():
-    doc_ref = db.collection("properties")
-    query_watch = db.collection('trips').on_snapshot(on_snapshot)
+# def start_watch():
+#     doc_ref = db.collection("properties")
+#     query_watch = db.collection('trips').on_snapshot(on_snapshot)
+#
+#     doc_watch = doc_ref.on_snapshot(on_snapshot)
+#
+# # https://firebase.google.com/docs/firestore/query-data/listen
+# # for property in properties:
+# #     create_cal_for_property(property)
+#
+# start_watch()
 
-    doc_watch = doc_ref.on_snapshot(on_snapshot)
-
-# https://firebase.google.com/docs/firestore/query-data/listen
-# for property in properties:
-#     create_cal_for_property(property)
-
-start_watch()
-
+# add to database using calendar information
