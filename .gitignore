@@ -1,6 +1,7 @@
 # this is a ignore file
+
+.env
+
 ./teamworks_service_account.json
 
 ./venv
-
-.env
