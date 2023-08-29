@@ -1,14 +1,15 @@
 import json
-import requests
-from devtools import debug
+import os
+from datetime import datetime, timezone
+
 import firebase_admin
+import requests
+import stripe
+from devtools import debug
+from dotenv import load_dotenv
 from firebase_admin import firestore, credentials
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
-import os
-from dotenv import load_dotenv
-from datetime import datetime, timezone
-import stripe
 
 load_dotenv()
 
@@ -18,8 +19,8 @@ cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CRE
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
 
 def get_dispute_from_firebase(trip_ref):
     collection_id, document_id = trip_ref.split('/')
@@ -27,7 +28,6 @@ def get_dispute_from_firebase(trip_ref):
     debug(trip.reference)
     debug('reeeeeeeeeeeeeeeeee')
     dispute = db.collection('disputes').where("tripRef", "==", trip.reference).stream()
-
 
     if not trip.exists:
         return "Trip document not found."
@@ -73,11 +73,12 @@ def get_dispute_from_firebase(trip_ref):
 # Calendar stuff
 
 debug("create_cal_for_property")
+
+
 def create_cal_for_property(propertyRef):
     debug(propertyRef)
 
     collection_id, document_id = propertyRef.split('/')
-
 
     trips_ref = db.collection("trips")
 
@@ -115,6 +116,8 @@ def create_cal_for_property(propertyRef):
 
 
 debug("create_trips from ics")
+
+
 def create_trips_from_ics(property_ref, ics_link):
     tz = timezone.utc
 
@@ -147,17 +150,20 @@ def create_trips_from_ics(property_ref, ics_link):
         debug(trip_end_datetime)
 
         trip_data = {
-                "isExternal": True,
-                "propertyRef": property_ref.reference,
-                "tripBeginDateTime": trip_begin_datetime,
-                "tripEndDateTime": trip_end_datetime,
-            }
+            "isExternal": True,
+            "propertyRef": property_ref.reference,
+            "tripBeginDateTime": trip_begin_datetime,
+            "tripEndDateTime": trip_end_datetime,
+        }
         debug(trip_data)
         trips_ref.add(trip_data)
 
     return True
 
+
 debug("Starting Calendar Sync")
+
+
 def update_calendars():
     debug("Updating Calendars")
 
@@ -180,7 +186,6 @@ def update_calendars():
 
     return True
 
-
 # On realtime updates:
 # callback_done = threading.Event()
 # def on_snapshot(doc_snapshot, changes, read_time):
@@ -189,7 +194,7 @@ def update_calendars():
 #         debug(doc.to_dict())
 #     callback_done.set()
 
-#update every hour
+# update every hour
 
 # def start_watch():
 #     doc_ref = db.collection("properties")
