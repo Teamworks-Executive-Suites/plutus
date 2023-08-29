@@ -13,15 +13,13 @@ from tasks import *
 
 app = FastAPI()
 
-# Token
+# Auth
+
+# gets the bearer token from the file for verification
 known_tokens = set()
 with open("bearer_token.txt", "r") as import_file:
     bearer_token = import_file.read().strip()
 known_tokens.add(bearer_token)
-
-# Auth
-# Placeholder for a database containing valid token values
-# known_tokens = {""}
 
 # We will handle a missing token ourselves
 get_bearer_token = HTTPBearer(auto_error=False)
@@ -66,7 +64,6 @@ def refund(data: Dispute,
 def get_property_cal(property_ref: str, token: str = Depends(get_token)):
     cal_link = create_cal_for_property(property_ref)
     # add all cal stuff
-    debug("test")
 
     return {
         "propertyRef": property_ref,
@@ -90,15 +87,6 @@ def cal_to_property(data: PropertyCal, token: str = Depends(get_token)):
             "propertyRef": data.property_ref,
             "message": "Calendar could not be added to property"
         }
-
-
-@app.get(
-    "/protected",
-    response_model=str,
-    responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)},
-)
-async def protected(token: str = Depends(get_token)):
-    return f"Hello, user! Your token is {token}."
 
 
 # Static Files
