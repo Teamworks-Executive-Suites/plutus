@@ -1,1 +1,1 @@
-web: uvicorn main:app --port=$PORT && python bearer_token.py
+web: uvicorn main:app --host=0.0.0.0 --port=${PORT:-5000} && python bearer_token.py
