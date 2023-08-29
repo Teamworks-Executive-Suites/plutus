@@ -12,3 +12,7 @@ class Dispute(BaseModel):
 class PropertyCal(BaseModel):
     property_ref: str
     cal_link: str
+
+
+class UnauthorizedMessage(BaseModel):
+    detail: str = "Bearer token missing or unknown"
