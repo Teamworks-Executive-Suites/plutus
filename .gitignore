@@ -1,7 +1,24 @@
-# this is a ignore file
+# Ignore macOS .DS_Store files
+.DS_Store
 
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDE specific files
+.idea/
+.vscode/
+
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Ignore environment variables file
 .env
 
-./teamworks_service_account.json
+# Ignore bearer token file
+bearer_token.txt
 
-./venv
