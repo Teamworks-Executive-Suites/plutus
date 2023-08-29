@@ -89,15 +89,6 @@ def cal_to_property(data: PropertyCal, token: str = Depends(get_token)):
         }
 
 
-@app.get(
-    "/protected",
-    response_model=str,
-    responses={status.HTTP_401_UNAUTHORIZED: dict(model=UnauthorizedMessage)},
-)
-async def protected(token: str = Depends(get_token)):
-    return f"Hello, user! Your token is {token}."
-
-
 # Static Files
 
 ics_directory = "./calendars"  # Replace with your directory path
