@@ -22,3 +22,4 @@ ENV/
 # Ignore bearer token file
 bearer_token.txt
 
+.vercel
