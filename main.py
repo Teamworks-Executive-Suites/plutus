@@ -28,10 +28,10 @@ def startup_event():
 def refund(data: Dispute):
    # get dispute document from firebase where ref == ref
     # get user document from firebase where user == user
-
     get_dispute_from_firebase(data.trip_ref)
 
     return
+
 
 
 # Calendar Generation

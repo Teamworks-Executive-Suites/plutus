@@ -1,6 +1,8 @@
 import stripe
 from devtools import debug
-import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
@@ -17,7 +19,7 @@ debug(charge)
 
 stripe.Refund.create(
   charge=charge.id,
-  amount=,
+  amount=1000,
 )
 
 

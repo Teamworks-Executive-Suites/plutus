@@ -18,18 +18,54 @@ cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CRE
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-stripe.api_key = "sk_test_51LQ7q1DzTJHYWfEwPPpWGKBy5szd2b5O0OjbhQW9JVLAfCxPpy31zCN91pTe92zbjWmxO9OQ9xafA132bO0BkNiH00wBtBrAxI"
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 def get_dispute_from_firebase(trip_ref):
     collection_id, document_id = trip_ref.split('/')
-    dis = db.collection("disputes").document(document_id).get()
-    debug(dis.to_dict())
-    dispute = db.child("disputes").child(trip_ref).get()
-    # payment_intent_id = db.child("disputes").child(ref).child("tripPaymentId").get()
-    # debug(payment_intent_id)
-    charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
-    return dis.val()
+    trip = db.collection(collection_id).document(document_id).get()
+    debug(trip.reference)
+    debug('reeeeeeeeeeeeeeeeee')
+    dispute = db.collection('disputes').where("tripRef", "==", trip.reference).stream()
 
+    if not trip.exists:
+        return "Trip document not found."
+
+    dispute_query = db.collection('disputes').where("tripRef", "==", trip.reference).limit(1)
+    dispute_documents = dispute_query.stream()
+
+    # Check if there are any dispute documents
+    if not trip.exists:
+        return "Trip document not found."
+
+    dispute_query = db.collection('disputes').where("tripRef", "==", trip.reference).limit(1)
+    dispute_documents = list(dispute_query.stream())
+
+    # Check if there are any dispute documents
+    if len(dispute_documents) == 0:
+        return "Dispute document not found."
+
+    dispute = dispute_documents[0]  # Get the first dispute document
+
+    payment_intent_id = dispute.get("tripPaymentId")
+
+    if not payment_intent_id:
+        return "Payment ID not found in the dispute document."
+
+    try:
+        charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
+        if charge.data:
+            refund = stripe.Refund.create(
+                charge=charge.data[0].id,
+                amount=int(dispute.get("disputeAmount") * 100),
+            )
+            if refund.status == 'succeeded':
+                return "Refund successful."
+            else:
+                return "Refund failed."
+        else:
+            return "Charge not found."
+    except Exception as e:
+        return f"An error occurred: {str(e)}"
 
 
 # Calendar stuff
