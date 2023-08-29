@@ -1,1 +1,2 @@
-uvicorn main:app && python bearer_token.py
+uvicorn main:app --reload --port=$PORT && python3 bearer_token.py
+
