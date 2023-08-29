@@ -9,6 +9,8 @@ from tasks import *
 from devtools import debug
 app = FastAPI()
 
+# Nica was here
+
 @app.on_event("startup")
 def startup_event():
     schedule.every().hour.do(update_calendars)
