@@ -49,9 +49,10 @@ def get_dispute_from_firebase(trip_ref):
     try:
         charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
         if charge.data:
+            refund_amount = int((dispute.get("tripDepositAmount") - dispute.get("disputeAmount")) * 100)
             refund = stripe.Refund.create(
                 charge=charge.data[0].id,
-                amount=int(dispute.get("disputeAmount") * 100),
+                amount=refund_amount,
             )
             if refund.status == 'succeeded':
                 return "Refund successful."
