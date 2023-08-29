@@ -8,6 +8,7 @@ from ics import Calendar, Event
 import os
 from dotenv import load_dotenv
 from datetime import datetime, timezone
+import stripe
 
 load_dotenv()
 
@@ -17,12 +18,7 @@ cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CRE
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-<<<<<<< Updated upstream
 
-def get_dispute_from_firebase(ref):
-    dis = db.child("disputes").child(ref).get()
-    return dis.val()
-=======
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 def get_dispute_from_firebase(trip_ref):
@@ -31,7 +27,7 @@ def get_dispute_from_firebase(trip_ref):
     debug(trip.reference)
     debug('reeeeeeeeeeeeeeeeee')
     dispute = db.collection('disputes').where("tripRef", "==", trip.reference).stream()
->>>>>>> Stashed changes
+
 
     if not trip.exists:
         return "Trip document not found."
