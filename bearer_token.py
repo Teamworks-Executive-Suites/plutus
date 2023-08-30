@@ -14,6 +14,3 @@ def generate_bearer_token():
     print('new bearer token: ', token)
 
     return token
-
-
-generate_bearer_token()
