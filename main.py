@@ -34,8 +34,8 @@ def startup_event():
 # gets the bearer token from the file for verification
 known_tokens = set()
 with open("bearer_token.txt", "r") as import_file:
-    token = import_file.read().strip()
-known_tokens.add(token)
+    btoken = import_file.read().strip()
+known_tokens.add(btoken)
 
 # We will handle a missing token ourselves
 get_bearer_token = HTTPBearer(auto_error=False)
@@ -45,12 +45,12 @@ async def get_token(
         auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
 ) -> str:
     # Simulate a database query to find a known token
-    if auth is None or (btoken := auth.credentials) not in known_tokens:
+    if auth is None or (token := auth.credentials) not in known_tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=UnauthorizedMessage().detail,
         )
-    return btoken
+    return token
 
 
 
