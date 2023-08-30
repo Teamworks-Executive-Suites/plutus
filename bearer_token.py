@@ -16,3 +16,4 @@ def generate_bearer_token():
     return token
 
 
+generate_bearer_token()
