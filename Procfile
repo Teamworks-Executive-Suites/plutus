@@ -1,1 +1,1 @@
-web: python main.py --port=$PORT
+web: uvicorn main:app --workers 4
