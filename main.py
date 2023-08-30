@@ -14,7 +14,20 @@ from tasks import *
 
 app = FastAPI()
 
-# comment
+@app.on_event("startup")
+def startup_event():
+    generate_bearer_token()
+
+    schedule.every().hour.do(update_calendars)
+
+    def run_schedule():
+        while True:
+            schedule.run_pending()
+            time.sleep(3600)
+
+    import threading
+    threading.Thread(target=run_schedule).start()
+
 
 # Auth
 
@@ -40,19 +53,6 @@ async def get_token(
     return btoken
 
 
-@app.on_event("startup")
-def startup_event():
-    generate_bearer_token()
-
-    schedule.every().hour.do(update_calendars)
-
-    def run_schedule():
-        while True:
-            schedule.run_pending()
-            time.sleep(3600)
-
-    import threading
-    threading.Thread(target=run_schedule).start()
 
 
 # Endpoints
