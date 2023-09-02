@@ -37,7 +37,16 @@ def get_dispute_from_firebase(trip_ref):
 
     # Check if there are any dispute documents
     if len(dispute_documents) == 0:
-        return "Dispute document not found."
+        # if the dispute is not found then a refund of the full amount is issued
+        refund_amount = int(trip.get("tripDepositAmount") * 100)
+        refund = stripe.Refund.create(
+            charge=trip.get("tripPaymentId"),
+            amount=refund_amount,
+        )
+        if refund.status == 'succeeded':
+            return "Full Refund successful."
+        else:
+            return "Full Refund failed."
 
     dispute = dispute_documents[0]  # Get the first dispute document
 
