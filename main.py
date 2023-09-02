@@ -16,8 +16,6 @@ app = FastAPI()
 
 @app.on_event("startup")
 def startup_event():
-    generate_bearer_token()
-
     schedule.every().hour.do(update_calendars)
 
     def run_schedule():
@@ -30,7 +28,7 @@ def startup_event():
 
 
 # Auth
-
+generate_bearer_token()
 # gets the bearer token from the file for verification
 known_tokens = set()
 with open("bearer_token.txt", "r") as import_file:
