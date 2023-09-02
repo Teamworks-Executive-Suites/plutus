@@ -80,6 +80,9 @@ def create_cal_for_property(propertyRef):
                       .stream()
                       )
 
+    # check if trip has been completed
+    current_time = datetime.now(tz)
+
     cal = Calendar()
     for trip in property_trips:
         user_ref = trip.get("userRef").id
@@ -91,7 +94,11 @@ def create_cal_for_property(propertyRef):
         cal_event.begin = trip.get("tripBeginDateTime")
         cal_event.end = trip.get("tripEndDateTime")
 
+        if current_time > trip.get("tripEndDateTime"):
+            trip.reference.update({"isComplete": True})
+
         cal.events.add(cal_event)
+
 
     # Create an .ics file
     ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'

@@ -8,18 +8,34 @@ from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
 from starlette.responses import FileResponse
 
+from bearer_token import *
 from models import *
 from tasks import *
 
 app = FastAPI()
+
+@app.on_event("startup")
+def startup_event():
+    generate_bearer_token()
+
+    schedule.every().hour.do(update_calendars)
+
+    def run_schedule():
+        while True:
+            schedule.run_pending()
+            time.sleep(3600)
+
+    import threading
+    threading.Thread(target=run_schedule).start()
+
 
 # Auth
 
 # gets the bearer token from the file for verification
 known_tokens = set()
 with open("bearer_token.txt", "r") as import_file:
-    bearer_token = import_file.read().strip()
-known_tokens.add(bearer_token)
+    btoken = import_file.read().strip()
+known_tokens.add(btoken)
 
 # We will handle a missing token ourselves
 get_bearer_token = HTTPBearer(auto_error=False)
@@ -37,25 +53,13 @@ async def get_token(
     return token
 
 
-@app.on_event("startup")
-def startup_event():
-    schedule.every().hour.do(update_calendars)
-
-    def run_schedule():
-        while True:
-            schedule.run_pending()
-            time.sleep(3600)
-
-    import threading
-    threading.Thread(target=run_schedule).start()
 
 
 # Endpoints
 # Stripe
 
 @app.post("/refund_deposit")
-def refund(data: Dispute,
-           token: str = Depends(get_token)):
+def refund(data: Dispute, token: str = Depends(get_token)):
     return get_dispute_from_firebase(data.trip_ref)
 
 
