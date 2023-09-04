@@ -24,60 +24,56 @@ db = firestore.client()
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 
-def get_dispute_from_firebase(trip_ref):
+# Stripe stuff
+def get_trip_document(trip_ref):
     collection_id, document_id = trip_ref.split('/')
     trip = db.collection(collection_id).document(document_id).get()
-    debug(trip.reference)
+    return trip
 
-    if not trip.exists:
-        return "Trip document not found."
 
-    dispute_query = db.collection('disputes').where(filter=FieldFilter("tripRef", "==", trip.reference)).limit(1)
+def get_dispute_by_trip_ref(trip_ref):
+    dispute_query = db.collection('disputes').where(filter=FieldFilter("tripRef", "==", trip_ref)).limit(1)
     dispute_documents = list(dispute_query.stream())
+    return dispute_documents[0] if dispute_documents else None
 
-    # Check if there are any dispute documents
-    if len(dispute_documents) == 0:
-        # if the dispute is not found then a refund of the full amount is issued
-        refund_amount = int(trip.get("tripDeposit") * 100)
+
+def process_refund(charge_id, amount):
+    try:
         refund = stripe.Refund.create(
-            charge=trip.get("paymentMethod"),
-            amount=refund_amount,
+            charge=charge_id,
+            amount=amount,
         )
-        if refund.status == 'succeeded':
-            return "Full Refund successful."
-        else:
-            return "Full Refund failed."
+        return refund.status == 'succeeded'
+    except Exception as e:
+        return f"An error occurred: {str(e)}"
 
-    dispute = dispute_documents[0]  # Get the first dispute document
 
-    payment_intent_id = dispute.get("tripPaymentId")
-
-    if not payment_intent_id:
-        return "Payment ID not found in the dispute document."
-
+def refund_logic(payment_intent_id, trip_deposit, dispute_amount):
     try:
         charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
         if charge.data:
-            refund_amount = int((dispute.get("tripDepositAmount") - dispute.get("disputeAmount")) * 100)
-            refund = stripe.Refund.create(
-                charge=charge.data[0].id,
-                amount=refund_amount,
-            )
-            if refund.status == 'succeeded':
-                db.collection(collection_id).document(document_id).update({"isRefunded": True})
-                trip_end_time = datetime.strptime(trip.get("endTime"), "%Y-%m-%d %H:%M:%S")
-                now = datetime.now()
-                seventy_two_hours_ago = now - timedelta(hours=72)
-
-                if not trip.get("isRefunded") and trip_end_time <= seventy_two_hours_ago:                    # Call the refund deposit function with amount = 0
-                    refund_amount = 0
-                return "Refund successful."
-            else:
-                return "Refund failed."
+            refund_amount = int((trip_deposit - dispute_amount) * 100)
+            return process_refund(charge.data[0].id, refund_amount)
         else:
             return "Charge not found."
     except Exception as e:
         return f"An error occurred: {str(e)}"
+
+
+def handle_dispute_and_refund(trip_ref):
+    trip = get_trip_document(trip_ref)
+
+    if not trip.exists:
+        return "Trip document not found."
+
+    dispute = get_dispute_by_trip_ref(trip.reference)
+
+    if not dispute:
+        payment_intent_id = trip.get("paymentMethod")
+        return refund_logic(payment_intent_id, trip.get("tripDeposit"), 0)  # Full refund
+
+    payment_intent_id = dispute.get("tripPaymentId")
+    return refund_logic(payment_intent_id, trip.get("tripDeposit"), dispute.get("disputeAmount"))
 
 
 # Calendar stuff

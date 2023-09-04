@@ -8,7 +8,7 @@ load_dotenv()
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
-payment_intent_id = "pi_3Nk791DzTJHYWfEw02mD0ylu"
+payment_intent_id = "'pi_3NjuEBDzTJHYWfEw15tkFZkh'"
 
 charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
 
@@ -18,9 +18,9 @@ debug(charge)
 #   "ch_3Nk791DzTJHYWfEw0cULikcQ",
 # )
 
-stripe.Refund.create(
-    charge=charge.id,
-    amount=1000,
-)
+# stripe.Refund.create(
+#     charge=charge.id,
+#     amount=1000,
+# )
 
 debug(charge)
