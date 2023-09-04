@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import firebase_admin
 import requests
@@ -55,6 +55,13 @@ def get_dispute_from_firebase(trip_ref):
                 amount=refund_amount,
             )
             if refund.status == 'succeeded':
+                db.collection(collection_id).document(document_id).update({"isRefunded": True})
+                trip_end_time = datetime.strptime(trip.get("endTime"), "%Y-%m-%d %H:%M:%S")
+                now = datetime.now()
+                seventy_two_hours_ago = now - timedelta(hours=72)
+
+                if not trip.get("isRefunded") and trip_end_time <= seventy_two_hours_ago:                    # Call the refund deposit function with amount = 0
+                    refund_amount = 0
                 return "Refund successful."
             else:
                 return "Refund failed."
