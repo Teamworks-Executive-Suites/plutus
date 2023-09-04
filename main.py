@@ -58,7 +58,7 @@ async def get_token(
 
 @app.post("/refund_deposit")
 def refund(data: Dispute, token: str = Depends(get_token)):
-    return get_dispute_from_firebase(data.trip_ref)
+    return handle_dispute_and_refund(data.trip_ref)
 
 
 # Calendar Generation
