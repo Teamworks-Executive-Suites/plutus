@@ -26,7 +26,6 @@ def startup_event():
     import threading
     threading.Thread(target=run_schedule).start()
 
-
 # Auth
 generate_bearer_token()
 # gets the bearer token from the file for verification

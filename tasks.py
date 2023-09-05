@@ -77,7 +77,6 @@ def handle_dispute_and_refund(trip_ref):
 
 
 # Calendar stuff
-
 def create_cal_for_property(propertyRef):
     debug("create_cal_for_property")
 
@@ -94,7 +93,6 @@ def create_cal_for_property(propertyRef):
 
     # check if trip has been completed
     current_time = datetime.now(tz)
-
     cal = Calendar()
     for trip in property_trips:
         user_ref = trip.get("userRef").id
