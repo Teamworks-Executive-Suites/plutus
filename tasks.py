@@ -75,6 +75,25 @@ def handle_dispute_and_refund(trip_ref):
     payment_intent_id = dispute.get("tripPaymentId")
     return refund_logic(payment_intent_id, trip.get("tripDeposit"), dispute.get("disputeAmount"))
 
+def auto_complete_and_refund(trip_ref):
+    trip = get_trip_document(trip_ref)
+
+    if not trip.exists:
+        return "Trip document not found."
+
+    current_time = datetime.now(tz)
+
+    if not trip.get("isComplete") and not trip.get("isRefunded") and (current_time > trip.get("tripEndDateTime")):
+        payment_intent_id = trip.get("paymentMethod")
+        refund_amount = 0  # Full refund
+        if refund_logic(payment_intent_id, refund_amount):
+            trip.reference.update({"isRefunded": True})  # Update isRefunded to True
+            trip.reference.update({"isComplete": True})  # Update isComplete to True
+            return "Auto-completion and full refund processed."
+        else:
+            return "Failed to process auto-completion and refund."
+
+    return "Trip is already complete or refunded."
 
 # Calendar stuff
 
