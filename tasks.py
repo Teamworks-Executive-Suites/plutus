@@ -1,6 +1,6 @@
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import firebase_admin
 import requests
@@ -15,7 +15,6 @@ from ics import Calendar, Event
 load_dotenv()
 tz = timezone.utc
 
-# Initialize Firebase
 cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
 
 app = firebase_admin.initialize_app(cred)
@@ -70,30 +69,50 @@ def handle_dispute_and_refund(trip_ref):
 
     if not dispute:
         payment_intent_id = trip.get("paymentMethod")
-        return refund_logic(payment_intent_id, trip.get("tripDeposit"), 0)  # Full refund
+        refund = refund_logic(payment_intent_id, trip.get("tripDeposit"), 0)  # Full refund
+        trip.reference.update({"isRefunded": True})
+        return refund
 
     payment_intent_id = dispute.get("tripPaymentId")
-    return refund_logic(payment_intent_id, trip.get("tripDeposit"), dispute.get("disputeAmount"))
+    refund = refund_logic(payment_intent_id, trip.get("tripDeposit"), dispute.get("disputeAmount"))
+    trip.reference.update({"isRefunded": True})
+    return refund
 
-def auto_complete_and_refund(trip_ref):
-    trip = get_trip_document(trip_ref)
 
-    if not trip.exists:
-        return "Trip document not found."
+def auto_complete():
+    '''
+    function called every hour,
+    checks if trip is complete and not refunded and if it is 72 hours after the trip end date
+    it refunds the full deposit and sets isComplete and isRefunded to true
 
-    current_time = datetime.now(tz)
+    :param trip_ref: The trip reference to check.
+    :return: True if the trip was auto-completed and refunded, otherwise False.
+    '''
 
-    if not trip.get("isComplete") and not trip.get("isRefunded") and (current_time > trip.get("tripEndDateTime")):
-        payment_intent_id = trip.get("paymentMethod")
-        refund_amount = 0  # Full refund
-        if refund_logic(payment_intent_id, refund_amount):
-            trip.reference.update({"isRefunded": True})  # Update isRefunded to True
-            trip.reference.update({"isComplete": True})  # Update isComplete to True
-            return "Auto-completion and full refund processed."
-        else:
-            return "Failed to process auto-completion and refund."
+    # for every property
+    for property in properties:
+    #  for every trip in property
+        for trip in trips:
+            trip_doc = get_trip_document(trip_ref)
 
-    return "Trip is already complete or refunded."
+            if not trip.exists:
+                return "Trip document not found."
+
+            current_time = datetime.now(tz)
+            auto_complete_time = current_time + timedelta(hours=72)
+
+            # if booking is not complete and not refunded and it is 72 hours after the booking refund deposit and set isComplete and isRefunded to true
+
+            if not trip.get("isComplete") and not trip.get("isRefunded") and (auto_complete_time > trip.get("tripEndDateTime")):
+
+                # now refund the full deposit
+                try:
+                    handle_dispute_and_refund(trip_doc)
+                    trip.reference.update({"isComplete": True})
+                except:
+                    return "Failed to process auto-completion and refund."
+
+
 
 # Calendar stuff
 
@@ -129,7 +148,6 @@ def create_cal_for_property(propertyRef):
             trip.reference.update({"isComplete": True})
 
         cal.events.add(cal_event)
-
 
     # Create an .ics file
     ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'

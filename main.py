@@ -17,7 +17,7 @@ app = FastAPI()
 @app.on_event("startup")
 def startup_event():
     schedule.every().hour.do(update_calendars)
-    schedule.every().hour.do(auto_complete_and_refund)
+    schedule.every().hour.do(auto_complete)
 
     def run_schedule():
         while True:
