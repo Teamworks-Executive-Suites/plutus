@@ -17,6 +17,7 @@ app = FastAPI()
 @app.on_event("startup")
 def startup_event():
     schedule.every().hour.do(update_calendars)
+    schedule.every().hour.do(auto_complete)
 
     def run_schedule():
         while True:
@@ -25,7 +26,6 @@ def startup_event():
 
     import threading
     threading.Thread(target=run_schedule).start()
-
 
 # Auth
 generate_bearer_token()
