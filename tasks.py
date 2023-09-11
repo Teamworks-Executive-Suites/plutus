@@ -90,11 +90,12 @@ def auto_complete():
     '''
 
     # for every property
-    for property in properties:
-    #  for every trip in property
-        for trip in trips:
-            trip_doc = get_trip_document(trip_ref)
+    properties_ref = db.collection("properties")
+    for property in properties_ref:
+        #  for every trip in property
+        trips_ref = db.collection("trips").where(filter=FieldFilter("propertyRef", "==", property.reference))
 
+        for trip in trips_ref:
             if not trip.exists:
                 return "Trip document not found."
 
@@ -103,15 +104,46 @@ def auto_complete():
 
             # if booking is not complete and not refunded and it is 72 hours after the booking refund deposit and set isComplete and isRefunded to true
 
-            if not trip.get("isComplete") and not trip.get("isRefunded") and (auto_complete_time > trip.get("tripEndDateTime")):
+            if not trip.get("isComplete") and not trip.get("isRefunded") and (
+                    auto_complete_time > trip.get("tripEndDateTime")):
 
                 # now refund the full deposit
                 try:
-                    handle_dispute_and_refund(trip_doc)
+                    handle_dispute_and_refund(trip.reference)
                     trip.reference.update({"isComplete": True})
                 except:
                     return "Failed to process auto-completion and refund."
 
+
+def process_cancel_refund(trip_ref):
+    trip = get_trip_document(trip_ref)
+
+    if not trip.exists:
+        return "Trip document not found."
+
+    current_time = datetime.now(tz)
+    trip_begin_time = trip.get("tripBeginDateTime")
+
+    time_difference = trip_begin_time - current_time
+    refund_amount = 0
+
+    payment_intent_id = trip.get("paymentMethod")
+    charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
+    if charge.data:
+        original_amount = charge.data[0].amount
+
+        if time_difference >= timedelta(days=7):
+            refund_amount = original_amount  # full refund
+        elif timedelta(hours=48) <= time_difference < timedelta(days=7):
+            refund_amount = original_amount // 2  # half refund
+        # If time_difference is less than 48 hours, refund_amount remains 0
+
+        if refund_amount:
+            return process_refund(charge.data[0].id, refund_amount)
+        else:
+            return "Refund not applicable due to close proximity to trip start time."
+
+    return "No charge found for this trip."
 
 
 # Calendar stuff
