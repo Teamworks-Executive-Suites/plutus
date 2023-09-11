@@ -61,6 +61,10 @@ def refund(data: Dispute, token: str = Depends(get_token)):
     return handle_dispute_and_refund(data.trip_ref)
 
 
+@app.post("/cancel_refund")
+def cancel_refund(data: Dispute, token: str = Depends(get_token)):
+    return process_cancel_refund(data.trip_ref)
+
 # Calendar Generation
 @app.get('/get_property_cal')
 def get_property_cal(property_ref: str, token: str = Depends(get_token)):
