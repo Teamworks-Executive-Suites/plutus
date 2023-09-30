@@ -1,3 +1,4 @@
+import threading
 import time
 import typing as t
 
@@ -14,8 +15,14 @@ from tasks import *
 
 app = FastAPI()
 
+
 @app.on_event("startup")
 def startup_event():
+    # Retrieve master token from environment variable and add it to known_tokens
+    master_token = os.getenv("MASTER_TOKEN")
+    if master_token:
+        known_tokens.add(master_token)
+
     schedule.every().hour.do(update_calendars)
     schedule.every().hour.do(auto_complete)
 
@@ -24,8 +31,8 @@ def startup_event():
             schedule.run_pending()
             time.sleep(3600)
 
-    import threading
     threading.Thread(target=run_schedule).start()
+
 
 # Auth
 generate_bearer_token()
@@ -47,23 +54,29 @@ async def get_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=UnauthorizedMessage().detail,
+            # Assuming UnauthorizedMessage is defined somewhere in your actual code
         )
     return token
-
-
 
 
 # Endpoints
 # Stripe
 
-@app.post("/refund_deposit")
-def refund(data: Dispute, token: str = Depends(get_token)):
-    return handle_dispute_and_refund(data.trip_ref)
+
+@app.post("/extra_charge")
+def extra_charge(data: Trip, token: str = Depends(get_token)):
+    return process_extra_charge(data.trip_ref)
+
+
+@app.post("/refund")
+def refund(data: Refund, token: str = Depends(get_token)):
+    return handle_refund(data.trip_ref, data.amount)
 
 
 @app.post("/cancel_refund")
-def cancel_refund(data: Dispute, token: str = Depends(get_token)):
+def cancel_refund(data: Trip, token: str = Depends(get_token)):
     return process_cancel_refund(data.trip_ref)
+
 
 # Calendar Generation
 @app.get('/get_property_cal')

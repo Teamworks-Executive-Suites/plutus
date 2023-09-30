@@ -5,8 +5,13 @@ class Name(BaseModel):
     name: str
 
 
-class Dispute(BaseModel):
+class Trip(BaseModel):
     trip_ref: str
+
+
+class Refund(BaseModel):
+    trip_ref: str
+    amount: int
 
 
 class PropertyCal(BaseModel):
