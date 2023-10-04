@@ -73,16 +73,18 @@ def handle_refund(trip_ref, amount):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
-        return "Trip document not found."
+        return {"status": 404, "message": "Trip document not found."}
 
     payment_intent_ids = trip.get("stripePaymentIntents")
     if not payment_intent_ids:
-        return "No payment intents found on trip."
+        return {"status": 404, "message": "No payment intents found on trip."}
 
+    total_refunded = 0
+    refund_details = []
     remaining_refund = amount
     for payment_intent_id in payment_intent_ids:
         if remaining_refund <= 0:
-            break  # Exit the loop if the refund amount has been fulfilled
+            break
 
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
         for charge in charges.auto_paging_iter():
@@ -92,7 +94,6 @@ def handle_refund(trip_ref, amount):
             already_refunded = charge.amount_refunded
             refundable_amount = charge.amount - already_refunded
 
-            # If there's nothing to refund in this charge, continue to the next one
             if refundable_amount <= 0:
                 continue
 
@@ -101,15 +102,25 @@ def handle_refund(trip_ref, amount):
 
             debug(refund_result)  # This is for debugging purposes, adjust as needed
 
+            refund_details.append({
+                "refunded_amount": refund_amount,
+                "charge_id": charge.id,
+                "payment_intent_id": payment_intent_id
+            })
+            total_refunded += refund_amount
             remaining_refund -= refund_amount
 
-    if remaining_refund > 0:
-        return f"Refund incomplete. Unable to refund {remaining_refund} out of requested {amount}."
-    else:
-        return "Refund processed successfully."
+    response = {
+        "status": 200 if remaining_refund == 0 else 206,
+        "message": "Refund processed successfully." if remaining_refund == 0 else f"Partial refund processed. Unable to refund {remaining_refund} out of requested {amount}.",
+        "total_refunded": total_refunded,
+        "refund_details": refund_details
+    }
+
+    return response
 
 
-def process_extra_charge(trip_ref):  # test with the payment intents having no edit (setup_future_usage)
+def process_extra_charge(trip_ref):
     """
     Process an extra charge for a given trip in the case of a dispute.
 
@@ -120,17 +131,24 @@ def process_extra_charge(trip_ref):  # test with the payment intents having no e
     - A dictionary containing the result of the extra charge process or an error message.
     """
 
+    # Initiate a response dictionary
+    response = {"status": None, "message": None, "details": {}}
+
     # Retrieve the trip document
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
-        return {"error": "Trip document not found."}
+        response["status"] = 404
+        response["message"] = "Trip document not found."
+        return response
 
     # Retrieve the dispute associated with the trip
     dispute = get_dispute_by_trip_ref(trip_ref)
 
     if not dispute:
-        return {"error": "No dispute found for this trip."}
+        response["status"] = 404
+        response["message"] = "No dispute found for this trip."
+        return response
 
     # Avoid code duplication by retrieving PaymentIntent once
     first_payment_intent = stripe.PaymentIntent.retrieve(trip.get("stripePaymentIntents")[0])
@@ -148,60 +166,90 @@ def process_extra_charge(trip_ref):  # test with the payment intents having no e
             off_session=True,
             confirm=True,
         )
-        return {"success": extra_charge_pi}
+
+        # Update response for successful extra charge
+        response["status"] = 200
+        response["message"] = "Extra charge processed successfully."
+        response["details"]["payment_intent"] = extra_charge_pi
+
+        return response
     except stripe.error.CardError as e:
         err = e.error
-        # Consider logging the error instead of printing
-        print("Code is: %s" % err.code)
-        return {"error": f"Failed to process extra charge due to a card error: {err.code}"}
+        response["status"] = 400
+        response["message"] = "Failed to process extra charge due to a card error."
+        response["details"]["error_code"] = err.code
+        response["details"]["error_message"] = str(e)
+
+        return response
     except Exception as e:
-        # Catch any other exceptions
-        print(f"An unexpected error occurred: {e}")
-        return {"error": "An unexpected error occurred while processing the extra charge."}
+        response["status"] = 500
+        response["message"] = "An unexpected error occurred while processing the extra charge."
+        response["details"]["error_message"] = str(e)
+
+        return response
 
 
 def process_cancel_refund(trip_ref):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
-        return "Trip document not found."
+        return {"status": 404, "message": "Trip document not found."}
 
-    current_time = datetime.now(tz)
+    current_time = datetime.now(timezone.utc)  # Make sure to use the appropriate timezone
     trip_begin_time = trip.get("tripBeginDateTime")
 
     time_difference = trip_begin_time - current_time
-    refund_amount = 0
 
-    payment_intent_ids = trip.get("setupPaymentIntents")  # Changed to get all payment intent IDs
+    payment_intent_ids = trip.get("stripePaymentIntents")
     if not payment_intent_ids:
-        return "no payment intents found on trip"
+        return {"status": 404, "message": "No payment intents found on trip."}
 
-    refund_results = []
+    total_refunded = 0
+    refund_details = []
     for payment_intent_id in payment_intent_ids:
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
         for charge in charges.auto_paging_iter():
-            if charge.status != 'succeeded':  # Check if the charge is successful
-                continue  # Skip to the next iteration if the charge is not successful
+            if charge.status != 'succeeded':
+                continue
 
-            original_amount = charge.amount
-            already_refunded = charge.amount_refunded  # Get the already refunded amount
-
-            refundable_amount = original_amount - already_refunded  # Calculate refundable amount
+            already_refunded = charge.amount_refunded
+            refundable_amount = charge.amount - already_refunded
 
             if time_difference >= timedelta(days=7):
                 refund_amount = refundable_amount
+                refund_reason = "7 or more days before trip"
             elif timedelta(hours=48) <= time_difference < timedelta(days=7):
                 refund_amount = refundable_amount // 2
+                refund_reason = "Between 48 hours and 7 days before trip"
             else:
                 refund_amount = 0
+                refund_reason = "Less than 48 hours before trip"
 
             if refund_amount > 0:
-                refund_result = process_refund(charge.id, refund_amount)
-                refund_results.append(refund_result)
+                process_refund(charge.id, refund_amount)
+                refund_details.append({
+                    "refunded_amount": refund_amount,
+                    "reason": refund_reason,
+                    "charge_id": charge.id,
+                    "payment_intent_id": payment_intent_id
+                })
+                total_refunded += refund_amount
             else:
-                refund_results.append("Refund not applicable due to close proximity to trip start time.")
+                refund_details.append({
+                    "refunded_amount": 0,
+                    "reason": refund_reason,
+                    "charge_id": charge.id,
+                    "payment_intent_id": payment_intent_id
+                })
 
-    return refund_results
+    response = {
+        "status": 200,
+        "message": "Refund processed.",
+        "total_refunded": total_refunded,
+        "refund_details": refund_details
+    }
+
+    return response
 
 
 # Calendar stuff
