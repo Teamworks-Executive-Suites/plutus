@@ -63,24 +63,6 @@ def process_refund(charge_id, amount):
         return f"An error occurred: {str(e)}"
 
 
-def refund_logic(payment_intent_id, amount):
-    """
-    Refund a given amount for a given payment intent.
-    :param payment_intent_id:
-    :param amount:
-    :return:
-    """
-    try:
-        charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
-        if charge.data:
-            refund_amount = int(amount * 100)
-            return process_refund(charge.data[0].id, refund_amount)
-        else:
-            return "Charge not found."
-    except Exception as e:
-        return f"An error occurred: {str(e)}"
-
-
 def handle_refund(trip_ref, amount):
     """
     Handle a refund for a given trip.
@@ -93,10 +75,38 @@ def handle_refund(trip_ref, amount):
     if not trip.exists:
         return "Trip document not found."
 
-    debug(trip)
-    payment_intent_id = trip.get("stripePaymentIntents")[0]
-    refund = refund_logic(payment_intent_id, amount)
-    return refund
+    payment_intent_ids = trip.get("stripePaymentIntents")
+    if not payment_intent_ids:
+        return "No payment intents found on trip."
+
+    remaining_refund = amount
+    for payment_intent_id in payment_intent_ids:
+        if remaining_refund <= 0:
+            break  # Exit the loop if the refund amount has been fulfilled
+
+        charges = stripe.Charge.list(payment_intent=payment_intent_id)
+        for charge in charges.auto_paging_iter():
+            if charge.status != 'succeeded' or remaining_refund <= 0:
+                continue
+
+            already_refunded = charge.amount_refunded
+            refundable_amount = charge.amount - already_refunded
+
+            # If there's nothing to refund in this charge, continue to the next one
+            if refundable_amount <= 0:
+                continue
+
+            refund_amount = min(remaining_refund, refundable_amount)
+            refund_result = process_refund(charge.id, refund_amount)
+
+            debug(refund_result)  # This is for debugging purposes, adjust as needed
+
+            remaining_refund -= refund_amount
+
+    if remaining_refund > 0:
+        return f"Refund incomplete. Unable to refund {remaining_refund} out of requested {amount}."
+    else:
+        return "Refund processed successfully."
 
 
 def process_extra_charge(trip_ref):  # test with the payment intents having no edit (setup_future_usage)
@@ -168,23 +178,28 @@ def process_cancel_refund(trip_ref):
 
     refund_results = []
     for payment_intent_id in payment_intent_ids:
-        charge = stripe.Charge.list(payment_intent=payment_intent_id, limit=1)
-        if charge.data:
-            original_amount = charge.data[0].amount
+        charges = stripe.Charge.list(payment_intent=payment_intent_id)
+        for charge in charges.auto_paging_iter():
+            if charge.status != 'succeeded':  # Check if the charge is successful
+                continue  # Skip to the next iteration if the charge is not successful
+
+            original_amount = charge.amount
+            already_refunded = charge.amount_refunded  # Get the already refunded amount
+
+            refundable_amount = original_amount - already_refunded  # Calculate refundable amount
 
             if time_difference >= timedelta(days=7):
-                refund_amount = original_amount  # full refund
+                refund_amount = refundable_amount
             elif timedelta(hours=48) <= time_difference < timedelta(days=7):
-                refund_amount = original_amount // 2  # half refund
-            # If time_difference is less than 48 hours, refund_amount remains 0
+                refund_amount = refundable_amount // 2
+            else:
+                refund_amount = 0
 
-            if refund_amount:
-                refund_result = process_refund(charge.data[0].id, refund_amount)
+            if refund_amount > 0:
+                refund_result = process_refund(charge.id, refund_amount)
                 refund_results.append(refund_result)
             else:
                 refund_results.append("Refund not applicable due to close proximity to trip start time.")
-        else:
-            refund_results.append("No charge found for this payment intent.")
 
     return refund_results
 

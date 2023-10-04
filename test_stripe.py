@@ -28,23 +28,26 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 #   type="card",
 # )
 
+#
+# try:
+#     stripe.PaymentIntent.create(
+#         amount=1099,
+#         currency='usd',
+#         # In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
+#         automatic_payment_methods={"enabled": True},
+#         customer='cus_OK8AP9RpPEMrsM', # need to get from payment intent
+#         payment_method='pm_1NotP1DzTJHYWfEwXlBaphWv', # need to get from payment intent
+#         # return_url='https://example.com/order/123/complete',
+#         off_session=True,
+#         confirm=True,
+#     )
+# except stripe.error.CardError as e:
+#     err = e.error
+#     # Error code will be authentication_required if authentication is needed
+#     print("Code is: %s" % err.code)
+#     payment_intent_id = err.payment_intent['id']
+#     payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
+#
 
-try:
-    stripe.PaymentIntent.create(
-        amount=1099,
-        currency='usd',
-        # In the latest version of the API, specifying the `automatic_payment_methods` parameter is optional because Stripe enables its functionality by default.
-        automatic_payment_methods={"enabled": True},
-        customer='cus_OK8AP9RpPEMrsM', # need to get from payment intent
-        payment_method='pm_1NotP1DzTJHYWfEwXlBaphWv', # need to get from payment intent
-        # return_url='https://example.com/order/123/complete',
-        off_session=True,
-        confirm=True,
-    )
-except stripe.error.CardError as e:
-    err = e.error
-    # Error code will be authentication_required if authentication is needed
-    print("Code is: %s" % err.code)
-    payment_intent_id = err.payment_intent['id']
-    payment_intent = stripe.PaymentIntent.retrieve(payment_intent_id)
-
+payment_intent = stripe.PaymentIntent.retrieve("pi_3NxHl8DzTJHYWfEw1auGrNXH")
+debug(payment_intent)
