@@ -15,6 +15,8 @@ from ics import Calendar, Event
 load_dotenv()
 tz = timezone.utc
 
+current_time = datetime.now(timezone.utc)
+
 cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
 
 app = firebase_admin.initialize_app(cred)
@@ -167,6 +169,14 @@ def process_extra_charge(trip_ref):
             confirm=True,
         )
 
+        # Update dispute with the new PaymentIntent ID
+        dispute.reference.update({"paymentIntent": extra_charge_pi.id})
+
+        # Update the trip with the new PaymentIntent ID
+        current_payment_intents = trip.get("stripePaymentIntents")
+        current_payment_intents.append(extra_charge_pi.id)
+        trip.reference.update({"stripePaymentIntents": current_payment_intents})
+
         # Update response for successful extra charge
         response["status"] = 200
         response["message"] = "Extra charge processed successfully."
@@ -189,13 +199,13 @@ def process_extra_charge(trip_ref):
         return response
 
 
+
 def process_cancel_refund(trip_ref):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
         return {"status": 404, "message": "Trip document not found."}
 
-    current_time = datetime.now(timezone.utc)  # Make sure to use the appropriate timezone
     trip_begin_time = trip.get("tripBeginDateTime")
 
     time_difference = trip_begin_time - current_time
@@ -257,8 +267,6 @@ def process_cancel_refund(trip_ref):
 def create_cal_for_property(propertyRef):
     debug("create_cal_for_property")
 
-    debug(propertyRef)
-
     collection_id, document_id = propertyRef.split('/')
     trips_ref = db.collection("trips")
     property_ref = db.collection('properties').document(document_id).get()
@@ -268,28 +276,35 @@ def create_cal_for_property(propertyRef):
                       .stream()
                       )
 
-    # check if trip has been completed
-    current_time = datetime.now(tz)
-
-    cal = Calendar()
-    for trip in property_trips:
-        user_ref = trip.get("userRef").id
-        user = db.collection("users").document(user_ref).get()
-        debug(f'{user.get("email")} | {property_ref.get("propertyName")}')
-
-        cal_event = Event()
-        cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
-        cal_event.begin = trip.get("tripBeginDateTime")
-        cal_event.end = trip.get("tripEndDateTime")
-
-        if current_time > trip.get("tripEndDateTime"):
-            trip.reference.update({"isComplete": True})
-
-        cal.events.add(cal_event)
-
-    # Create an .ics file
     ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'
-    with open(ics_file_path, "w") as ics_file:
+
+    # If calendar file exists, load it, else create a new calendar
+    if os.path.exists(ics_file_path):
+        with open(ics_file_path, 'r') as ics_file:
+            cal = Calendar(ics_file.read())
+    else:
+        cal = Calendar()
+
+
+    for trip in property_trips:
+        trip_begin_datetime = trip.get("tripBeginDateTime")
+
+        # Check if the trip is in the future
+        if trip_begin_datetime > current_time:
+            user_ref = trip.get("userRef").id
+            user = db.collection("users").document(user_ref).get()
+            debug(f'{user.get("email")} | {property_ref.get("propertyName")}')
+
+            cal_event = Event()
+            cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
+            cal_event.begin = trip_begin_datetime
+            cal_event.end = trip.get("tripEndDateTime")
+
+            # Adding event to the calendar
+            cal.events.add(cal_event)
+
+    # Writing the updated calendar back to the file
+    with open(ics_file_path, 'w') as ics_file:
         ics_file.writelines(cal)
 
     return ics_file_path
@@ -316,23 +331,25 @@ def create_trips_from_ics(property_ref, ics_link):
 
         # convert ical datetime to firestore datetime
         eventstart = event.get('DTSTART').dt
-        eventend = event.get('DTEND').dt
 
-        trip_begin_datetime = datetime(eventstart.year, eventstart.month, eventstart.day, tzinfo=tz)
-        trip_end_datetime = datetime(eventend.year, eventend.month, eventend.day, tzinfo=tz)
+        # Check if the event is in the future
+        if eventstart > current_time:
+            eventend = event.get('DTEND').dt
 
-        trip_data = {
-            "isExternal": True,
-            "propertyRef": property_ref.reference,
-            "tripBeginDateTime": trip_begin_datetime,
-            "tripEndDateTime": trip_end_datetime,
-        }
-        trips_ref.add(trip_data)
+            trip_begin_datetime = datetime(eventstart.year, eventstart.month, eventstart.day, tzinfo=tz)
+            trip_end_datetime = datetime(eventend.year, eventend.month, eventend.day, tzinfo=tz)
+
+            trip_data = {
+                "isExternal": True,
+                "propertyRef": property_ref.reference,
+                "tripBeginDateTime": trip_begin_datetime,
+                "tripEndDateTime": trip_end_datetime,
+            }
+            trips_ref.add(trip_data)
 
     return True
 
 
-debug("Starting Calendar Sync")
 
 
 def update_calendars():
@@ -368,18 +385,19 @@ def auto_complete():
     :param trip_ref: The trip reference to check.
     '''
 
+    debug('Running Auto Complete')
     # for every property
-    properties_ref = db.collection("properties")
-    for property in properties_ref:
+    properties_ref = db.collection("properties").stream()
+    for prop in properties_ref:
         #  for every trip in property
-        trips_ref = db.collection("trips").where(filter=FieldFilter("propertyRef", "==", property.reference))
+        trips = db.collection("trips").where(filter=FieldFilter("propertyRef", "==", prop.reference)).stream()
+        for trip in trips:
 
-        for trip in trips_ref:
             if not trip.exists:
                 return "Trip document not found."
 
-            current_time = datetime.now(tz)
             auto_complete_time = current_time + timedelta(hours=72)
 
             if not trip.get("isComplete") and (auto_complete_time > trip.get("tripEndDateTime")):
                 trip.reference.update({"isComplete": True})
+                debug(f'Trip {trip.reference.path} marked as complete')

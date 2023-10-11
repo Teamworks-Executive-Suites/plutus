@@ -2,7 +2,7 @@ import threading
 import time
 import typing as t
 
-import schedule
+from apscheduler.schedulers.background import BackgroundScheduler
 from devtools import debug
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
@@ -17,22 +17,24 @@ app = FastAPI()
 
 
 @app.on_event("startup")
-def startup_event():
+async def startup_event():
     # Retrieve master token from environment variable and add it to known_tokens
+
+    debug('startup')
+
     master_token = os.getenv("MASTER_TOKEN")
     if master_token:
         known_tokens.add(master_token)
 
-    schedule.every().hour.do(update_calendars)
-    schedule.every().hour.do(auto_complete)
+    # Run the tasks immediately on startup
+    update_calendars()
+    auto_complete()
 
-    def run_schedule():
-        while True:
-            schedule.run_pending()
-            time.sleep(3600)
-
-    threading.Thread(target=run_schedule).start()
-
+    # Schedule the tasks to run every hour
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(update_calendars, 'interval', hours=1)
+    scheduler.add_job(auto_complete, 'interval', hours=1)
+    scheduler.start()
 
 # Auth
 generate_bearer_token()
