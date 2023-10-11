@@ -1,5 +1,6 @@
 annotated-types==0.5.0
 anyio==3.7.1
+APScheduler==3.10.4
 arrow==1.2.3
 asttokens==2.2.1
 attrs==23.1.0
@@ -9,7 +10,7 @@ certifi==2023.7.22
 cffi==1.15.1
 charset-normalizer==3.2.0
 click==8.1.7
-cryptography==41.0.4
+cryptography==41.0.3
 devtools==0.12.1
 executing==1.2.0
 fastapi==0.103.0
@@ -26,7 +27,6 @@ google-resumable-media==2.5.0
 googleapis-common-protos==1.60.0
 grpcio==1.57.0
 grpcio-status==1.57.0
-gunicorn==21.2.0
 h11==0.14.0
 httplib2==0.22.0
 icalendar==5.0.7
@@ -56,6 +56,7 @@ starlette==0.27.0
 stripe==6.1.0
 TatSu==5.8.3
 typing_extensions==4.7.1
+tzlocal==5.1
 uritemplate==4.1.1
-urllib3==1.26.17
+urllib3==1.26.16
 uvicorn==0.23.2
