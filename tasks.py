@@ -379,8 +379,7 @@ def update_calendars():
 def auto_complete():
     '''
     function called every hour,
-    checks if trip is complete and not refunded and if it is 72 hours after the trip end date
-    it marks the trip as complete
+    checks if trip is complete and if current time is past trip end time
 
     :param trip_ref: The trip reference to check.
     '''
@@ -396,8 +395,6 @@ def auto_complete():
             if not trip.exists:
                 return "Trip document not found."
 
-            auto_complete_time = current_time + timedelta(hours=72)
-
-            if not trip.get("isComplete") and (auto_complete_time > trip.get("tripEndDateTime")):
-                trip.reference.update({"isComplete": True})
+            if not trip.get("complete") and (current_time > trip.get("tripEndDateTime")):
+                trip.reference.update({"complete": True})
                 debug(f'Trip {trip.reference.path} marked as complete')
