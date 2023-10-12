@@ -1,16 +1,16 @@
 import json
 import os
-from datetime import datetime, timezone, timedelta
 
+import logging
 import firebase_admin
 import requests
 import stripe
-from devtools import debug
 from dotenv import load_dotenv
 from firebase_admin import firestore, credentials
 from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
+from datetime import datetime, timezone, timedelta
 
 load_dotenv()
 tz = timezone.utc
@@ -102,7 +102,7 @@ def handle_refund(trip_ref, amount):
             refund_amount = min(remaining_refund, refundable_amount)
             refund_result = process_refund(charge.id, refund_amount)
 
-            debug(refund_result)  # This is for debugging purposes, adjust as needed
+            logging.info(refund_result)  # This is for logging purposes, adjust as needed
 
             refund_details.append({
                 "refunded_amount": refund_amount,
@@ -265,7 +265,7 @@ def process_cancel_refund(trip_ref):
 # Calendar stuff
 
 def create_cal_for_property(propertyRef):
-    debug("create_cal_for_property")
+    logging.info("create_cal_for_property")
 
     collection_id, document_id = propertyRef.split('/')
     trips_ref = db.collection("trips")
@@ -293,7 +293,7 @@ def create_cal_for_property(propertyRef):
         if trip_begin_datetime > current_time:
             user_ref = trip.get("userRef").id
             user = db.collection("users").document(user_ref).get()
-            debug(f'{user.get("email")} | {property_ref.get("propertyName")}')
+            logging.info(f'{user.get("email")} | {property_ref.get("propertyName")}')
 
             cal_event = Event()
             cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
@@ -311,7 +311,7 @@ def create_cal_for_property(propertyRef):
 
 
 def create_trips_from_ics(property_ref, ics_link):
-    debug("create_trips_from_ics")
+    logging.info("create_trips_from_ics")
 
     collection_id, document_id = property_ref.split('/')
 
@@ -327,7 +327,7 @@ def create_trips_from_ics(property_ref, ics_link):
     trips_ref = db.collection("trips")
 
     for event in cal.walk('VEVENT'):
-        debug(event)
+        logging.info(event)
 
         # convert ical datetime to firestore datetime
         eventstart = event.get('DTSTART').dt
@@ -353,7 +353,7 @@ def create_trips_from_ics(property_ref, ics_link):
 
 
 def update_calendars():
-    debug("Updating Calendars")
+    logging.info("Updating Calendars")
 
     properties_ref = db.collection("properties")
     properties = properties_ref.stream()
@@ -378,23 +378,28 @@ def update_calendars():
 
 def auto_complete():
     '''
-    function called every hour,
-    checks if trip is complete and if current time is past trip end time
-
-    :param trip_ref: The trip reference to check.
+    Function called every hour, checks if trip is complete and if current
+    time is past trip end time.
     '''
+    logging.info('Running Auto Complete')
 
-    debug('Running Auto Complete')
-    # for every property
+    # Iterate through every property
     properties_ref = db.collection("properties").stream()
     for prop in properties_ref:
-        #  for every trip in property
+        # Iterate through every trip in property
         trips = db.collection("trips").where(filter=FieldFilter("propertyRef", "==", prop.reference)).stream()
+
         for trip in trips:
-
             if not trip.exists:
-                return "Trip document not found."
+                logging.error(f'Trip document not found for property {prop.id}')
+                continue  # Changed from return to continue to process the next trip
 
-            if not trip.get("complete") and (current_time > trip.get("tripEndDateTime")):
-                trip.reference.update({"complete": True})
-                debug(f'Trip {trip.reference.path} marked as complete')
+            if (not trip.get("complete") or trip.get("upcoming")) and (current_time > trip.get("tripEndDateTime")):
+                try:
+                    trip.reference.update({"complete": True, "upcoming": False})
+                    logging.info(f'Trip {trip.id} for property {prop.id} marked as complete')
+                except Exception as e:
+                    logging.error(f"Failed to update trip {trip.id} for property {prop.id}: {str(e)}")
+
+    logging.info('Auto Complete Run Completed')
+    return True  # Added a return statement for consistency

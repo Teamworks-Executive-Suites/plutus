@@ -1,9 +1,5 @@
-import threading
-import time
 import typing as t
-
 from apscheduler.schedulers.background import BackgroundScheduler
-from devtools import debug
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
@@ -20,7 +16,7 @@ app = FastAPI()
 async def startup_event():
     # Retrieve master token from environment variable and add it to known_tokens
 
-    debug('startup')
+    logging.info('startup')
 
     master_token = os.getenv("MASTER_TOKEN")
     if master_token:
@@ -95,8 +91,8 @@ def get_property_cal(property_ref: str, token: str = Depends(get_token)):
 # Sync External Calendar
 @app.post('/cal_to_property')
 def cal_to_property(data: PropertyCal, token: str = Depends(get_token)):
-    debug(data.property_ref)
-    debug(data.cal_link)
+    logging.info(data.property_ref)
+    logging.info(data.cal_link)
     # add all cal stuff
     if create_trips_from_ics(data.property_ref, data.cal_link):
         return {
