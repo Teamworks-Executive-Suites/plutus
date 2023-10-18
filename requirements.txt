@@ -58,5 +58,5 @@ TatSu==5.8.3
 typing_extensions==4.7.1
 tzlocal==5.1
 uritemplate==4.1.1
-urllib3==1.26.16
+urllib3==1.26.18
 uvicorn==0.23.2
