@@ -1,28 +1,30 @@
 import json
-import os
-
 import logging
+import os
+from datetime import datetime, timedelta, timezone
+
 import firebase_admin
 import requests
 import stripe
 from dotenv import load_dotenv
-from firebase_admin import firestore, credentials
+from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
-from datetime import datetime, timezone, timedelta
 
 load_dotenv()
 tz = timezone.utc
 
 current_time = datetime.now(timezone.utc)
 
-cred = credentials.Certificate(json.loads(os.environ.get('GOOGLE_APPLICATION_CREDENTIALS')))
+cred = credentials.Certificate(
+    json.loads(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+)
 
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 
 # Stripe stuff
@@ -32,7 +34,7 @@ def get_document_from_ref(trip_ref):
     :param trip_ref:
     :return:
     """
-    collection_id, document_id = trip_ref.split('/')
+    collection_id, document_id = trip_ref.split("/")
     trip = db.collection(collection_id).document(document_id).get()
     return trip
 
@@ -43,7 +45,11 @@ def get_dispute_by_trip_ref(trip_ref):
     :param trip_ref:
     :return:
     """
-    dispute_query = db.collection('disputes').where(filter=FieldFilter("tripRef", "==", trip_ref)).limit(1)
+    dispute_query = (
+        db.collection("disputes")
+        .where(filter=FieldFilter("tripRef", "==", trip_ref))
+        .limit(1)
+    )
     dispute_documents = list(dispute_query.stream())
     return dispute_documents[0] if dispute_documents else None
 
@@ -60,7 +66,7 @@ def process_refund(charge_id, amount):
             charge=charge_id,
             amount=amount,
         )
-        return refund.status == 'succeeded'
+        return refund.status == "succeeded"
     except Exception as e:
         return f"An error occurred: {str(e)}"
 
@@ -90,7 +96,7 @@ def handle_refund(trip_ref, amount):
 
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
         for charge in charges.auto_paging_iter():
-            if charge.status != 'succeeded' or remaining_refund <= 0:
+            if charge.status != "succeeded" or remaining_refund <= 0:
                 continue
 
             already_refunded = charge.amount_refunded
@@ -102,21 +108,27 @@ def handle_refund(trip_ref, amount):
             refund_amount = min(remaining_refund, refundable_amount)
             refund_result = process_refund(charge.id, refund_amount)
 
-            logging.info(refund_result)  # This is for logging purposes, adjust as needed
+            logging.info(
+                refund_result
+            )  # This is for logging purposes, adjust as needed
 
-            refund_details.append({
-                "refunded_amount": refund_amount,
-                "charge_id": charge.id,
-                "payment_intent_id": payment_intent_id
-            })
+            refund_details.append(
+                {
+                    "refunded_amount": refund_amount,
+                    "charge_id": charge.id,
+                    "payment_intent_id": payment_intent_id,
+                }
+            )
             total_refunded += refund_amount
             remaining_refund -= refund_amount
 
     response = {
         "status": 200 if remaining_refund == 0 else 206,
-        "message": "Refund processed successfully." if remaining_refund == 0 else f"Partial refund processed. Unable to refund {remaining_refund} out of requested {amount}.",
+        "message": "Refund processed successfully."
+        if remaining_refund == 0
+        else f"Partial refund processed. Unable to refund {remaining_refund} out of requested {amount}.",
         "total_refunded": total_refunded,
-        "refund_details": refund_details
+        "refund_details": refund_details,
     }
 
     return response
@@ -153,15 +165,19 @@ def process_extra_charge(trip_ref):
         return response
 
     # Avoid code duplication by retrieving PaymentIntent once
-    first_payment_intent = stripe.PaymentIntent.retrieve(trip.get("stripePaymentIntents")[0])
+    first_payment_intent = stripe.PaymentIntent.retrieve(
+        trip.get("stripePaymentIntents")[0]
+    )
     stripe_customer = first_payment_intent.customer
     payment_method = first_payment_intent.payment_method
 
     try:
         # Create a new PaymentIntent for the extra charge
         extra_charge_pi = stripe.PaymentIntent.create(
-            amount=int(dispute.get("disputeAmount") * 100),  # Ensure the amount is an integer
-            currency='usd',
+            amount=int(
+                dispute.get("disputeAmount") * 100
+            ),  # Ensure the amount is an integer
+            currency="usd",
             automatic_payment_methods={"enabled": True},
             customer=stripe_customer,
             payment_method=payment_method,
@@ -193,11 +209,12 @@ def process_extra_charge(trip_ref):
         return response
     except Exception as e:
         response["status"] = 500
-        response["message"] = "An unexpected error occurred while processing the extra charge."
+        response[
+            "message"
+        ] = "An unexpected error occurred while processing the extra charge."
         response["details"]["error_message"] = str(e)
 
         return response
-
 
 
 def process_cancel_refund(trip_ref):
@@ -226,7 +243,7 @@ def process_cancel_refund(trip_ref):
     for payment_intent_id in payment_intent_ids:
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
         for charge in charges.auto_paging_iter():
-            if charge.status != 'succeeded':
+            if charge.status != "succeeded":
                 continue
 
             already_refunded = charge.amount_refunded
@@ -255,26 +272,30 @@ def process_cancel_refund(trip_ref):
 
             if refund_amount > 0:
                 process_refund(charge.id, refund_amount)
-                refund_details.append({
-                    "refunded_amount": refund_amount,
-                    "reason": refund_reason,
-                    "charge_id": charge.id,
-                    "payment_intent_id": payment_intent_id
-                })
+                refund_details.append(
+                    {
+                        "refunded_amount": refund_amount,
+                        "reason": refund_reason,
+                        "charge_id": charge.id,
+                        "payment_intent_id": payment_intent_id,
+                    }
+                )
                 total_refunded += refund_amount
             else:
-                refund_details.append({
-                    "refunded_amount": 0,
-                    "reason": refund_reason,
-                    "charge_id": charge.id,
-                    "payment_intent_id": payment_intent_id
-                })
+                refund_details.append(
+                    {
+                        "refunded_amount": 0,
+                        "reason": refund_reason,
+                        "charge_id": charge.id,
+                        "payment_intent_id": payment_intent_id,
+                    }
+                )
 
     response = {
         "status": 200,
         "message": "Refund processed.",
         "total_refunded": total_refunded,
-        "refund_details": refund_details
+        "refund_details": refund_details,
     }
 
     return response
@@ -282,27 +303,27 @@ def process_cancel_refund(trip_ref):
 
 # Calendar stuff
 
+
 def create_cal_for_property(propertyRef):
     logging.info("create_cal_for_property")
 
-    collection_id, document_id = propertyRef.split('/')
+    collection_id, document_id = propertyRef.split("/")
     trips_ref = db.collection("trips")
-    property_ref = db.collection('properties').document(document_id).get()
-    property_trips = (trips_ref
-                      .where(filter=FieldFilter("propertyRef", "==", property_ref.reference))
-                      .where(filter=FieldFilter("isExternal", "==", False))
-                      .stream()
-                      )
+    property_ref = db.collection("properties").document(document_id).get()
+    property_trips = (
+        trips_ref.where(filter=FieldFilter("propertyRef", "==", property_ref.reference))
+        .where(filter=FieldFilter("isExternal", "==", False))
+        .stream()
+    )
 
     ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'
 
     # If calendar file exists, load it, else create a new calendar
     if os.path.exists(ics_file_path):
-        with open(ics_file_path, 'r') as ics_file:
+        with open(ics_file_path, "r") as ics_file:
             cal = Calendar(ics_file.read())
     else:
         cal = Calendar()
-
 
     for trip in property_trips:
         trip_begin_datetime = trip.get("tripBeginDateTime")
@@ -322,7 +343,7 @@ def create_cal_for_property(propertyRef):
             cal.events.add(cal_event)
 
     # Writing the updated calendar back to the file
-    with open(ics_file_path, 'w') as ics_file:
+    with open(ics_file_path, "w") as ics_file:
         ics_file.writelines(cal)
 
     return ics_file_path
@@ -331,7 +352,7 @@ def create_cal_for_property(propertyRef):
 def create_trips_from_ics(property_ref, ics_link):
     logging.info("create_trips_from_ics")
 
-    collection_id, document_id = property_ref.split('/')
+    collection_id, document_id = property_ref.split("/")
 
     property_ref = db.collection(collection_id).document(document_id).get()
 
@@ -344,18 +365,22 @@ def create_trips_from_ics(property_ref, ics_link):
     cal = iCalCalendar.from_ical(ics_data)
     trips_ref = db.collection("trips")
 
-    for event in cal.walk('VEVENT'):
+    for event in cal.walk("VEVENT"):
         logging.info(event)
 
         # convert ical datetime to firestore datetime
-        eventstart = event.get('DTSTART').dt
+        eventstart = event.get("DTSTART").dt
 
         # Check if the event is in the future
         if eventstart > current_time:
-            eventend = event.get('DTEND').dt
+            eventend = event.get("DTEND").dt
 
-            trip_begin_datetime = datetime(eventstart.year, eventstart.month, eventstart.day, tzinfo=tz)
-            trip_end_datetime = datetime(eventend.year, eventend.month, eventend.day, tzinfo=tz)
+            trip_begin_datetime = datetime(
+                eventstart.year, eventstart.month, eventstart.day, tzinfo=tz
+            )
+            trip_end_datetime = datetime(
+                eventend.year, eventend.month, eventend.day, tzinfo=tz
+            )
 
             trip_data = {
                 "isExternal": True,
@@ -368,8 +393,6 @@ def create_trips_from_ics(property_ref, ics_link):
     return True
 
 
-
-
 def update_calendars():
     logging.info("Updating Calendars")
 
@@ -377,7 +400,6 @@ def update_calendars():
     properties = properties_ref.stream()
 
     for prop in properties:
-
         # Sync External Calendars
         try:
             external_calendar_data = prop.get("externalCalendar")
@@ -394,30 +416,41 @@ def update_calendars():
 
 # Server Functions
 
+
 def auto_complete():
-    '''
+    """
     Function called every hour, checks if trip is complete and if current
     time is past trip end time.
-    '''
-    logging.info('Running Auto Complete')
+    """
+    logging.info("Running Auto Complete")
 
     # Iterate through every property
     properties_ref = db.collection("properties").stream()
     for prop in properties_ref:
         # Iterate through every trip in property
-        trips = db.collection("trips").where(filter=FieldFilter("propertyRef", "==", prop.reference)).stream()
+        trips = (
+            db.collection("trips")
+            .where(filter=FieldFilter("propertyRef", "==", prop.reference))
+            .stream()
+        )
 
         for trip in trips:
             if not trip.exists:
-                logging.error(f'Trip document not found for property {prop.id}')
+                logging.error(f"Trip document not found for property {prop.id}")
                 continue  # Changed from return to continue to process the next trip
 
-            if (not trip.get("complete") or trip.get("upcoming")) and (current_time > trip.get("tripEndDateTime")):
+            if (not trip.get("complete") or trip.get("upcoming")) and (
+                current_time > trip.get("tripEndDateTime")
+            ):
                 try:
                     trip.reference.update({"complete": True, "upcoming": False})
-                    logging.info(f'Trip {trip.id} for property {prop.id} marked as complete')
+                    logging.info(
+                        f"Trip {trip.id} for property {prop.id} marked as complete"
+                    )
                 except Exception as e:
-                    logging.error(f"Failed to update trip {trip.id} for property {prop.id}: {str(e)}")
+                    logging.error(
+                        f"Failed to update trip {trip.id} for property {prop.id}: {str(e)}"
+                    )
 
-    logging.info('Auto Complete Run Completed')
+    logging.info("Auto Complete Run Completed")
     return True  # Added a return statement for consistency
