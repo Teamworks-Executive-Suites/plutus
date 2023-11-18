@@ -206,8 +206,15 @@ def process_cancel_refund(trip_ref):
     if not trip.exists:
         return {"status": 404, "message": "Trip document not found."}
 
-    trip_begin_time = trip.get("tripBeginDateTime")
+    property_ref = trip.get("propertyRef")
+    property_doc = get_document_from_ref(property_ref)
 
+    if not property_doc.exists:
+        return {"status": 404, "message": "Property document not found."}
+
+    cancellation_policy = property_doc.get("cancellationPolicy")
+
+    trip_begin_time = trip.get("tripBeginDateTime")
     time_difference = trip_begin_time - current_time
 
     payment_intent_ids = trip.get("stripePaymentIntents")
@@ -225,15 +232,26 @@ def process_cancel_refund(trip_ref):
             already_refunded = charge.amount_refunded
             refundable_amount = charge.amount - already_refunded
 
-            if time_difference >= timedelta(days=7):
-                refund_amount = refundable_amount
-                refund_reason = "7 or more days before trip"
-            elif timedelta(hours=48) <= time_difference < timedelta(days=7):
-                refund_amount = refundable_amount // 2
-                refund_reason = "Between 48 hours and 7 days before trip"
+            if cancellation_policy == "Very Flexible":
+                if time_difference >= timedelta(hours=24):
+                    refund_amount = refundable_amount
+                    refund_reason = "24 or more hours before trip"
+                else:
+                    refund_amount = 0
+                    refund_reason = "Less than 24 hours before trip"
+            elif cancellation_policy == "Flexible":
+                if time_difference >= timedelta(days=7):
+                    refund_amount = refundable_amount
+                    refund_reason = "7 or more days before trip"
+                elif timedelta(hours=24) <= time_difference < timedelta(days=7):
+                    refund_amount = refundable_amount // 2
+                    refund_reason = "Between 24 hours and 7 days before trip"
+                else:
+                    refund_amount = 0
+                    refund_reason = "Less than 24 hours before trip"
             else:
                 refund_amount = 0
-                refund_reason = "Less than 48 hours before trip"
+                refund_reason = "Cancellation policy not recognized"
 
             if refund_amount > 0:
                 process_refund(charge.id, refund_amount)
