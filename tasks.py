@@ -266,6 +266,26 @@ def process_cancel_refund(trip_ref):
                 else:
                     refund_amount = 0
                     refund_reason = "Less than 24 hours before trip"
+            elif cancellation_policy == "Standard 30 Day":
+                if time_difference >= timedelta(days=30):
+                    refund_amount = refundable_amount
+                    refund_reason = "30 or more days before trip"
+                elif timedelta(days=7) <= time_difference < timedelta(days=30):
+                    refund_amount = refundable_amount // 2
+                    refund_reason = "Between 7 and 30 days before trip"
+                else:
+                    refund_amount = 0
+                    refund_reason = "Less than 7 days before trip"
+            elif cancellation_policy == "Standard 90 Day":
+                if time_difference >= timedelta(days=90):
+                    refund_amount = refundable_amount
+                    refund_reason = "90 or more days before trip"
+                elif timedelta(days=30) <= time_difference < timedelta(days=90):
+                    refund_amount = refundable_amount // 2
+                    refund_reason = "Between 30 and 90 days before trip"
+                else:
+                    refund_amount = 0
+                    refund_reason = "Less than 30 days before trip"
             else:
                 refund_amount = 0
                 refund_reason = "Cancellation policy not recognized"
