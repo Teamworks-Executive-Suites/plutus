@@ -2,7 +2,7 @@ import json
 import logging
 import os
 from datetime import datetime, timedelta, timezone
-
+from fastapi import Request
 import firebase_admin
 import requests
 import stripe
@@ -304,7 +304,7 @@ def process_cancel_refund(trip_ref):
 # Calendar stuff
 
 
-def create_cal_for_property(propertyRef):
+def create_cal_for_property(propertyRef: str):
     logging.info("create_cal_for_property")
 
     collection_id, document_id = propertyRef.split("/")
@@ -316,7 +316,7 @@ def create_cal_for_property(propertyRef):
         .stream()
     )
 
-    ics_file_path = f'calendars/{property_ref.get("propertyName")}.ics'
+    ics_file_path = f'calendars/{property_ref.get("propertyName").replace(" ", "_")}.ics'
 
     # If calendar file exists, load it, else create a new calendar
     if os.path.exists(ics_file_path):
@@ -346,7 +346,12 @@ def create_cal_for_property(propertyRef):
     with open(ics_file_path, "w") as ics_file:
         ics_file.writelines(cal)
 
-    return ics_file_path
+    # Get the base URL from the environment variable
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000/")
+
+    full_url = f'{base_url}{ics_file_path}'
+
+    return full_url
 
 
 def create_trips_from_ics(property_ref, ics_link):

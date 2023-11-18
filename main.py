@@ -2,8 +2,8 @@ import typing as t
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from starlette import status
-from starlette.responses import FileResponse
 
 from bearer_token import *
 from models import *
@@ -108,5 +108,6 @@ def cal_to_property(data: PropertyCal, token: str = Depends(get_token)):
 
 # Static Files
 
-ics_directory = "./calendars"  # Replace with your directory path
-app.mount("/calendars", FileResponse(ics_directory))
+# Static Files
+ics_directory = os.path.join(os.path.dirname(__file__), "calendars")
+app.mount("/calendars", StaticFiles(directory=ics_directory), name="calendars")
