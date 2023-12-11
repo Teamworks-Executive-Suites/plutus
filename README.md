@@ -1,4 +1,4 @@
-#Plutus - Teamworks API
+# Plutus - Teamworks API
 
 Welcome to the Teamworks API repository! This repository contains a FastAPI application that interacts with Firebase and external services to provide functionality related to property trips and refunds.
 
