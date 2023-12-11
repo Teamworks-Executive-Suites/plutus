@@ -22,3 +22,6 @@ ENV/
 # Ignore bearer token file
 bearer_token.txt
 
+# Ignore all files in /calendars/
+/calendars/*
+
