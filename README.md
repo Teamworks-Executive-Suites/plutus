@@ -1,6 +1,8 @@
 # Plutus - Teamworks API
 
-Welcome to the Teamworks API repository! This repository contains a FastAPI application that interacts with Firebase and external services to provide functionality related to property trips and refunds.
+Plutus was a Greek deity, considered the Greek god of wealth, This repository contains a FastAPI application that interacts with Firebase and external services to provide functionality related to property trips and refunds.
+
+Plutus manages complex refunds, extra charges through stripe and ical generation and syncing
 
 ## Installation
 
