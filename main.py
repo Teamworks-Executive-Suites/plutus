@@ -81,7 +81,6 @@ def cancel_refund(data: Trip, token: str = Depends(get_token)):
 def get_property_cal(property_ref: str, token: str = Depends(get_token)):
     cal_link = create_cal_for_property(property_ref)
     # add all cal stuff
-
     return {
         "propertyRef": property_ref,
         "cal_link": cal_link
