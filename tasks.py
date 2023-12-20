@@ -11,6 +11,7 @@ from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
+from devtools import debug
 
 load_dotenv()
 tz = timezone.utc

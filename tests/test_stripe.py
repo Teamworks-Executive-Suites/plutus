@@ -3,13 +3,11 @@ import os
 import unittest
 from unittest.mock import patch
 
-from bearer_token import generate_bearer_token
 from main import app
 from fastapi.testclient import TestClient
 import stripe
 
 from unittest.mock import MagicMock
-from tasks import get_document_from_ref
 
 client = TestClient(app)
 
@@ -76,17 +74,42 @@ class FakeFirestore:
         }
 
 
+
+def get_or_create_customer(email: str, name: str):
+    customers = stripe.Customer.list(email=email).data
+    if customers:
+        # Customer already exists, return the existing customer
+        return customers[0]
+    else:
+        # Customer does not exist, create a new one
+        return stripe.Customer.create(name=name, email=email)
+
+
+
+
 class StripeTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
         self.fake_firestore = FakeFirestore()
 
-        self.customer = stripe.Customer.create(
-            name='Test Customer',
-            email='test_customer@example.com',
-        )
+        self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
 
-        self.pi = stripe.PaymentIntent.create(
+        settings.testing = True
+        self.headers = {
+            "Authorization": f'Bearer {settings.test_token}'
+        }
+
+    @patch('tasks.get_document_from_ref')
+    def test_simple_refund(self, get_document_from_ref_mock):
+        # Create a mock Firestore DocumentSnapshot
+        mock_document_snapshot = MagicMock()
+        mock_document_snapshot.exists = True
+        mock_document_snapshot.to_dict.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
+
+        # Define what the mock should do when called
+        get_document_from_ref_mock.return_value = mock_document_snapshot
+
+        pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
@@ -94,30 +117,19 @@ class StripeTestCase(unittest.TestCase):
             off_session=True,
             confirm=True,
         )
-        settings.testing = True
-        self.headers = {
-            "Authorization": f'Bearer {settings.test_token}'
-        }
-
-    @patch('firebase_admin.firestore.client')
-    def test_simple_refund(self, firestore_client_mock):
-        # Define what the mock should do when called
-
-        firestore_client_mock.collection().document().get.return_value = self.fake_firestore.db["trips"][
-            "fake_trip_ref"]
 
         # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(self.pi.id)
+        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
+
+
         data = {
             "trip_ref": "trips/fake_trip_ref",
             "amount": 1099
         }
         r = self.client.post("/refund", headers=self.headers, json=data)
-        debug(r.content)
+        debug(r.json())
         # Check the result
         self.assertEqual(r.status_code, 200)
 
         # Verify the mock was called with the correct arguments
-        firestore_client_mock.collection.assert_called_with("trips")
-        firestore_client_mock.collection().document.assert_called_with("fake_trip_ref")
-        firestore_client_mock.collection().document().get.assert_called_once()
+        get_document_from_ref_mock.assert_called_once_with("trips/fake_trip_ref")
