@@ -35,7 +35,9 @@ def get_document_from_ref(trip_ref):
     :return:
     """
     collection_id, document_id = trip_ref.split("/")
+    debug(collection_id, document_id)
     trip = db.collection(collection_id).document(document_id).get()
+    debug(trip.get("stripePaymentIntents"))
     return trip
 
 
@@ -78,6 +80,9 @@ def handle_refund(trip_ref, amount):
     :param amount:
     :return:
     """
+    logging.info("handle_refund called with trip_ref: %s", trip_ref)
+
+    print(trip_ref)
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:

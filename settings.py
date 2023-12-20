@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     testing: bool = False
     dev: bool = False
     log_level: str = 'INFO'
+    test_token: str = '29326669-224b-414c-9978-39e1cd8c194c'
 
     logfire_token: Optional[str] = None
 

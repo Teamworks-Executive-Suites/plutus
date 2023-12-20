@@ -1,9 +1,15 @@
 import os
 
-from fastapi.testclient import TestClient
-from unittest.mock import patch, MagicMock
+import unittest
+from unittest.mock import patch
+
+from bearer_token import generate_bearer_token
 from main import app
+from fastapi.testclient import TestClient
 import stripe
+
+from unittest.mock import MagicMock
+from tasks import get_document_from_ref
 
 client = TestClient(app)
 
@@ -70,58 +76,46 @@ class FakeFirestore:
         }
 
 
-
-
-
-class StripeTestCase:
+class StripeTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        settings.testing = True
+        self.client = TestClient(app)
         self.fake_firestore = FakeFirestore()
-
-        firestore_client_mock = MagicMock()
-
-        firestore_client_mock.collection().document().get.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
 
         self.customer = stripe.Customer.create(
             name='Test Customer',
             email='test_customer@example.com',
-        )
-        self.pm = stripe.PaymentMethod.create(
-            type="card",
-            card={
-                "number": '4242424242424242',
-                "exp_month": 12,
-                "exp_year": 2021,
-                "cvc": '123',
-            },
         )
 
         self.pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method=self.pm.id,
-            # return_url='https://example.com/order/123/complete',
+            payment_method="pm_card_visa",
             off_session=True,
             confirm=True,
         )
-
+        settings.testing = True
+        self.headers = {
+            "Authorization": f'Bearer {settings.test_token}'
+        }
 
     @patch('firebase_admin.firestore.client')
     def test_simple_refund(self, firestore_client_mock):
-        # Create a mock Firestore client
-        firestore_client_mock = MagicMock()
-
         # Define what the mock should do when called
-        firestore_client_mock.collection().document().get.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
+
+        firestore_client_mock.collection().document().get.return_value = self.fake_firestore.db["trips"][
+            "fake_trip_ref"]
 
         # Add payment to trip
         self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(self.pi.id)
-
-        r = client.post("/refund", json={"trip_ref": "fake_trip_ref"})
-
+        data = {
+            "trip_ref": "trips/fake_trip_ref",
+            "amount": 1099
+        }
+        r = self.client.post("/refund", headers=self.headers, json=data)
+        debug(r.content)
         # Check the result
-        assert r.status_code == 200
+        self.assertEqual(r.status_code, 200)
 
         # Verify the mock was called with the correct arguments
         firestore_client_mock.collection.assert_called_with("trips")

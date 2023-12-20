@@ -4,10 +4,13 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
 from starlette.responses import FileResponse
-
 from bearer_token import *
 from models import *
 from tasks import *
+
+from settings import Settings
+
+settings = Settings()
 
 app = FastAPI()
 
@@ -47,7 +50,13 @@ get_bearer_token = HTTPBearer(auto_error=False)
 async def get_token(
         auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
 ) -> str:
+    # If settings.testing is True, return a dummy token
+    debug(settings.testing)
+    if settings.test_token:
+        known_tokens.add(settings.test_token)
+
     # Simulate a database query to find a known token
+    debug(known_tokens)
     if auth is None or (token := auth.credentials) not in known_tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -68,6 +77,8 @@ def extra_charge(data: Trip, token: str = Depends(get_token)):
 
 @app.post("/refund")
 def refund(data: Refund, token: str = Depends(get_token)):
+    debug(data)
+    print('reeeee')
     return handle_refund(data.trip_ref, data.amount)
 
 
