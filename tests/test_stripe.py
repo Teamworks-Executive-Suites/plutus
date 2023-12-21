@@ -3,9 +3,9 @@ import os
 import unittest
 from unittest.mock import patch
 
-from main import app
+from main2 import app
 from fastapi.testclient import TestClient
-import stripe
+from app import stripe
 
 from unittest.mock import MagicMock
 
@@ -13,7 +13,7 @@ client = TestClient(app)
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
-from settings import Settings
+from app.settings import Settings
 
 settings = Settings()
 

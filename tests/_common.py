@@ -1,7 +1,7 @@
 
 import logging
 
-from settings import Settings
+from app.settings import Settings
 
 settings = Settings()
 
