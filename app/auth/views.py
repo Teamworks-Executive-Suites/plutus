@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
+
+from app.auth.tasks import generate_bearer_token
+from app.main import settings
 from app.models import UnauthorizedMessage
 import typing as t
 
