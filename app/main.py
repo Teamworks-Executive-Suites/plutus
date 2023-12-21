@@ -1,10 +1,19 @@
+import sys
+
+print('reeeeeeeeeeeeeee')
+print(sys.executable)
+
+import logging
+import os
+
 from fastapi import FastAPI
 from apscheduler.schedulers.background import BackgroundScheduler
-from tasks2 import *
 
+from app.auto.tasks import auto_complete
+from app.cal.tasks import update_calendars
 from app.settings import Settings
 from app.auth.views import auth_router
-from app.calendar.views import cal_router
+from app.cal.views import cal_router
 from app.stripe.views import stripe_router
 from app.static.views import static_router
 
@@ -13,6 +22,8 @@ settings = Settings()
 app = FastAPI()
 
 known_tokens = set()
+
+
 @app.on_event("startup")
 async def startup_event():
     # Retrieve master token from environment variable and add it to known_tokens
@@ -32,6 +43,7 @@ async def startup_event():
     scheduler.add_job(update_calendars, 'interval', hours=1)
     scheduler.add_job(auto_complete, 'interval', hours=1)
     scheduler.start()
+
 
 app.include_router(auth_router)
 app.include_router(cal_router)

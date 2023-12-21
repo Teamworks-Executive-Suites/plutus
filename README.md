@@ -18,7 +18,7 @@ pip install -r requirements.txt
 
 To Start the FastAPI application, run the following command:
 ```bash
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 ### Refund Deposit Endpoint

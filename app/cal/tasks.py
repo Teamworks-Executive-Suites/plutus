@@ -1,31 +1,17 @@
-import json
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 
-import firebase_admin
 import requests
 from app import stripe
-from dotenv import load_dotenv
-from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
 from devtools import debug
-
-load_dotenv()
-tz = timezone.utc
-
-current_time = datetime.now(timezone.utc)
-
-cred = credentials.Certificate(
-    json.loads(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
-)
-
-app = firebase_admin.initialize_app(cred)
-db = firestore.client()
+from app.firebase_setup import db, current_time
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
+
 
 def create_cal_for_property(propertyRef):
     logging.info("create_cal_for_property")
@@ -114,7 +100,6 @@ def create_trips_from_ics(property_ref, ics_link):
             trips_ref.add(trip_data)
 
     return True
-
 
 
 def update_calendars():

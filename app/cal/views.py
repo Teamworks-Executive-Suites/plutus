@@ -1,15 +1,16 @@
 import logging
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from app.auth.views import get_token
 
-from app.calendar.tasks import create_cal_for_property, create_trips_from_ics
+from app.cal.tasks import create_cal_for_property, create_trips_from_ics
 from app.models import PropertyCal
 
 cal_router = APIRouter()
 
 
 # Calendar Generation
-@app.get('/get_property_cal')
+@cal_router.get('/get_property_cal')
 def get_property_cal(property_ref: str, token: str = Depends(get_token)):
     cal_link = create_cal_for_property(property_ref)
     # add all cal stuff
@@ -20,7 +21,7 @@ def get_property_cal(property_ref: str, token: str = Depends(get_token)):
 
 
 # Sync External Calendar
-@app.post('/cal_to_property')
+@cal_router.post('/cal_to_property')
 def cal_to_property(data: PropertyCal, token: str = Depends(get_token)):
     logging.info(data.property_ref)
     logging.info(data.cal_link)

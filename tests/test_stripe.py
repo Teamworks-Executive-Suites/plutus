@@ -3,11 +3,13 @@ import os
 import unittest
 from unittest.mock import patch
 
-from main2 import app
+
 from fastapi.testclient import TestClient
 from app import stripe
 
 from unittest.mock import MagicMock
+
+from app.main import app
 
 client = TestClient(app)
 
