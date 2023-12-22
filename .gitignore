@@ -23,5 +23,5 @@ ENV/
 bearer_token.txt
 
 # Ignore all files in /calendars/
-/calendars/*
+/app/static/calendars/*
 
