@@ -14,8 +14,7 @@ from app.cal.tasks import update_calendars
 from app.settings import Settings
 from app.auth.views import auth_router
 from app.cal.views import cal_router
-from app.stripe.views import stripe_router
-from app.static.views import static_router
+from app.pay.views import stripe_router
 
 settings = Settings()
 
@@ -48,4 +47,3 @@ async def startup_event():
 app.include_router(auth_router)
 app.include_router(cal_router)
 app.include_router(stripe_router)
-app.include_router(static_router)

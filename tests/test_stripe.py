@@ -1,11 +1,10 @@
 import os
-
+import stripe
 import unittest
 from unittest.mock import patch
 
 
 from fastapi.testclient import TestClient
-from app import stripe
 
 from unittest.mock import MagicMock
 
@@ -101,7 +100,7 @@ class StripeTestCase(unittest.TestCase):
             "Authorization": f'Bearer {settings.test_token}'
         }
 
-    @patch('tasks.get_document_from_ref')
+    @patch('app.pay.tasks.get_document_from_ref')
     def test_simple_refund(self, get_document_from_ref_mock):
         # Create a mock Firestore DocumentSnapshot
         mock_document_snapshot = MagicMock()
