@@ -8,6 +8,7 @@ import os
 
 from fastapi import FastAPI
 from apscheduler.schedulers.background import BackgroundScheduler
+from contextlib import asynccontextmanager
 
 from app.auto.tasks import auto_complete
 from app.cal.tasks import update_calendars
@@ -18,13 +19,10 @@ from app.pay.views import stripe_router
 
 settings = Settings()
 
-app = FastAPI()
-
 known_tokens = set()
 
-
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     # Retrieve master token from environment variable and add it to known_tokens
 
     logging.info('startup')
@@ -43,6 +41,10 @@ async def startup_event():
     scheduler.add_job(auto_complete, 'interval', hours=1)
     scheduler.start()
 
+    yield  # anything before this line runs on before startup and anything after runs on shutdown
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(auth_router)
 app.include_router(cal_router)

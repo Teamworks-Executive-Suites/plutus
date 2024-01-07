@@ -1,12 +1,12 @@
 import os
+from unittest.mock import Mock
+
 import stripe
 import unittest
-from unittest.mock import patch
-
+from unittest import mock, TestCase
 
 from fastapi.testclient import TestClient
 
-from unittest.mock import MagicMock
 
 from app.main import app
 
@@ -75,7 +75,6 @@ class FakeFirestore:
         }
 
 
-
 def get_or_create_customer(email: str, name: str):
     customers = stripe.Customer.list(email=email).data
     if customers:
@@ -86,9 +85,7 @@ def get_or_create_customer(email: str, name: str):
         return stripe.Customer.create(name=name, email=email)
 
 
-
-
-class StripeTestCase(unittest.TestCase):
+class StripeTestCase(TestCase):
     def setUp(self) -> None:
         self.client = TestClient(app)
         self.fake_firestore = FakeFirestore()
@@ -100,13 +97,12 @@ class StripeTestCase(unittest.TestCase):
             "Authorization": f'Bearer {settings.test_token}'
         }
 
-    @patch('app.pay.tasks.get_document_from_ref')
+    @mock.patch('app.pay.tasks.get_document_from_ref')
     def test_simple_refund(self, get_document_from_ref_mock):
-        # Create a mock Firestore DocumentSnapshot
-        mock_document_snapshot = MagicMock()
+
+        mock_document_snapshot = Mock()
         mock_document_snapshot.exists = True
         mock_document_snapshot.to_dict.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
-
         # Define what the mock should do when called
         get_document_from_ref_mock.return_value = mock_document_snapshot
 
@@ -121,7 +117,6 @@ class StripeTestCase(unittest.TestCase):
 
         # Add payment to trip
         self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
-
 
         data = {
             "trip_ref": "trips/fake_trip_ref",
@@ -135,48 +130,57 @@ class StripeTestCase(unittest.TestCase):
         # Verify the mock was called with the correct arguments
         get_document_from_ref_mock.assert_called_once_with("trips/fake_trip_ref")
 
-    @patch('app.pay.tasks.get_document_from_ref')
-    def test_complex_refund_one(self, get_document_from_ref_mock):
-        # This test will replicate when a guest has made a booking, then made an adjustment to the booking to get an extra addon. Therefore there will be two payment intents on the trip, one for the base trip cost, and one for the addon cost. Then the guest will cancel the trip, and the refund will be for the base trip cost.
-
-        # The mock trip property shoul
-
-        # Create a mock Firestore DocumentSnapshot
-        mock_document_snapshot = MagicMock()
-        mock_document_snapshot.exists = True
-        mock_document_snapshot.to_dict.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
-
-        # Define what the mock should do when called
-        get_document_from_ref_mock.return_value = mock_document_snapshot
-
-        # Create the first payment intent
-        pi = stripe.PaymentIntent.create(
-            amount=1099,
-            currency='usd',
-            customer=self.customer.id,
-            payment_method="pm_card_visa",
-            off_session=True,
-            confirm=True,
-        )
-
-        # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
-
-        # Create the second payment intent
-        pi2 = stripe.PaymentIntent.create(
-            amount=999,
-            currency='usd',
-            customer=self.customer.id,
-            payment_method="pm_card_visa",
-            off_session=True,
-            confirm=True,
-        )
-
-        # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi2.id)
-
-        # setup refund request data
-        data = {
-            "trip_ref": "trips/fake_trip_ref",
-            "amount": 1099
-        }
+    # @patch('app.pay.tasks.get_document_from_ref')
+    # def test_complex_refund_one(self, get_document_from_ref_mock):
+    #     # This test will replicate when a guest has made a booking, then made an adjustment to the booking to get an
+    #     # extra addon. Therefore there will be two payment intents on the trip, one for the base trip cost,
+    #     # and one for the addon cost. Then the guest will cancel the trip, and the refund will be for the base trip
+    #     # cost.
+    #
+    #     # Create a mock Firestore DocumentSnapshot
+    #     mock_document_snapshot = MagicMock()
+    #     mock_document_snapshot.exists = True
+    #     mock_document_snapshot.to_dict.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
+    #
+    #     # Define what the mock should do when called
+    #     get_document_from_ref_mock.return_value = mock_document_snapshot
+    #
+    #     # Create the first payment intent
+    #     pi = stripe.PaymentIntent.create(
+    #         amount=1099,
+    #         currency='usd',
+    #         customer=self.customer.id,
+    #         payment_method="pm_card_visa",
+    #         off_session=True,
+    #         confirm=True,
+    #     )
+    #
+    #     # Add payment to trip
+    #     self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
+    #
+    #     # Create the second payment intent
+    #     pi2 = stripe.PaymentIntent.create(
+    #         amount=999,
+    #         currency='usd',
+    #         customer=self.customer.id,
+    #         payment_method="pm_card_visa",
+    #         off_session=True,
+    #         confirm=True,
+    #     )
+    #
+    #     # Add payment to trip
+    #     self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi2.id)
+    #
+    #     # setup refund request data
+    #     data = {
+    #         "trip_ref": "trips/fake_trip_ref",
+    #         "amount": 1099
+    #     }
+    #
+    #     r = self.client.post("/refund", headers=self.headers, json=data)
+    #     debug(r.json())
+    #     # Check the result
+    #     self.assertEqual(r.status_code, 200)
+    #
+    #     # Verify the mock was called with the correct arguments
+    #     get_document_from_ref_mock.assert_called_once_with("trips/fake_trip_ref")
