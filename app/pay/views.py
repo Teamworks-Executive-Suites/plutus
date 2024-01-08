@@ -21,7 +21,6 @@ def refund(data: Refund, token: str = Depends(get_token)):
     :param token:
     :return:
     '''
-    debug(data)
     return handle_refund(data.trip_ref, data.amount)
 
 

@@ -18,10 +18,7 @@ def get_document_from_ref(trip_ref):
     :return:
     """
     collection_id, document_id = trip_ref.split("/")
-    debug(collection_id, document_id)
-    debug(db)
     trip = db.collection(collection_id).document(document_id).get()
-    debug(trip.get("stripePaymentIntents"))
     return trip
 
 
@@ -66,15 +63,12 @@ def handle_refund(trip_ref, amount):
     """
     logging.info("handle_refund called with trip_ref: %s", trip_ref)
 
-    debug(trip_ref)
     trip = get_document_from_ref(trip_ref)
-    debug(trip)
 
-    # if not trip.exists:
-    #     return {"status": 404, "message": "Trip document not found."}
+    if not trip.exists:
+        return {"status": 404, "message": "Trip document not found."}
 
     payment_intent_ids = trip.get("stripePaymentIntents")
-    debug(payment_intent_ids)
     if not payment_intent_ids:
         return {"status": 404, "message": "No payment intents found on trip."}
 
@@ -82,7 +76,6 @@ def handle_refund(trip_ref, amount):
     refund_details = []
     remaining_refund = amount
     for payment_intent_id in payment_intent_ids:
-        debug(payment_intent_id)
         if remaining_refund <= 0:
             break
 
