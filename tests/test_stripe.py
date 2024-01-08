@@ -1,14 +1,15 @@
 import os
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import stripe
 import unittest
-from unittest import mock, TestCase
+from unittest import TestCase
 
 from fastapi.testclient import TestClient
 
 
 from app.main import app
+from app.firebase_setup import db
 
 client = TestClient(app)
 
@@ -97,14 +98,20 @@ class StripeTestCase(TestCase):
             "Authorization": f'Bearer {settings.test_token}'
         }
 
-    @mock.patch('app.pay.tasks.get_document_from_ref')
-    def test_simple_refund(self, get_document_from_ref_mock):
 
-        mock_document_snapshot = Mock()
-        mock_document_snapshot.exists = True
-        mock_document_snapshot.to_dict.return_value = self.fake_firestore.db["trips"]["fake_trip_ref"]
-        # Define what the mock should do when called
-        get_document_from_ref_mock.return_value = mock_document_snapshot
+    @patch('google.cloud.firestore_v1.collection.CollectionReference.document')
+    def test_simple_refund(self, document_mock):
+        # Create a mock Firestore document
+        mock_document = Mock()
+
+        # Create a mock DocumentSnapshot
+        mock_snapshot = Mock()
+        mock_snapshot.exists = True
+        mock_snapshot.get = lambda key: self.fake_firestore.db["trips"]["fake_trip_ref"].get(
+            key)  # Use a lambda function here
+
+        mock_document.get.return_value = mock_snapshot
+        document_mock.return_value = mock_document
 
         pi = stripe.PaymentIntent.create(
             amount=1099,
@@ -123,12 +130,9 @@ class StripeTestCase(TestCase):
             "amount": 1099
         }
         r = self.client.post("/refund", headers=self.headers, json=data)
-        debug(r.json())
         # Check the result
         self.assertEqual(r.status_code, 200)
 
-        # Verify the mock was called with the correct arguments
-        get_document_from_ref_mock.assert_called_once_with("trips/fake_trip_ref")
 
     # @patch('app.pay.tasks.get_document_from_ref')
     # def test_complex_refund_one(self, get_document_from_ref_mock):

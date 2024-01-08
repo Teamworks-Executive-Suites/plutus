@@ -1,6 +1,5 @@
 import sys
 
-print('reeeeeeeeeeeeeee')
 print(sys.executable)
 
 import logging
