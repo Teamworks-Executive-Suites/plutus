@@ -112,13 +112,14 @@ def get_or_create_customer(email: str, name: str):
         return stripe.Customer.create(name=name, email=email)
 
 
+# Ensure that the MockDB and its related classes (MockCollection, MockDocument) are working correctly
+
+# Look to we mock stripe on TC
 class MockDB:
     def __init__(self, data):
         self.data = data
-        debug(self.data)
 
     def collection(self, collection_name):
-        debug(collection_name)
         if collection_name in self.data:
             return MockCollection(self.data[collection_name])
         else:
@@ -139,7 +140,6 @@ class MockDocument:
         self.data = data
 
     def get(self):
-        debug(self.data)
         mock_snapshot = Mock()
         mock_snapshot.exists = bool(self.data)
         mock_snapshot.get = lambda key: self.data.get(key)
@@ -270,7 +270,7 @@ class StripeCancelRefund(TestCase):
 
     @patch('app.pay.tasks.db', new_callable=lambda: MockDB(FakeFirestore().db))
     @patch.object(MockDB, 'collection', return_value=MockCollection(FakeFirestore().db["trips"]))
-    def test_simple_cancel_refund_with_string_property_ref(self, db_mock, collection_mock):
+    def test_simple_cancel_refund(self, db_mock, collection_mock):
         # Create a mock Firestore document
         mock_document = Mock()
 
@@ -280,14 +280,43 @@ class StripeCancelRefund(TestCase):
         mock_snapshot_trip.get = lambda key: self.fake_firestore.db["trips"]["fake_trip_ref"].get(key)
         mock_snapshot_trip.to_dict = lambda: self.fake_firestore.db["trips"]["fake_trip_ref"]
 
+        # Create a mock DocumentSnapshot for the property document
+        mock_snapshot_property = Mock()
+        mock_snapshot_property.exists = True
+        mock_snapshot_property.get = lambda key: self.fake_firestore.db["properties"]["fake_property_ref"].get(key)
+        mock_snapshot_property.to_dict = lambda: self.fake_firestore.db["properties"]["fake_property_ref"]
+
         # Set the return value of the get method of the mock document
-        mock_document.get.return_value = mock_snapshot_trip
+        mock_document.get.side_effect = [mock_snapshot_trip, mock_snapshot_property]
 
         # Set the return value of the document method of the db object to the mock document
         db_mock.collection().document.return_value = mock_document
 
-        # Add property_ref to the trip document as a string
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["propertyRef"] = "fake_property_ref"
+        # Add property_ref to the trip document
+        self.fake_firestore.db["trips"]["fake_trip_ref"]["propertyRef"] = "properties/fake_property_ref"
+
+        # Add property_ref to the trip document
+        self.fake_firestore.db["trips"]["fake_trip_ref"]["propertyRef"] = self.fake_firestore.db["properties"][
+            "fake_property_ref"]
+
+        # Add Cancellation Policy to the property document
+        self.fake_firestore.db["properties"]["fake_property_ref"]["cancellationPolicy"] = "Very Flexible"
+
+        # Create a Stripe PaymentIntent
+        pi = stripe.PaymentIntent.create(
+            amount=1099,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method="pm_card_visa",
+            off_session=True,
+            confirm=True,
+        )
+
+        # Add payment to trip
+        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
+
+        # Add tripBeginDateTime to the trip document
+        self.fake_firestore.db["trips"]["fake_trip_ref"]["tripBeginDateTime"] = "2023-08-01T00:00:00.000Z"
 
         data = {
             "trip_ref": "trips/fake_trip_ref",
@@ -295,9 +324,11 @@ class StripeCancelRefund(TestCase):
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
 
         # Check the result
-        assert r.json()['status'] == 404
-        assert r.json()['message'] == 'Property document not found.'
-
-        self.assertEqual(r.status_code, 200)
+        assert r.json()['status'] == 200
+        assert r.json()['message'] == 'Refund processed.'
+        assert r.json()['total_refunded'] == 1099
+        assert r.json()['refund_details'][0]['refunded_amount'] == 1099
+        assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
+        assert r.json()['cancellation_policy'] == "Very Flexible"
 
         self.assertEqual(r.status_code, 200)
