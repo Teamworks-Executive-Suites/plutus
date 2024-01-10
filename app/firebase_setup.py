@@ -16,4 +16,4 @@ cred = credentials.Certificate(
 )
 
 app = firebase_admin.initialize_app(cred)
-db = firestore.client()
+db = firestore.client() # I should be mocking this,  Look at how we mock stripe

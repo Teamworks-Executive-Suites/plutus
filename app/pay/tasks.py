@@ -12,19 +12,20 @@ stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 
 # Stripe stuff
-def get_document_from_ref(trip_ref):
+def get_document_from_ref(ref):
     """
     Get a document from a given reference.
-    :param trip_ref:
+    :param ref:
     :return:
     """
-    debug(trip_ref)
-    collection_id, document_id = trip_ref.split("/")
+    debug(ref)
+    collection_id, document_id = ref.split("/")
     debug(collection_id)
     debug(document_id)
-    trip = db.collection(collection_id).document(document_id).get()
-    debug(trip)
-    return trip
+    debug(db.collection(collection_id).document(document_id).get())
+    document = db.collection(collection_id).document(document_id).get()
+    debug("Document in get_document_from_ref:", document)
+    return document
 
 
 def get_dispute_by_trip_ref(trip_ref):

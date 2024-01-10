@@ -6,6 +6,7 @@ import unittest
 from unittest import TestCase
 
 from fastapi.testclient import TestClient
+from mockfirestore import MockFirestore
 
 from app.main import app
 from app.firebase_setup import db
@@ -101,6 +102,45 @@ class FakeFirestore:
             }
         }
 
+#
+# # Ensure that the MockDB and its related classes (MockCollection, MockDocument) are working correctly
+#
+# # Look to we mock stripe on TC
+# class FakeDocument:
+#     def __init__(self, data):
+#         self.data = data
+#
+#     def get(self):
+#         debug('FakeDocument get')
+#         debug(self.data)
+#         return self.data
+#
+#
+# class FakeCollection:
+#     def __init__(self, data):
+#         self.data = data
+#
+#     def document(self, document_id):
+#         debug('FakeCollection document')
+#         debug(self.data)
+#         if document_id in self.data:
+#             return FakeDocument(self.data[document_id])
+#         else:
+#             raise ValueError(f"Document {document_id} does not exist in the mock data.")
+#
+#
+# class FakeClient:
+#     def __init__(self, data):
+#         self.data = data
+#         debug('FakeClient init')
+#
+#     def collection(self, collection_id):
+#         debug('FakeClient collection')
+#         if collection_id in self.data:
+#             return FakeCollection(self.data[collection_id])
+#         else:
+#             raise ValueError(f"Collection {collection_id} does not exist in the mock data.")
+#
 
 def get_or_create_customer(email: str, name: str):
     customers = stripe.Customer.list(email=email).data
@@ -111,40 +151,6 @@ def get_or_create_customer(email: str, name: str):
         # Customer does not exist, create a new one
         return stripe.Customer.create(name=name, email=email)
 
-
-# Ensure that the MockDB and its related classes (MockCollection, MockDocument) are working correctly
-
-# Look to we mock stripe on TC
-class MockDB:
-    def __init__(self, data):
-        self.data = data
-
-    def collection(self, collection_name):
-        if collection_name in self.data:
-            return MockCollection(self.data[collection_name])
-        else:
-            raise ValueError(f"Collection {collection_name} does not exist in the mock data.")
-
-class MockCollection:
-    def __init__(self, data):
-        self.data = data
-
-    def document(self, document_name):
-        if document_name in self.data:
-            return MockDocument(self.data[document_name])
-        else:
-            raise ValueError(f"Document {document_name} does not exist in the mock data.")
-
-class MockDocument:
-    def __init__(self, data):
-        self.data = data
-
-    def get(self):
-        mock_snapshot = Mock()
-        mock_snapshot.exists = bool(self.data)
-        mock_snapshot.get = lambda key: self.data.get(key)
-        mock_snapshot.to_dict = lambda: self.data
-        return mock_snapshot
 
 class StripeRefund(TestCase):
     def setUp(self) -> None:
@@ -198,7 +204,6 @@ class StripeRefund(TestCase):
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
 
         self.assertEqual(r.status_code, 200)
-
 
     @patch('google.cloud.firestore_v1.collection.CollectionReference.document')
     def test_complex_one(self, document_mock):
@@ -268,39 +273,31 @@ class StripeCancelRefund(TestCase):
             "Authorization": f'Bearer {settings.test_token}'
         }
 
-    @patch('app.pay.tasks.db', new_callable=lambda: MockDB(FakeFirestore().db))
-    @patch.object(MockDB, 'collection', return_value=MockCollection(FakeFirestore().db["trips"]))
-    def test_simple_cancel_refund(self, db_mock, collection_mock):
-        # Create a mock Firestore document
-        mock_document = Mock()
+        # Create a MockFirestore instance
+        self.mock_firestore = MockFirestore()
 
-        # Create a mock DocumentSnapshot for the trip document
-        mock_snapshot_trip = Mock()
-        mock_snapshot_trip.exists = True
-        mock_snapshot_trip.get = lambda key: self.fake_firestore.db["trips"]["fake_trip_ref"].get(key)
-        mock_snapshot_trip.to_dict = lambda: self.fake_firestore.db["trips"]["fake_trip_ref"]
+        # Set up your mock data
+        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
+            self.fake_firestore.db["trips"]["fake_trip_ref"]
+        )
+        self.mock_firestore.collection('properties').document('fake_property_ref').set(
+            self.fake_firestore.db["properties"]["fake_property_ref"]
+        )
 
-        # Create a mock DocumentSnapshot for the property document
-        mock_snapshot_property = Mock()
-        mock_snapshot_property.exists = True
-        mock_snapshot_property.get = lambda key: self.fake_firestore.db["properties"]["fake_property_ref"].get(key)
-        mock_snapshot_property.to_dict = lambda: self.fake_firestore.db["properties"]["fake_property_ref"]
-
-        # Set the return value of the get method of the mock document
-        mock_document.get.side_effect = [mock_snapshot_trip, mock_snapshot_property]
-
-        # Set the return value of the document method of the db object to the mock document
-        db_mock.collection().document.return_value = mock_document
+    @patch('app.firebase_setup.db')
+    def test_simple_cancel_refund(self, firestore_mock):
+        # Create a MockFirestore instance
+        firestore_mock.return_value = self.mock_firestore
 
         # Add property_ref to the trip document
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["propertyRef"] = "properties/fake_property_ref"
-
-        # Add property_ref to the trip document
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["propertyRef"] = self.fake_firestore.db["properties"][
-            "fake_property_ref"]
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "propertyRef": "properties/fake_property_ref"
+        })
 
         # Add Cancellation Policy to the property document
-        self.fake_firestore.db["properties"]["fake_property_ref"]["cancellationPolicy"] = "Very Flexible"
+        self.mock_firestore.collection('properties').document('fake_property_ref').update({
+            "cancellationPolicy": "Very Flexible"
+        })
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
@@ -313,15 +310,21 @@ class StripeCancelRefund(TestCase):
         )
 
         # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "stripePaymentIntents": [pi.id]
+        })
 
         # Add tripBeginDateTime to the trip document
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["tripBeginDateTime"] = "2023-08-01T00:00:00.000Z"
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "tripBeginDateTime": "2023-08-01T00:00:00.000Z"
+        })
+
 
         data = {
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
