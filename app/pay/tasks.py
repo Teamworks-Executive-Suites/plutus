@@ -22,7 +22,7 @@ def get_document_from_ref(ref):
     collection_id, document_id = ref.split("/")
     debug(collection_id)
     debug(document_id)
-    debug(db.collection(collection_id).document(document_id).get())
+    debug(db.collection(collection_id).document(document_id).get().to_dict())
     document = db.collection(collection_id).document(document_id).get()
     debug("Document in get_document_from_ref:", document)
     return document

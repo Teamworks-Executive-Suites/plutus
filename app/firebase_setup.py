@@ -5,6 +5,13 @@ from datetime import datetime, timezone
 import firebase_admin
 from dotenv import load_dotenv
 from firebase_admin import credentials, firestore
+from mockfirestore import MockFirestore
+
+from app.settings import Settings
+
+from devtools import debug
+
+settings = Settings()
 
 load_dotenv()
 tz = timezone.utc
@@ -16,4 +23,14 @@ cred = credentials.Certificate(
 )
 
 app = firebase_admin.initialize_app(cred)
-db = firestore.client() # I should be mocking this,  Look at how we mock stripe
+
+MOCK_DB = MockFirestore()
+
+debug(settings.testing)
+settings.testing = True
+
+if settings.testing:
+    debug('hi')
+    db = MOCK_DB
+else:
+    db = firestore.client()

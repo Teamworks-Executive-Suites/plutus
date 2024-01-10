@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from mockfirestore import MockFirestore
 
 from app.main import app
-from app.firebase_setup import db
+from app.firebase_setup import db, MOCK_DB
 
 client = TestClient(app)
 
@@ -274,7 +274,7 @@ class StripeCancelRefund(TestCase):
         }
 
         # Create a MockFirestore instance
-        self.mock_firestore = MockFirestore()
+        self.mock_firestore = MOCK_DB
 
         # Set up your mock data
         self.mock_firestore.collection('trips').document('fake_trip_ref').set(
@@ -284,10 +284,9 @@ class StripeCancelRefund(TestCase):
             self.fake_firestore.db["properties"]["fake_property_ref"]
         )
 
-    @patch('app.firebase_setup.db')
-    def test_simple_cancel_refund(self, firestore_mock):
+    def test_simple_cancel_refund(self):
         # Create a MockFirestore instance
-        firestore_mock.return_value = self.mock_firestore
+        # firestore_mock.return_value = self.mock_firestore
 
         # Add property_ref to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update({
