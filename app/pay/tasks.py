@@ -259,26 +259,26 @@ def process_cancel_refund(trip_ref):
             elif cancellation_policy == "Standard 30 Day":
                 if time_difference >= timedelta(days=30):
                     refund_amount = refundable_amount
-                    refund_reason = "30 or more days before booking"
+                    refund_reason = "30 or more days before booking - 100% refund"
                 elif timedelta(days=7) <= time_difference < timedelta(days=30):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 7 and 30 days before booking"
+                    refund_reason = "Between 7 and 30 days before booking - 50% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 7 days before booking"
+                    refund_reason = "Less than 7 days before booking - no refund"
             elif cancellation_policy == "Standard 90 Day":
                 if time_difference >= timedelta(days=90):
                     refund_amount = refundable_amount
-                    refund_reason = "90 or more days before booking"
+                    refund_reason = "90 or more days before booking - 100% refund"
                 elif timedelta(days=30) <= time_difference < timedelta(days=90):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 30 and 90 days before booking"
+                    refund_reason = "Between 30 and 90 days before booking - 50% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 30 days before booking"
+                    refund_reason = "Less than 30 days before booking - no refund"
             else:
                 refund_amount = 0
-                refund_reason = "Cancellation policy not recognized - no refund - please contact support"
+                refund_reason = f"Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support"
 
             if refund_amount > 0:
                 process_refund(charge.id, refund_amount)
