@@ -10,7 +10,6 @@ from app.firebase_setup import db, current_time
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 
-
 # Stripe stuff
 def get_document_from_ref(ref):
     """
@@ -19,7 +18,6 @@ def get_document_from_ref(ref):
     :return:
     """
     collection_id, document_id = ref.split("/")
-    debug(db.collection(collection_id).document(document_id).get().to_dict())
     document = db.collection(collection_id).document(document_id).get()
     return document
 
@@ -217,17 +215,12 @@ def process_cancel_refund(trip_ref):
     if not property.exists:
         return {"status": 404, "message": "Property document not found."}
 
-
     cancellation_policy = property.get("cancellationPolicy")
-    debug(cancellation_policy)
-
     logging.info("Cancellation policy: %s", cancellation_policy)
 
     trip_begin_time = trip.get("tripBeginDateTime")
     trip_begin_time = datetime.fromtimestamp(trip_begin_time, tz=current_time.tzinfo)
-    time_difference = current_time - trip_begin_time # from start to now
-
-    debug(time_difference)
+    time_difference = current_time - trip_begin_time  # from start to now
 
     payment_intent_ids = trip.get("stripePaymentIntents")
     debug(payment_intent_ids)
@@ -243,54 +236,51 @@ def process_cancel_refund(trip_ref):
                 continue
 
             already_refunded = charge.amount_refunded
-
-            debug(already_refunded)
-
             refundable_amount = charge.amount - already_refunded
 
-            debug(refundable_amount)
+            debug(cancellation_policy)
 
             if cancellation_policy == "Very Flexible":
                 debug(time_difference)
                 if time_difference <= timedelta(hours=24):
                     refund_amount = refundable_amount
-                    refund_reason = "24 or more less before trip"
+                    refund_reason = "24 or more before booking - 100% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 24 hours before trip"
+                    refund_reason = "Less than 24 hours before booking - no refund"
             elif cancellation_policy == "Flexible":
-                if time_difference <= timedelta(days=7):
+                if time_difference >= timedelta(days=7):
                     refund_amount = refundable_amount
-                    refund_reason = "7 or less days before trip"
+                    refund_reason = "7 or more days before booking - 100% refund"
                 elif timedelta(hours=24) <= time_difference < timedelta(days=7):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 24 hours and 7 days before trip"
+                    refund_reason = "Between 24 hours and 7 days before booking - 50% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 24 hours before trip"
+                    refund_reason = "Less than 24 hours before booking - no refund"
             elif cancellation_policy == "Standard 30 Day":
                 if time_difference >= timedelta(days=30):
                     refund_amount = refundable_amount
-                    refund_reason = "30 or more days before trip"
+                    refund_reason = "30 or more days before booking"
                 elif timedelta(days=7) <= time_difference < timedelta(days=30):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 7 and 30 days before trip"
+                    refund_reason = "Between 7 and 30 days before booking"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 7 days before trip"
+                    refund_reason = "Less than 7 days before booking"
             elif cancellation_policy == "Standard 90 Day":
                 if time_difference >= timedelta(days=90):
                     refund_amount = refundable_amount
-                    refund_reason = "90 or more days before trip"
+                    refund_reason = "90 or more days before booking"
                 elif timedelta(days=30) <= time_difference < timedelta(days=90):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 30 and 90 days before trip"
+                    refund_reason = "Between 30 and 90 days before booking"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 30 days before trip"
+                    refund_reason = "Less than 30 days before booking"
             else:
                 refund_amount = 0
-                refund_reason = "Cancellation policy not recognized"
+                refund_reason = "Cancellation policy not recognized - no refund - please contact support"
 
             if refund_amount > 0:
                 process_refund(charge.id, refund_amount)
