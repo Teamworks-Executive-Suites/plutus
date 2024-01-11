@@ -1173,3 +1173,78 @@ class StripeCancelRefund(TestCase):
         assert r.json()['cancellation_policy'] == "Standard 90 Day"
 
         self.assertEqual(r.status_code, 200)
+
+
+
+class StripeExtraCharge(TestCase):
+    def setUp(self) -> None:
+        self.client = TestClient(app)
+        self.fake_firestore = FakeFirestore()
+
+        self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
+
+        settings.testing = True
+        self.headers = {
+            "Authorization": f'Bearer {settings.test_token}'
+        }
+
+        # Create a MockFirestore instance
+        self.mock_firestore = MOCK_DB
+
+        # Set up your mock data
+        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
+            self.fake_firestore.db["trips"]["fake_trip_ref"]
+        )
+        self.mock_firestore.collection('properties').document('fake_property_ref').set(
+            self.fake_firestore.db["properties"]["fake_property_ref"]
+        )
+        # Add property_ref to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "propertyRef": "fake_property_ref"
+        })
+
+    def test_simple_extra_charge(self):
+        '''
+        This test has 1 payment intent
+        :return:
+        '''
+
+        # need to check and figure out how this works
+
+        # think we should check the pm and customer is the same as the previous pi
+
+        # check it went through
+
+
+        # Create a Stripe PaymentIntent
+        pi = stripe.PaymentIntent.create(
+            amount=1000,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method="pm_card_visa",
+            off_session=True,
+            confirm=True,
+            description="Test Payment"
+        )
+
+        # Add payment to trip
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "stripePaymentIntents": [pi.id]
+        })
+
+        data = {
+            "trip_ref": "trips/fake_trip_ref",
+            "amount": 1000,
+            "description": "Test Payment"
+        }
+        r = self.client.post("/extra_charge", headers=self.headers, json=data)
+        debug(r.json())
+
+        # Check the result
+        assert r.json()['status'] == 200
+        assert r.json()['message'] == 'Extra charge processed successfully.'
+        assert r.json()['total_charged'] == 1000
+        assert r.json()['charge_details'][0]['charged_amount'] == 1000
+        assert r.json()['charge_details'][0]['payment_intent_id'] == pi.id
+
+        self.assertEqual(r.status_code, 200)
