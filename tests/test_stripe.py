@@ -553,7 +553,7 @@ class StripeCancelRefund(TestCase):
         '''
         This test has 2 payment intents
         Flexible
-        between 7 and 30 days
+        between 24hrs and 7 days
         50% refund
         :return:
         '''
@@ -588,7 +588,7 @@ class StripeCancelRefund(TestCase):
         })
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=8)
+        trip_begin_datetime = current_time - timedelta(days=5)
 
         # Convert the datetime object to a timestamp
         trip_begin_timestamp = trip_begin_datetime.timestamp()
@@ -607,12 +607,81 @@ class StripeCancelRefund(TestCase):
         # Check the result
         assert r.json()['status'] == 200
         assert r.json()['message'] == 'Refund processed.'
-        assert r.json()['total_refunded'] == 1600
-        assert r.json()['refund_details'][0]['refunded_amount'] == 1099
+        assert r.json()['total_refunded'] == 799
+        assert r.json()['refund_details'][0]['refunded_amount'] == 549
         assert r.json()['refund_details'][0]['reason'] == 'Between 24 hours and 7 days before booking - 50% refund'
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
-        assert r.json()['refund_details'][1]['refunded_amount'] == 501
+        assert r.json()['refund_details'][1]['refunded_amount'] == 250
         assert r.json()['refund_details'][1]['reason'] == 'Between 24 hours and 7 days before booking - 50% refund'
+        assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
+        assert r.json()['cancellation_policy'] == "Flexible"
+
+        self.assertEqual(r.status_code, 200)
+
+    def test_simple_cancel_refund_6(self):
+        '''
+        This test has 2 payment intents
+        Flexible
+        less than 24hrs
+        no refund
+        :return:
+        '''
+
+        # Add Cancellation Policy to the property document
+        self.mock_firestore.collection('properties').document('fake_property_ref').update({
+            "cancellationPolicy": "Flexible"
+        })
+
+        # Create a Stripe PaymentIntent
+        pi = stripe.PaymentIntent.create(
+            amount=1099,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method="pm_card_visa",
+            off_session=True,
+            confirm=True,
+        )
+
+        pi2 = stripe.PaymentIntent.create(
+            amount=501,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method="pm_card_visa",
+            off_session=True,
+            confirm=True,
+        )
+
+        # Add payment to trip
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "stripePaymentIntents": [pi.id, pi2.id]
+        })
+
+        # Create a datetime object
+        trip_begin_datetime = current_time - timedelta(hours=5)
+
+        # Convert the datetime object to a timestamp
+        trip_begin_timestamp = trip_begin_datetime.timestamp()
+
+        # Add tripBeginDateTime to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "tripBeginDateTime": trip_begin_timestamp
+        })
+
+        data = {
+            "trip_ref": "trips/fake_trip_ref",
+        }
+        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        debug(r.json())
+
+        # Check the result
+        assert r.json()['status'] == 200
+        assert r.json()['message'] == 'Refund processed.'
+        assert r.json()['total_refunded'] == 0
+        assert r.json()['refund_details'][0]['refunded_amount'] == 0
+        assert r.json()['refund_details'][0]['reason'] == 'Less than 24 hours before booking - no refund'
+        assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
+        assert r.json()['refund_details'][1]['refunded_amount'] == 0
+        assert r.json()['refund_details'][1]['reason'] == 'Less than 24 hours before booking - no refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
         assert r.json()['cancellation_policy'] == "Flexible"
 

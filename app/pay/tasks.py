@@ -238,8 +238,6 @@ def process_cancel_refund(trip_ref):
             already_refunded = charge.amount_refunded
             refundable_amount = charge.amount - already_refunded
 
-            debug(cancellation_policy)
-
             if cancellation_policy == "Very Flexible":
                 debug(time_difference)
                 if time_difference <= timedelta(hours=24):
