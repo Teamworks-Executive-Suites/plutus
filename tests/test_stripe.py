@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
 
 import stripe
@@ -9,7 +10,7 @@ from fastapi.testclient import TestClient
 from mockfirestore import MockFirestore
 
 from app.main import app
-from app.firebase_setup import db, MOCK_DB
+from app.firebase_setup import db, MOCK_DB, current_time
 
 client = TestClient(app)
 
@@ -44,11 +45,11 @@ class FakeFirestore:
                     "stripePaymentIntents": [],
                     "tripAddonTotal": 0,
                     "tripBaseTotal": 0,
-                    "tripBeginDateTime": "",
+                    "tripBeginDateTime": None,
                     "tripCost": 0,
                     "tripCreated": "",
                     "tripDate": "",
-                    "tripEndDateTime": "",
+                    "tripEndDateTime": None,
                     "tripReason": "",
                     "upcoming": False,
                     "userRef": ""
@@ -285,12 +286,20 @@ class StripeCancelRefund(TestCase):
         )
 
     def test_simple_cancel_refund(self):
+        '''
+        This test has 1 payment intent
+        less than 24hrs
+        full refund
+        :return:
+        '''
+
+
         # Create a MockFirestore instance
         # firestore_mock.return_value = self.mock_firestore
 
         # Add property_ref to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "propertyRef": "properties/fake_property_ref"
+            "propertyRef": "fake_property_ref"
         })
 
         # Add Cancellation Policy to the property document
@@ -313,11 +322,16 @@ class StripeCancelRefund(TestCase):
             "stripePaymentIntents": [pi.id]
         })
 
+        # Create a datetime object
+        trip_begin_datetime = current_time - timedelta(days=1)
+
+        # Convert the datetime object to a timestamp
+        trip_begin_timestamp = trip_begin_datetime.timestamp()
+
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": "2023-08-01T00:00:00.000Z"
+            "tripBeginDateTime": trip_begin_timestamp
         })
-
 
         data = {
             "trip_ref": "trips/fake_trip_ref",

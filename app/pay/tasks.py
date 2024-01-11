@@ -1,7 +1,7 @@
 import logging
 import os
 import stripe
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from google.cloud.firestore_v1 import FieldFilter
 from devtools import debug
@@ -18,13 +18,9 @@ def get_document_from_ref(ref):
     :param ref:
     :return:
     """
-    debug(ref)
     collection_id, document_id = ref.split("/")
-    debug(collection_id)
-    debug(document_id)
     debug(db.collection(collection_id).document(document_id).get().to_dict())
     document = db.collection(collection_id).document(document_id).get()
-    debug("Document in get_document_from_ref:", document)
     return document
 
 
@@ -221,13 +217,17 @@ def process_cancel_refund(trip_ref):
     if not property.exists:
         return {"status": 404, "message": "Property document not found."}
 
-    cancellation_policy = property.cancellationPolicy
+
+    cancellation_policy = property.get("cancellationPolicy")
     debug(cancellation_policy)
 
     logging.info("Cancellation policy: %s", cancellation_policy)
 
-    trip_begin_time = trip.tripBeginDateTime
-    time_difference = trip_begin_time - current_time
+    trip_begin_time = trip.get("tripBeginDateTime")
+    trip_begin_time = datetime.fromtimestamp(trip_begin_time, tz=current_time.tzinfo)
+    time_difference = current_time - trip_begin_time # from start to now
+
+    debug(time_difference)
 
     payment_intent_ids = trip.get("stripePaymentIntents")
     debug(payment_intent_ids)
@@ -243,19 +243,25 @@ def process_cancel_refund(trip_ref):
                 continue
 
             already_refunded = charge.amount_refunded
+
+            debug(already_refunded)
+
             refundable_amount = charge.amount - already_refunded
 
+            debug(refundable_amount)
+
             if cancellation_policy == "Very Flexible":
-                if time_difference >= timedelta(hours=24):
+                debug(time_difference)
+                if time_difference <= timedelta(hours=24):
                     refund_amount = refundable_amount
-                    refund_reason = "24 or more hours before trip"
+                    refund_reason = "24 or more less before trip"
                 else:
                     refund_amount = 0
                     refund_reason = "Less than 24 hours before trip"
             elif cancellation_policy == "Flexible":
-                if time_difference >= timedelta(days=7):
+                if time_difference <= timedelta(days=7):
                     refund_amount = refundable_amount
-                    refund_reason = "7 or more days before trip"
+                    refund_reason = "7 or less days before trip"
                 elif timedelta(hours=24) <= time_difference < timedelta(days=7):
                     refund_amount = refundable_amount // 2
                     refund_reason = "Between 24 hours and 7 days before trip"
