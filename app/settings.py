@@ -5,6 +5,8 @@ from pydantic_settings import SettingsConfigDict, BaseSettings
 
 
 class Settings(BaseSettings):
+    load_dotenv('../.env')
+
     # Dev and Testing
     testing: bool = False
     dev: bool = False
