@@ -22,7 +22,6 @@ client = TestClient(app)
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 
-
 # need a fake firestore trip to test with
 class FakeFirestore:
     def __init__(self):
@@ -116,6 +115,7 @@ class FakeFirestore:
             }
         }
 
+
 #
 # # Ensure that the MockDB and its related classes (MockCollection, MockDocument) are working correctly
 #
@@ -178,20 +178,22 @@ class StripeRefund(TestCase):
             "Authorization": f'Bearer {settings.test_token}'
         }
 
-    @patch('google.cloud.firestore_v1.collection.CollectionReference.document')
-    def test_simple_refund(self, document_mock):
-        # Create a mock Firestore document
-        mock_document = Mock()
+        # Create a MockFirestore instance
+        self.mock_firestore = MOCK_DB
 
-        # Create a mock DocumentSnapshot
-        mock_snapshot = Mock()
-        mock_snapshot.exists = True
-        mock_snapshot.get = lambda key: self.fake_firestore.db["trips"]["fake_trip_ref"].get(
-            key)  # Use a lambda function here
+        # Set up your mock data
+        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
+            self.fake_firestore.db["trips"]["fake_trip_ref"]
+        )
+        self.mock_firestore.collection('properties').document('fake_property_ref').set(
+            self.fake_firestore.db["properties"]["fake_property_ref"]
+        )
+        # Add property_ref to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "propertyRef": "fake_property_ref"
+        })
 
-        mock_document.get.return_value = mock_snapshot
-        document_mock.return_value = mock_document
-
+    def test_simple_refund(self):
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
@@ -202,7 +204,13 @@ class StripeRefund(TestCase):
         )
 
         # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
+
+        trip = self.mock_firestore.collection('trips').document('fake_trip_ref').get()
+        current_intents = trip.get("stripePaymentIntents")
+        current_intents.append(pi.id)
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "stripePaymentIntents": current_intents
+        })
 
         data = {
             "trip_ref": "trips/fake_trip_ref",
@@ -219,20 +227,7 @@ class StripeRefund(TestCase):
 
         self.assertEqual(r.status_code, 200)
 
-    @patch('google.cloud.firestore_v1.collection.CollectionReference.document')
-    def test_complex_one(self, document_mock):
-        # Create a mock Firestore document
-        mock_document = Mock()
-
-        # Create a mock DocumentSnapshot
-        mock_snapshot = Mock()
-        mock_snapshot.exists = True
-        mock_snapshot.get = lambda key: self.fake_firestore.db["trips"]["fake_trip_ref"].get(
-            key)  # Use a lambda function here
-
-        mock_document.get.return_value = mock_snapshot
-        document_mock.return_value = mock_document
-
+    def test_complex_one(self):
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
@@ -241,9 +236,6 @@ class StripeRefund(TestCase):
             off_session=True,
             confirm=True,
         )
-
-        # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi.id)
 
         pi2 = stripe.PaymentIntent.create(
             amount=1099,
@@ -254,8 +246,13 @@ class StripeRefund(TestCase):
             confirm=True,
         )
 
-        # Add payment to trip
-        self.fake_firestore.db["trips"]["fake_trip_ref"]["stripePaymentIntents"].append(pi2.id)
+        trip = self.mock_firestore.collection('trips').document('fake_trip_ref').get()
+        current_intents = trip.get("stripePaymentIntents")
+        current_intents.append(pi.id)
+        current_intents.append(pi2.id)
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "stripePaymentIntents": current_intents
+        })
 
         data = {
             "trip_ref": "trips/fake_trip_ref",
@@ -271,6 +268,88 @@ class StripeRefund(TestCase):
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
         assert r.json()['refund_details'][1]['refunded_amount'] == 200
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
+
+        self.assertEqual(r.status_code, 200)
+
+
+class StripeCancelRefund(TestCase):
+    def setUp(self) -> None:
+        self.client = TestClient(app)
+        self.fake_firestore = FakeFirestore()
+
+        self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
+
+        settings.testing = True
+        self.headers = {
+            "Authorization": f'Bearer {settings.test_token}'
+        }
+
+        # Create a MockFirestore instance
+        self.mock_firestore = MOCK_DB
+
+        # Set up your mock data
+        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
+            self.fake_firestore.db["trips"]["fake_trip_ref"]
+        )
+        self.mock_firestore.collection('properties').document('fake_property_ref').set(
+            self.fake_firestore.db["properties"]["fake_property_ref"]
+        )
+        # Add property_ref to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "propertyRef": "fake_property_ref"
+        })
+
+    def test_simple_cancel_refund(self):
+        '''
+        This test has 1 payment intent
+        less than 24hrs
+        full refund
+        :return:
+        '''
+
+        # Add Cancellation Policy to the property document
+        self.mock_firestore.collection('properties').document('fake_property_ref').update({
+            "cancellationPolicy": "Very Flexible"
+        })
+
+        # Create a Stripe PaymentIntent
+        pi = stripe.PaymentIntent.create(
+            amount=1099,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method="pm_card_visa",
+            off_session=True,
+            confirm=True,
+        )
+
+        # Add payment to trip
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "stripePaymentIntents": [pi.id]
+        })
+
+        # Create a datetime object
+        trip_begin_datetime = current_time - timedelta(days=1)
+
+        # Convert the datetime object to a timestamp
+        trip_begin_timestamp = trip_begin_datetime.timestamp()
+
+        # Add tripBeginDateTime to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            "tripBeginDateTime": trip_begin_timestamp
+        })
+
+        data = {
+            "trip_ref": "trips/fake_trip_ref",
+        }
+        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+
+        # Check the result
+        assert r.json()['status'] == 200
+        assert r.json()['message'] == 'Refund processed.'
+        assert r.json()['total_refunded'] == 1099
+        assert r.json()['refund_details'][0]['refunded_amount'] == 1099
+        assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
+        assert r.json()['cancellation_policy'] == "Very Flexible"
 
         self.assertEqual(r.status_code, 200)
 
@@ -421,7 +500,6 @@ class StripeCancelRefund(TestCase):
 
         self.assertEqual(r.status_code, 200)
 
-
     def test_simple_cancel_refund_3(self):
         '''
         This test has 2 payment intent
@@ -480,10 +558,10 @@ class StripeCancelRefund(TestCase):
         assert r.json()['message'] == 'Refund processed.'
         assert r.json()['total_refunded'] == 0
         assert r.json()['refund_details'][0]['refunded_amount'] == 0
-        assert r.json()['refund_details'][0]['reason'] == 'Less than 24 hours before trip - no refund'
+        assert r.json()['refund_details'][0]['reason'] == 'Less than 24 hours before booking - no refund'
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
-        assert r.json()['refund_details'][1]['reason'] == 'Less than 24 hours before trip - no refund'
+        assert r.json()['refund_details'][1]['reason'] == 'Less than 24 hours before booking - no refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
         assert r.json()['cancellation_policy'] == "Very Flexible"
 
@@ -556,7 +634,6 @@ class StripeCancelRefund(TestCase):
         assert r.json()['cancellation_policy'] == "Flexible"
 
         self.assertEqual(r.status_code, 200)
-
 
     def test_simple_cancel_refund_5(self):
         '''
@@ -819,11 +896,11 @@ class StripeCancelRefund(TestCase):
         # Check the result
         assert r.json()['status'] == 200
         assert r.json()['message'] == 'Refund processed.'
-        assert r.json()['total_refunded'] == 800
+        assert r.json()['total_refunded'] == 799
         assert r.json()['refund_details'][0]['refunded_amount'] == 549
         assert r.json()['refund_details'][0]['reason'] == 'Between 7 and 30 days before booking - 50% refund'
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
-        assert r.json()['refund_details'][1]['refunded_amount'] == 251
+        assert r.json()['refund_details'][1]['refunded_amount'] == 250
         assert r.json()['refund_details'][1]['reason'] == 'Between 7 and 30 days before booking - 50% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
         assert r.json()['cancellation_policy'] == "Standard 30 Day"
@@ -897,7 +974,6 @@ class StripeCancelRefund(TestCase):
         assert r.json()['cancellation_policy'] == "Standard 30 Day"
 
         self.assertEqual(r.status_code, 200)
-
 
     def test_simple_cancel_refund_10(self):
         '''
@@ -1024,11 +1100,11 @@ class StripeCancelRefund(TestCase):
         # Check the result
         assert r.json()['status'] == 200
         assert r.json()['message'] == 'Refund processed.'
-        assert r.json()['total_refunded'] == 800
+        assert r.json()['total_refunded'] == 799
         assert r.json()['refund_details'][0]['refunded_amount'] == 549
         assert r.json()['refund_details'][0]['reason'] == 'Between 30 and 90 days before booking - 50% refund'
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
-        assert r.json()['refund_details'][1]['refunded_amount'] == 251
+        assert r.json()['refund_details'][1]['refunded_amount'] == 250
         assert r.json()['refund_details'][1]['reason'] == 'Between 30 and 90 days before booking - 50% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
         assert r.json()['cancellation_policy'] == "Standard 90 Day"
@@ -1103,7 +1179,6 @@ class StripeCancelRefund(TestCase):
 
         self.assertEqual(r.status_code, 200)
 
-
     def test_simple_cancel_refund_13(self):
         '''
         This test has 2 payment intents
@@ -1164,17 +1239,15 @@ class StripeCancelRefund(TestCase):
         assert r.json()['total_refunded'] == 0
         assert r.json()['refund_details'][0]['refunded_amount'] == 0
         assert r.json()['refund_details'][0]['reason'] == ('Cancellation policy not recognized: Unknown Cancellation '
-                                                           'Policy  - no refund - please contact support')
+                                                           'Policy - no refund - please contact support')
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
         assert r.json()['refund_details'][1]['reason'] == ('Cancellation policy not recognized: Unknown Cancellation '
-                                                           'Policy  - no refund - please contact support')
+                                                           'Policy - no refund - please contact support')
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 90 Day"
+        assert r.json()['cancellation_policy'] == "Unknown Cancellation Policy"
 
         self.assertEqual(r.status_code, 200)
-
-
 
 # class StripeExtraCharge(TestCase):
 #     def setUp(self) -> None:

@@ -5,3 +5,7 @@ install:
 .PHONY: test
 test:
 	pytest --cov=app
+
+.PHONY: start
+start:
+	uvicorn app.main:app --reload
