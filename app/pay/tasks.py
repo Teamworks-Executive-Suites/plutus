@@ -119,7 +119,7 @@ def handle_refund(trip_ref, amount):
     return response
 
 
-def process_extra_charge(trip_ref):
+def process_extra_charge(trip_ref, dispute_ref):
     """
     Process an extra charge for a given trip in the case of a dispute.
 
@@ -142,7 +142,9 @@ def process_extra_charge(trip_ref):
         return response
 
     # Retrieve the dispute associated with the trip
-    dispute = get_dispute_by_trip_ref(trip_ref)
+    # dispute = get_dispute_by_trip_ref(trip_ref)
+
+    dispute = get_document_from_ref(dispute_ref)
 
     if not dispute:
         response["status"] = 404
@@ -183,6 +185,8 @@ def process_extra_charge(trip_ref):
         response["message"] = "Extra charge processed successfully."
         response["details"]["payment_intent"] = extra_charge_pi
 
+        logging.info("Extra charge processed successfully: %s", extra_charge_pi)
+
         return response
     except stripe.error.CardError as e:
         err = e.error
@@ -191,6 +195,8 @@ def process_extra_charge(trip_ref):
         response["details"]["error_code"] = err.code
         response["details"]["error_message"] = str(e)
 
+        logging.error("Failed to process extra charge due to a card error: %s", err.code)
+
         return response
     except Exception as e:
         response["status"] = 500
@@ -198,6 +204,8 @@ def process_extra_charge(trip_ref):
             "message"
         ] = "An unexpected error occurred while processing the extra charge."
         response["details"]["error_message"] = str(e)
+
+        logging.error("An unexpected error occurred while processing the extra charge: %s", str(e))
 
         return response
 

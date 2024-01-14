@@ -1,7 +1,3 @@
-import sys
-
-print(sys.executable)
-
 import logging
 import os
 
@@ -11,14 +7,12 @@ from contextlib import asynccontextmanager
 
 from app.auto.tasks import auto_complete
 from app.cal.tasks import update_calendars
-from app.settings import Settings
 from app.auth.views import auth_router
 from app.cal.views import cal_router
 from app.pay.views import stripe_router
 
-settings = Settings()
-
 known_tokens = set()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

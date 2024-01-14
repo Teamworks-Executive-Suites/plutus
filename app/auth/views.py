@@ -4,11 +4,10 @@ from starlette import status
 from devtools import debug
 
 from app.auth.tasks import generate_bearer_token
-from app.settings import Settings
+from app.utils import settings
+
 from app.models import UnauthorizedMessage
 import typing as t
-
-settings = Settings()
 
 auth_router = APIRouter()
 
@@ -27,7 +26,6 @@ async def get_token(
         auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
 ) -> str:
     # If settings.testing is True, return a dummy token
-    debug(settings.testing)
     if settings.test_token:
         known_tokens.add(settings.test_token)
 

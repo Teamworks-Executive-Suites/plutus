@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.auth.views import get_token
 
-from app.models import Trip, Refund
+from app.models import Trip, Refund, ExtraCharge
 from app.pay.tasks import process_extra_charge, handle_refund, process_cancel_refund
 from devtools import debug
 
@@ -9,8 +9,8 @@ stripe_router = APIRouter()
 
 
 @stripe_router.post("/extra_charge")
-def extra_charge(data: Trip, token: str = Depends(get_token)):
-    return process_extra_charge(data.trip_ref)
+def extra_charge(data: ExtraCharge, token: str = Depends(get_token)):
+    return process_extra_charge(data.trip_ref, data.dispute_ref)
 
 
 @stripe_router.post("/refund")

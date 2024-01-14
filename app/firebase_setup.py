@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from datetime import datetime, timezone
 
@@ -7,11 +8,9 @@ from dotenv import load_dotenv
 from firebase_admin import credentials, firestore
 from mockfirestore import MockFirestore
 
-from app.settings import Settings
-
 from devtools import debug
 
-settings = Settings()
+from app.utils import settings
 
 load_dotenv()
 tz = timezone.utc
@@ -24,13 +23,15 @@ cred = credentials.Certificate(
 
 app = firebase_admin.initialize_app(cred)
 
+
 MOCK_DB = MockFirestore()
 
 debug(settings.testing)
-settings.testing = True
 
 if settings.testing:
-    debug('hi')
+    debug("Using mock db")
+    logging.info("Using mock db")
     db = MOCK_DB
 else:
+    debug("Using real db")
     db = firestore.client()
