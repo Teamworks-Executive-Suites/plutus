@@ -1,5 +1,6 @@
+import os
 from typing import Optional
-
+from dotenv import load_dotenv
 from pydantic_settings import SettingsConfigDict, BaseSettings
 
 
@@ -16,8 +17,8 @@ class Settings(BaseSettings):
     # Google
     g_project_id: str = 'teamworks-3b262'
     g_client_email: str = 'firebase-adminsdk-2xapk@teamworks-3b262.iam.gserviceaccount.com'
-    g_private_key_id: str = ''
-    g_private_key: str = ''
+    g_private_key_id: str = os.getenv('G_PRIVATE_KEY_ID')
+    g_private_key: str = os.getenv('G_PRIVATE_KEY')
     g_client_id: str = '107343977696521340350'
     g_auth_uri: str = 'https://accounts.google.com/o/oauth2/auth'
     g_token_uri: str = 'https://oauth2.googleapis.com/token'
