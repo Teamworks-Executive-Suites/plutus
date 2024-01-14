@@ -217,7 +217,6 @@ def process_cancel_refund(trip_ref):
         return {"status": 404, "message": "Trip document not found."}
 
     property_ref = trip.get("propertyRef")
-    debug(property_ref)
     property = get_document_from_ref(f'properties/{property_ref}')
 
     if not property.exists:
@@ -231,7 +230,6 @@ def process_cancel_refund(trip_ref):
     time_difference = current_time - trip_begin_time  # from start to now
 
     payment_intent_ids = trip.get("stripePaymentIntents")
-    debug(payment_intent_ids)
     if not payment_intent_ids:
         return {"status": 404, "message": "No payment intents found on trip."}
 
@@ -247,7 +245,6 @@ def process_cancel_refund(trip_ref):
             refundable_amount = charge.amount - already_refunded
 
             if cancellation_policy == "Very Flexible":
-                debug(time_difference)
                 if time_difference <= timedelta(hours=24):
                     refund_amount = refundable_amount
                     refund_reason = "24 or more before booking - 100% refund"

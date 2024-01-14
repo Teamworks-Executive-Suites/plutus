@@ -345,7 +345,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -409,7 +408,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -476,7 +474,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -545,7 +542,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -615,7 +611,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -684,7 +679,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -753,7 +747,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -822,7 +815,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -891,7 +883,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -961,7 +952,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -1030,7 +1020,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -1099,7 +1088,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200
@@ -1169,7 +1157,6 @@ class StripeCancelRefund(TestCase):
             "trip_ref": "trips/fake_trip_ref",
         }
         r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-        debug(r.json())
 
         # Check the result
         assert r.json()['status'] == 200

@@ -30,7 +30,6 @@ async def get_token(
         known_tokens.add(settings.test_token)
 
     # Simulate a database query to find a known token
-    debug(known_tokens)
     if auth is None or (token := auth.credentials) not in known_tokens:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

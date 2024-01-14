@@ -26,12 +26,9 @@ app = firebase_admin.initialize_app(cred)
 
 MOCK_DB = MockFirestore()
 
-debug(settings.testing)
 
 if settings.testing:
-    debug("Using mock db")
     logging.info("Using mock db")
     db = MOCK_DB
 else:
-    debug("Using real db")
     db = firestore.client()
