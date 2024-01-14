@@ -1,12 +1,9 @@
-import logging
 import os
-from datetime import datetime, timedelta
-from unittest.mock import Mock, patch
+from datetime import timedelta
 
-import stripe
-import unittest
 from unittest import TestCase
 
+import stripe
 from fastapi.testclient import TestClient
 
 from app.utils import settings
@@ -15,7 +12,7 @@ from app.utils import settings
 settings.testing = True
 
 from app.main import app
-from app.firebase_setup import db, MOCK_DB, current_time
+from app.firebase_setup import MOCK_DB, current_time
 
 client = TestClient(app)
 
