@@ -1,0 +1,5 @@
+[tool.pytest]
+    testpaths = ['tests']
+
+[tool.pytest.ini_options]
+    addopts = '--tb=native'
