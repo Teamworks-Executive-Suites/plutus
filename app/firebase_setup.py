@@ -18,7 +18,7 @@ tz = timezone.utc
 current_time = datetime.now(timezone.utc)
 
 cred = credentials.Certificate(
-    json.loads(os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+    settings.firebase_credentials
 )
 
 app = firebase_admin.initialize_app(cred)
