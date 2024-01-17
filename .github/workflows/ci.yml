@@ -26,7 +26,11 @@ jobs:
         cache: 'pip'
 
     - name: Set up environment variables
-      run: echo "G_PRIVATE_KEY=${{ secrets.G_PRIVATE_KEY }}" >> $GITHUB_ENV
+      run: |
+          echo "G_PRIVATE_KEY=${{ secrets.G_PRIVATE_KEY }}" >> $GITHUB_ENV
+          echo "G_PRIVATE_KEY_ID=${{ secrets.G_PRIVATE_KEY_ID }}" >> $GITHUB_ENV
+          echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> $GITHUB_ENV
+          echo "MASTER_TOKEN=${{ secrets.MASTER_TOKEN }}" >> $GITHUB_ENV
 
     - name: install dependencies
       run: |
