@@ -3,15 +3,10 @@ import os
 from datetime import datetime
 
 import requests
-from app import stripe
 from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
-from devtools import debug
 from app.firebase_setup import db, current_time
-
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
-
 
 def create_cal_for_property(propertyRef):
     logging.info("create_cal_for_property")

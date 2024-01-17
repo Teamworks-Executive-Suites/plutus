@@ -1,12 +1,8 @@
-import json
 import logging
 import os
-from datetime import datetime, timedelta, timezone
+import stripe
+from datetime import timedelta, datetime
 
-import firebase_admin
-from app import stripe
-from dotenv import load_dotenv
-from firebase_admin import credentials, firestore
 from google.cloud.firestore_v1 import FieldFilter
 from devtools import debug
 from app.firebase_setup import db, current_time
@@ -15,17 +11,15 @@ stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
 
 
 # Stripe stuff
-def get_document_from_ref(trip_ref):
+def get_document_from_ref(ref):
     """
     Get a document from a given reference.
-    :param trip_ref:
+    :param ref:
     :return:
     """
-    collection_id, document_id = trip_ref.split("/")
-    debug(collection_id, document_id)
-    trip = db.collection(collection_id).document(document_id).get()
-    debug(trip.get("stripePaymentIntents"))
-    return trip
+    collection_id, document_id = ref.split("/")
+    document = db.collection(collection_id).document(document_id).get()
+    return document
 
 
 def get_dispute_by_trip_ref(trip_ref):
@@ -69,7 +63,6 @@ def handle_refund(trip_ref, amount):
     """
     logging.info("handle_refund called with trip_ref: %s", trip_ref)
 
-    print(trip_ref)
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
@@ -126,7 +119,7 @@ def handle_refund(trip_ref, amount):
     return response
 
 
-def process_extra_charge(trip_ref):
+def process_extra_charge(trip_ref, dispute_ref):
     """
     Process an extra charge for a given trip in the case of a dispute.
 
@@ -149,7 +142,9 @@ def process_extra_charge(trip_ref):
         return response
 
     # Retrieve the dispute associated with the trip
-    dispute = get_dispute_by_trip_ref(trip_ref)
+    # dispute = get_dispute_by_trip_ref(trip_ref)
+
+    dispute = get_document_from_ref(dispute_ref)
 
     if not dispute:
         response["status"] = 404
@@ -190,6 +185,8 @@ def process_extra_charge(trip_ref):
         response["message"] = "Extra charge processed successfully."
         response["details"]["payment_intent"] = extra_charge_pi
 
+        logging.info("Extra charge processed successfully: %s", extra_charge_pi)
+
         return response
     except stripe.error.CardError as e:
         err = e.error
@@ -198,6 +195,8 @@ def process_extra_charge(trip_ref):
         response["details"]["error_code"] = err.code
         response["details"]["error_message"] = str(e)
 
+        logging.error("Failed to process extra charge due to a card error: %s", err.code)
+
         return response
     except Exception as e:
         response["status"] = 500
@@ -205,6 +204,8 @@ def process_extra_charge(trip_ref):
             "message"
         ] = "An unexpected error occurred while processing the extra charge."
         response["details"]["error_message"] = str(e)
+
+        logging.error("An unexpected error occurred while processing the extra charge: %s", str(e))
 
         return response
 
@@ -216,15 +217,17 @@ def process_cancel_refund(trip_ref):
         return {"status": 404, "message": "Trip document not found."}
 
     property_ref = trip.get("propertyRef")
-    property_doc = get_document_from_ref(property_ref)
+    property = get_document_from_ref(f'properties/{property_ref}')
 
-    if not property_doc.exists:
+    if not property.exists:
         return {"status": 404, "message": "Property document not found."}
 
-    cancellation_policy = property_doc.get("cancellationPolicy")
+    cancellation_policy = property.get("cancellationPolicy")
+    logging.info("Cancellation policy: %s", cancellation_policy)
 
     trip_begin_time = trip.get("tripBeginDateTime")
-    time_difference = trip_begin_time - current_time
+    trip_begin_time = datetime.fromtimestamp(trip_begin_time, tz=current_time.tzinfo)
+    time_difference = current_time - trip_begin_time  # from start to now
 
     payment_intent_ids = trip.get("stripePaymentIntents")
     if not payment_intent_ids:
@@ -242,45 +245,45 @@ def process_cancel_refund(trip_ref):
             refundable_amount = charge.amount - already_refunded
 
             if cancellation_policy == "Very Flexible":
-                if time_difference >= timedelta(hours=24):
+                if time_difference <= timedelta(hours=24):
                     refund_amount = refundable_amount
-                    refund_reason = "24 or more hours before trip"
+                    refund_reason = "24 or more before booking - 100% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 24 hours before trip"
+                    refund_reason = "Less than 24 hours before booking - no refund"
             elif cancellation_policy == "Flexible":
                 if time_difference >= timedelta(days=7):
                     refund_amount = refundable_amount
-                    refund_reason = "7 or more days before trip"
+                    refund_reason = "7 or more days before booking - 100% refund"
                 elif timedelta(hours=24) <= time_difference < timedelta(days=7):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 24 hours and 7 days before trip"
+                    refund_reason = "Between 24 hours and 7 days before booking - 50% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 24 hours before trip"
+                    refund_reason = "Less than 24 hours before booking - no refund"
             elif cancellation_policy == "Standard 30 Day":
                 if time_difference >= timedelta(days=30):
                     refund_amount = refundable_amount
-                    refund_reason = "30 or more days before trip"
+                    refund_reason = "30 or more days before booking - 100% refund"
                 elif timedelta(days=7) <= time_difference < timedelta(days=30):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 7 and 30 days before trip"
+                    refund_reason = "Between 7 and 30 days before booking - 50% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 7 days before trip"
+                    refund_reason = "Less than 7 days before booking - no refund"
             elif cancellation_policy == "Standard 90 Day":
                 if time_difference >= timedelta(days=90):
                     refund_amount = refundable_amount
-                    refund_reason = "90 or more days before trip"
+                    refund_reason = "90 or more days before booking - 100% refund"
                 elif timedelta(days=30) <= time_difference < timedelta(days=90):
                     refund_amount = refundable_amount // 2
-                    refund_reason = "Between 30 and 90 days before trip"
+                    refund_reason = "Between 30 and 90 days before booking - 50% refund"
                 else:
                     refund_amount = 0
-                    refund_reason = "Less than 30 days before trip"
+                    refund_reason = "Less than 30 days before booking - no refund"
             else:
                 refund_amount = 0
-                refund_reason = "Cancellation policy not recognized"
+                refund_reason = f"Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support"
 
             if refund_amount > 0:
                 process_refund(charge.id, refund_amount)
@@ -308,6 +311,7 @@ def process_cancel_refund(trip_ref):
         "message": "Refund processed.",
         "total_refunded": total_refunded,
         "refund_details": refund_details,
+        "cancellation_policy": cancellation_policy,
     }
 
     return response

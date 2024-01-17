@@ -8,6 +8,10 @@ class Name(BaseModel):
 class Trip(BaseModel):
     trip_ref: str
 
+class ExtraCharge(BaseModel):
+    trip_ref: str
+    dispute_ref: str
+
 
 class Refund(BaseModel):
     trip_ref: str

@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '**'
+  pull_request: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    env:
+      LOGFIRE_SEND_TO_LOGFIRE: 'false'
+      TESTING: 'true'
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: set up python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.10'
+        cache: 'pip'
+
+    - name: Set up environment variables
+      run: echo "G_PRIVATE_KEY=${{ secrets.G_PRIVATE_KEY }}" >> $GITHUB_ENV
+
+    - name: install dependencies
+      run: |
+          make install
+          pip freeze
+
+    - name: test
+      run: make test
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v3
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
