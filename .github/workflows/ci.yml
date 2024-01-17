@@ -25,6 +25,9 @@ jobs:
         python-version: '3.10'
         cache: 'pip'
 
+    - name: Set up environment variables
+      run: echo "G_PRIVATE_KEY=${{ secrets.G_PRIVATE_KEY }}" >> $GITHUB_ENV
+
     - name: install dependencies
       run: |
           make install
