@@ -34,7 +34,7 @@ class Settings(BaseSettings):
             'type': 'service_account',
             'project_id': self.g_project_id,
             'private_key_id': self.g_private_key_id,
-            'private_key': self.g_private_key.replace('\\n', '\n'),
+            'private_key': self.g_private_key,
             'client_email': self.g_client_email,
             'client_id': self.g_client_id,
             'auth_uri': self.g_auth_uri,
