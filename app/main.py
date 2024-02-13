@@ -1,6 +1,6 @@
 import logging
-import os
 
+import logfire
 from fastapi import FastAPI
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
@@ -11,7 +11,8 @@ from app.auth.views import auth_router
 from app.cal.views import cal_router
 from app.pay.views import stripe_router
 
-known_tokens = set()
+from app.utils import settings
+
 
 
 @asynccontextmanager
@@ -19,10 +20,6 @@ async def lifespan(app: FastAPI):
     # Retrieve master token from environment variable and add it to known_tokens
 
     logging.info('startup')
-
-    master_token = os.getenv("MASTER_TOKEN")
-    if master_token:
-        known_tokens.add(master_token)
 
     # Run the tasks immediately on startup
     update_calendars()
@@ -38,6 +35,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+if bool(settings.logfire_token):
+    logfire.configure()
+    logfire.instrument_fastapi(app)
+    logfire.install_auto_tracing(modules=['app'])
 
 app.include_router(auth_router)
 app.include_router(cal_router)
