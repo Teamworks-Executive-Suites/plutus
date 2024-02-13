@@ -95,3 +95,9 @@ Before using the endpoints, make sure to configure the necessary environment var
 - `GOOGLE_APPLICATION_CREDENTIALS`: Firebase configuration JSON string
 - `STRIPE_SECRET_KEY`: Your Stripe API key
 
+
+## Logfire:
+
+[Logfire](https://dash.logfire.dev/anonymous/Plutus)
+
+run `logfire whoami to get the url with token`
