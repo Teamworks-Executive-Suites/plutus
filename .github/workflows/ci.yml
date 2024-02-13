@@ -31,6 +31,7 @@ jobs:
           echo "G_PRIVATE_KEY_ID=${{ secrets.G_PRIVATE_KEY_ID }}" >> $GITHUB_ENV
           echo "STRIPE_SECRET_KEY=${{ secrets.STRIPE_SECRET_KEY }}" >> $GITHUB_ENV
           echo "MASTER_TOKEN=${{ secrets.MASTER_TOKEN }}" >> $GITHUB_ENV
+          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
 
     - name: install dependencies
       run: |
@@ -45,3 +46,19 @@ jobs:
       env:
         CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  deploy:
+    needs:
+      - test
+    if: "success() && startsWith(github.ref, 'refs/tags/')"
+    runs-on: ubuntu-latest
+
+    env:
+      HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+      HEROKU_APP: tw-plutus
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: git fetch --unshallow
+      - run: git switch main
+      - run: git remote add heroku https://heroku:$HEROKU_API_KEY@git.heroku.com/$HEROKU_APP.git
+      - run: git push heroku main
