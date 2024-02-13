@@ -3,3 +3,6 @@
 
 [tool.pytest.ini_options]
     addopts = '--tb=native'
+
+[tool.logfire]
+    project_name = 'Plutus'
