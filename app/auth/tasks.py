@@ -1,7 +1,3 @@
-import uuid
-from devtools import debug
-
-
 # def generate_bearer_token():
 #     # Generate a random UUID to act as the token
 #     token = str(uuid.uuid4())

@@ -1,18 +1,16 @@
 import logging
-
-import logfire
-from fastapi import FastAPI
-from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
 
+import logfire
+from apscheduler.schedulers.background import BackgroundScheduler
+from fastapi import FastAPI
+
+from app.auth.views import auth_router
 from app.auto.tasks import auto_complete
 from app.cal.tasks import update_calendars
-from app.auth.views import auth_router
 from app.cal.views import cal_router
 from app.pay.views import stripe_router
-
 from app.utils import settings
-
 
 
 @asynccontextmanager
@@ -39,7 +37,6 @@ app = FastAPI(lifespan=lifespan)
 if bool(settings.logfire_token):
     logfire.configure()
     logfire.instrument_fastapi(app)
-    logfire.install_auto_tracing(modules=['app'])
 
 app.include_router(auth_router)
 app.include_router(cal_router)

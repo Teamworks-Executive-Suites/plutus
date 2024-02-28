@@ -1,14 +1,11 @@
-import os
+import typing as t
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
-from devtools import debug
-
-from app.utils import settings
 
 from app.models import UnauthorizedMessage
-import typing as t
+from app.utils import settings
 
 auth_router = APIRouter()
 
@@ -20,7 +17,7 @@ get_bearer_token = HTTPBearer(auto_error=False)
 
 
 async def get_token(
-        auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
+    auth: t.Optional[HTTPAuthorizationCredentials] = Depends(get_bearer_token),
 ) -> str:
     # If settings.testing is True, return a dummy token
     if settings.testing:
@@ -28,8 +25,6 @@ async def get_token(
 
     if settings.master_token:
         known_tokens.add(settings.master_token)
-
-    debug(known_tokens)
 
     # Simulate a database query to find a known token
     if auth is None or (token := auth.credentials) not in known_tokens:
