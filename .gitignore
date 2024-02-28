@@ -1,0 +1,20 @@
+env/
+.env
+
+# PyCharm files
+.pytest_cache
+__pycache__
+.idea/
+
+# Lint files
+.ruff_cache
+.mypy_cache
+
+# Coverage
+.coverage
+
+# Logfire
+/.logfire/
+
+# Calendar ics files
+*.ics

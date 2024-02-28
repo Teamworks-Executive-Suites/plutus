@@ -1,6 +1,6 @@
-import os
 from typing import Optional
-from pydantic_settings import SettingsConfigDict, BaseSettings
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -13,7 +13,6 @@ class Settings(BaseSettings):
 
     logfire_token: Optional[str] = None
 
-
     # Google
     g_project_id: str = 'teamworks-3b262'
     g_client_email: str = 'firebase-adminsdk-2xapk@teamworks-3b262.iam.gserviceaccount.com'
@@ -23,9 +22,7 @@ class Settings(BaseSettings):
     g_auth_uri: str = 'https://accounts.google.com/o/oauth2/auth'
     g_token_uri: str = 'https://oauth2.googleapis.com/token'
     g_auth_provider_x509_cert_url: str = 'https://www.googleapis.com/oauth2/v1/certs'
-    g_client_x509_cert_url: str = (
-        'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2xapk%40teamworks-3b262.iam.gserviceaccount.com'
-    )
+    g_client_x509_cert_url: str = 'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2xapk%40teamworks-3b262.iam.gserviceaccount.com'
 
     # # Firebase Creds
     @property
@@ -42,7 +39,5 @@ class Settings(BaseSettings):
             'auth_provider_x509_cert_url': self.g_auth_provider_x509_cert_url,
             'client_x509_cert_url': self.g_client_x509_cert_url,
         }
-
-
 
     model_config = SettingsConfigDict(env_file='.env', extra='allow')

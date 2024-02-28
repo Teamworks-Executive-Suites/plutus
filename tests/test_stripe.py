@@ -1,18 +1,17 @@
 import os
 from datetime import timedelta
-
 from unittest import TestCase
 
 import stripe
 from fastapi.testclient import TestClient
 
+from app.firebase_setup import MOCK_DB, current_time
+from app.main import app
 from app.utils import settings
 
 # Set settings.testing to True before importing app/firebase_setup.py
 settings.testing = True
 
-from app.main import app
-from app.firebase_setup import MOCK_DB, current_time
 
 client = TestClient(app)
 
@@ -23,93 +22,93 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 class FakeFirestore:
     def __init__(self):
         self.db = {
-            "trips": {
-                "fake_trip_ref": {
-                    "id": "fake_trip_ref",
-                    "cancelTrip": False,
-                    "complete": False,
-                    "editedTripRef": "",
-                    "guests": [],
-                    "host": "",
-                    "inquiryDescription": "",
-                    "isBlocked": False,
-                    "isExternal": False,
-                    "isInquiry": False,
-                    "isOffer": False,
-                    "isRefunded": False,
-                    "isTempEditTrip": False,
-                    "propertyRef": "",
-                    "rated": False,
-                    "stripePaymentIntents": [],
-                    "tripAddonTotal": 0,
-                    "tripBaseTotal": 0,
-                    "tripBeginDateTime": None,
-                    "tripCost": 0,
-                    "tripCreated": "",
-                    "tripDate": "",
-                    "tripEndDateTime": None,
-                    "tripReason": "",
-                    "upcoming": False,
-                    "userRef": ""
+            'trips': {
+                'fake_trip_ref': {
+                    'id': 'fake_trip_ref',
+                    'cancelTrip': False,
+                    'complete': False,
+                    'editedTripRef': '',
+                    'guests': [],
+                    'host': '',
+                    'inquiryDescription': '',
+                    'isBlocked': False,
+                    'isExternal': False,
+                    'isInquiry': False,
+                    'isOffer': False,
+                    'isRefunded': False,
+                    'isTempEditTrip': False,
+                    'propertyRef': '',
+                    'rated': False,
+                    'stripePaymentIntents': [],
+                    'tripAddonTotal': 0,
+                    'tripBaseTotal': 0,
+                    'tripBeginDateTime': None,
+                    'tripCost': 0,
+                    'tripCreated': '',
+                    'tripDate': '',
+                    'tripEndDateTime': None,
+                    'tripReason': '',
+                    'upcoming': False,
+                    'userRef': '',
                 }
             },
-            "users": {
-                "fake_user_ref": {
-                    "id": "fake_user_ref",
-                    "bio": "",
-                    "company": "",
-                    "created_time": "",
-                    "display_name": "",
-                    "email": "",
-                    "isAdmin": False,
-                    "isHost": False,
-                    "numberProperties": 0,
-                    "phone_number": "",
-                    "photo_url": "",
-                    "termsandconditionsaccepted": False,
-                    "uid": "",
-                    "userCity": "",
-                    "fcm_tokens": []
+            'users': {
+                'fake_user_ref': {
+                    'id': 'fake_user_ref',
+                    'bio': '',
+                    'company': '',
+                    'created_time': '',
+                    'display_name': '',
+                    'email': '',
+                    'isAdmin': False,
+                    'isHost': False,
+                    'numberProperties': 0,
+                    'phone_number': '',
+                    'photo_url': '',
+                    'termsandconditionsaccepted': False,
+                    'uid': '',
+                    'userCity': '',
+                    'fcm_tokens': [],
                 }
             },
-            "properties": {
-                "fake_property_ref": {
-                    "cancellationPolicy": "",
-                    "checkInInstructions": "",
-                    "cleaningFee": 0,
-                    "externalCalendar": "",
-                    "hostRules": "",
-                    "id": "fake_property_ref",
-                    "isDraft": False,
-                    "isLive": True,
-                    "lastUpdated": "",
-                    "mainImage": [],
-                    "maxGuests": 0,
-                    "minHours": 4,
-                    "notes": "",
-                    "parkingInstructions": "",
-                    "price": [0, 0, 0, 0, 0, 0],
-                    "propertyAddress": "",
-                    "propertyArea": "",
-                    "propertyDescription": "",
-                    "propertyName": "Test Property",
-                    "ratingSummary": 5,
-                    "sqft": 450,
-                    "taxRate": 0,
-                    "userRef": "users/fake_user_ref",
+            'properties': {
+                'fake_property_ref': {
+                    'cancellationPolicy': '',
+                    'checkInInstructions': '',
+                    'cleaningFee': 0,
+                    'externalCalendar': '',
+                    'hostRules': '',
+                    'id': 'fake_property_ref',
+                    'isDraft': False,
+                    'isLive': True,
+                    'lastUpdated': '',
+                    'mainImage': [],
+                    'maxGuests': 0,
+                    'minHours': 4,
+                    'notes': '',
+                    'parkingInstructions': '',
+                    'price': [0, 0, 0, 0, 0, 0],
+                    'propertyAddress': '',
+                    'propertyArea': '',
+                    'propertyDescription': '',
+                    'propertyName': 'Test Property',
+                    'ratingSummary': 5,
+                    'sqft': 450,
+                    'taxRate': 0,
+                    'userRef': 'users/fake_user_ref',
                 }
             },
-            "disputes": {
-                "fake_dispute_ref": {
-                    "id": "fake_dispute_ref",
-                    "tripRef": "trips/fake_trip_ref",
-                    "disputeCategory": "damage",
-                    "disputeAmount": 1000,
-                    "disputeDescription": "test",
-                    "disputeCreated": None,
-                    "paymentIntent": "",
+            'disputes': {
+                'fake_dispute_ref': {
+                    'id': 'fake_dispute_ref',
+                    'tripRef': 'trips/fake_trip_ref',
+                    'disputeCategory': 'damage',
+                    'disputeAmount': 1000,
+                    'disputeDescription': 'test',
+                    'disputeCreated': None,
+                    'paymentIntent': '',
                 }
-            }
+            },
         }
 
 
@@ -153,6 +152,7 @@ class FakeFirestore:
 #             raise ValueError(f"Collection {collection_id} does not exist in the mock data.")
 #
 
+
 def get_or_create_customer(email: str, name: str):
     customers = stripe.Customer.list(email=email).data
     if customers:
@@ -171,31 +171,27 @@ class StripeRefund(TestCase):
         self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
 
         settings.testing = True
-        self.headers = {
-            "Authorization": f'Bearer {settings.test_token}'
-        }
+        self.headers = {'Authorization': f'Bearer {settings.test_token}'}
 
         # Create a MockFirestore instance
         self.mock_firestore = MOCK_DB
 
         # Set up your mock data
         self.mock_firestore.collection('trips').document('fake_trip_ref').set(
-            self.fake_firestore.db["trips"]["fake_trip_ref"]
+            self.fake_firestore.db['trips']['fake_trip_ref']
         )
         self.mock_firestore.collection('properties').document('fake_property_ref').set(
-            self.fake_firestore.db["properties"]["fake_property_ref"]
+            self.fake_firestore.db['properties']['fake_property_ref']
         )
         # Add property_ref to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "propertyRef": "fake_property_ref"
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'propertyRef': 'fake_property_ref'})
 
     def test_simple_refund(self):
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -203,17 +199,14 @@ class StripeRefund(TestCase):
         # Add payment to trip
 
         trip = self.mock_firestore.collection('trips').document('fake_trip_ref').get()
-        current_intents = trip.get("stripePaymentIntents")
+        current_intents = trip.get('stripePaymentIntents')
         current_intents.append(pi.id)
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": current_intents
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': current_intents}
+        )
 
-        data = {
-            "trip_ref": "trips/fake_trip_ref",
-            "amount": 1099
-        }
-        r = self.client.post("/refund", headers=self.headers, json=data)
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099}
+        r = self.client.post('/refund', headers=self.headers, json=data)
         # Check the result
 
         assert r.json()['status'] == 200
@@ -229,7 +222,7 @@ class StripeRefund(TestCase):
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -238,24 +231,21 @@ class StripeRefund(TestCase):
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         trip = self.mock_firestore.collection('trips').document('fake_trip_ref').get()
-        current_intents = trip.get("stripePaymentIntents")
+        current_intents = trip.get('stripePaymentIntents')
         current_intents.append(pi.id)
         current_intents.append(pi2.id)
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": current_intents
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': current_intents}
+        )
 
-        data = {
-            "trip_ref": "trips/fake_trip_ref",
-            "amount": 1299
-        }
-        r = self.client.post("/refund", headers=self.headers, json=data)
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1299}
+        r = self.client.post('/refund', headers=self.headers, json=data)
         # Check the result
 
         assert r.json()['status'] == 200
@@ -277,52 +267,46 @@ class StripeCancelRefund(TestCase):
         self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
 
         settings.testing = True
-        self.headers = {
-            "Authorization": f'Bearer {settings.test_token}'
-        }
+        self.headers = {'Authorization': f'Bearer {settings.test_token}'}
 
         # Create a MockFirestore instance
         self.mock_firestore = MOCK_DB
 
         # Set up your mock data
         self.mock_firestore.collection('trips').document('fake_trip_ref').set(
-            self.fake_firestore.db["trips"]["fake_trip_ref"]
+            self.fake_firestore.db['trips']['fake_trip_ref']
         )
         self.mock_firestore.collection('properties').document('fake_property_ref').set(
-            self.fake_firestore.db["properties"]["fake_property_ref"]
+            self.fake_firestore.db['properties']['fake_property_ref']
         )
         # Add property_ref to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "propertyRef": "fake_property_ref"
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'propertyRef': 'fake_property_ref'})
 
     def test_simple_cancel_refund(self):
-        '''
+        """
         This test has 1 payment intent
         less than 24hrs
         full refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Very Flexible"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Very Flexible'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'stripePaymentIntents': [pi.id]})
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=1)
@@ -331,14 +315,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -346,111 +330,29 @@ class StripeCancelRefund(TestCase):
         assert r.json()['total_refunded'] == 1099
         assert r.json()['refund_details'][0]['refunded_amount'] == 1099
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
-        assert r.json()['cancellation_policy'] == "Very Flexible"
-
-        self.assertEqual(r.status_code, 200)
-
-
-class StripeCancelRefund(TestCase):
-    def setUp(self) -> None:
-        self.client = TestClient(app)
-        self.fake_firestore = FakeFirestore()
-
-        self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
-
-        settings.testing = True
-        self.headers = {
-            "Authorization": f'Bearer {settings.test_token}'
-        }
-
-        # Create a MockFirestore instance
-        self.mock_firestore = MOCK_DB
-
-        # Set up your mock data
-        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
-            self.fake_firestore.db["trips"]["fake_trip_ref"]
-        )
-        self.mock_firestore.collection('properties').document('fake_property_ref').set(
-            self.fake_firestore.db["properties"]["fake_property_ref"]
-        )
-        # Add property_ref to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "propertyRef": "fake_property_ref"
-        })
-
-    def test_simple_cancel_refund(self):
-        '''
-        This test has 1 payment intent
-        less than 24hrs
-        full refund
-        :return:
-        '''
-
-        # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Very Flexible"
-        })
-
-        # Create a Stripe PaymentIntent
-        pi = stripe.PaymentIntent.create(
-            amount=1099,
-            currency='usd',
-            customer=self.customer.id,
-            payment_method="pm_card_visa",
-            off_session=True,
-            confirm=True,
-        )
-
-        # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id]
-        })
-
-        # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=1)
-
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
-
-        # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
-
-        data = {
-            "trip_ref": "trips/fake_trip_ref",
-        }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
-
-        # Check the result
-        assert r.json()['status'] == 200
-        assert r.json()['message'] == 'Refund processed.'
-        assert r.json()['total_refunded'] == 1099
-        assert r.json()['refund_details'][0]['refunded_amount'] == 1099
-        assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
-        assert r.json()['cancellation_policy'] == "Very Flexible"
+        assert r.json()['cancellation_policy'] == 'Very Flexible'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_2(self):
-        '''
+        """
         This test has 2 payment intent
         less than 24hrs
         full refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Very Flexible"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Very Flexible'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -459,15 +361,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=1)
@@ -476,14 +378,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -493,29 +395,29 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
         assert r.json()['refund_details'][1]['refunded_amount'] == 501
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Very Flexible"
+        assert r.json()['cancellation_policy'] == 'Very Flexible'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_3(self):
-        '''
+        """
         This test has 2 payment intent
         greater than 24hrs
         no refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Very Flexible"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Very Flexible'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -524,15 +426,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=2)
@@ -541,14 +443,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -560,30 +462,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
         assert r.json()['refund_details'][1]['reason'] == 'Less than 24 hours before booking - no refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Very Flexible"
+        assert r.json()['cancellation_policy'] == 'Very Flexible'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_4(self):
-        '''
+        """
         This test has 2 payment intents
         Flexible
         less than 7 days
         no refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Flexible"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Flexible'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -592,15 +494,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=8)
@@ -609,14 +511,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -628,30 +530,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 501
         assert r.json()['refund_details'][1]['reason'] == '7 or more days before booking - 100% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Flexible"
+        assert r.json()['cancellation_policy'] == 'Flexible'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_5(self):
-        '''
+        """
         This test has 2 payment intents
         Flexible
         between 24hrs and 7 days
         50% refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Flexible"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Flexible'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -660,15 +562,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=5)
@@ -677,14 +579,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -696,30 +598,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 250
         assert r.json()['refund_details'][1]['reason'] == 'Between 24 hours and 7 days before booking - 50% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Flexible"
+        assert r.json()['cancellation_policy'] == 'Flexible'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_6(self):
-        '''
+        """
         This test has 2 payment intents
         Flexible
         less than 24hrs
         no refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Flexible"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Flexible'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -728,15 +630,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(hours=5)
@@ -745,14 +647,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -764,30 +666,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
         assert r.json()['refund_details'][1]['reason'] == 'Less than 24 hours before booking - no refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Flexible"
+        assert r.json()['cancellation_policy'] == 'Flexible'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_7(self):
-        '''
+        """
         This test has 2 payment intents
         Standard 30 Day
         more than 30 days before
         100% refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Standard 30 Day"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 30 Day'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -796,15 +698,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=31)
@@ -813,14 +715,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -832,30 +734,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 501
         assert r.json()['refund_details'][1]['reason'] == '30 or more days before booking - 100% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 30 Day"
+        assert r.json()['cancellation_policy'] == 'Standard 30 Day'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_8(self):
-        '''
+        """
         This test has 2 payment intents
         Standard 30 Day
         between 7 and 30 days
         50% refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Standard 30 Day"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 30 Day'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -864,15 +766,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=8)
@@ -881,14 +783,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -900,30 +802,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 250
         assert r.json()['refund_details'][1]['reason'] == 'Between 7 and 30 days before booking - 50% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 30 Day"
+        assert r.json()['cancellation_policy'] == 'Standard 30 Day'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_9(self):
-        '''
+        """
         This test has 2 payment intents
         Standard 30 Day
         less than 7 days
         no refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Standard 30 Day"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 30 Day'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -932,15 +834,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=2)
@@ -949,14 +851,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -968,30 +870,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
         assert r.json()['refund_details'][1]['reason'] == 'Less than 7 days before booking - no refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 30 Day"
+        assert r.json()['cancellation_policy'] == 'Standard 30 Day'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_10(self):
-        '''
+        """
         This test has 2 payment intents
         Standard 90 Day
         more than 90 days before
         100% refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Standard 90 Day"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 90 Day'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -1000,15 +902,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=92)
@@ -1017,14 +919,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -1036,30 +938,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 501
         assert r.json()['refund_details'][1]['reason'] == '90 or more days before booking - 100% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 90 Day"
+        assert r.json()['cancellation_policy'] == 'Standard 90 Day'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_11(self):
-        '''
+        """
         This test has 2 payment intents
         Standard 90 Day
         between 30 and 90 days
         50% refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Standard 90 Day"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 90 Day'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -1068,15 +970,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=40)
@@ -1085,14 +987,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -1104,30 +1006,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 250
         assert r.json()['refund_details'][1]['reason'] == 'Between 30 and 90 days before booking - 50% refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 90 Day"
+        assert r.json()['cancellation_policy'] == 'Standard 90 Day'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_12(self):
-        '''
+        """
         This test has 2 payment intents
         Standard 90 Day
         less than 30 days
         no refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Standard 90 Day"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 90 Day'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -1136,15 +1038,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=20)
@@ -1153,14 +1055,14 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
@@ -1172,30 +1074,30 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
         assert r.json()['refund_details'][1]['reason'] == 'Less than 30 days before booking - no refund'
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Standard 90 Day"
+        assert r.json()['cancellation_policy'] == 'Standard 90 Day'
 
         self.assertEqual(r.status_code, 200)
 
     def test_simple_cancel_refund_13(self):
-        '''
+        """
         This test has 2 payment intents
         Unknown Cancellation Policy
         random number of days
         no refund
         :return:
-        '''
+        """
 
         # Add Cancellation Policy to the property document
-        self.mock_firestore.collection('properties').document('fake_property_ref').update({
-            "cancellationPolicy": "Unknown Cancellation Policy"
-        })
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Unknown Cancellation Policy'}
+        )
 
         # Create a Stripe PaymentIntent
         pi = stripe.PaymentIntent.create(
             amount=1099,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
@@ -1204,15 +1106,15 @@ class StripeCancelRefund(TestCase):
             amount=501,
             currency='usd',
             customer=self.customer.id,
-            payment_method="pm_card_visa",
+            payment_method='pm_card_visa',
             off_session=True,
             confirm=True,
         )
 
         # Add payment to trip
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "stripePaymentIntents": [pi.id, pi2.id]
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
 
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=20)
@@ -1221,30 +1123,33 @@ class StripeCancelRefund(TestCase):
         trip_begin_timestamp = trip_begin_datetime.timestamp()
 
         # Add tripBeginDateTime to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
-            "tripBeginDateTime": trip_begin_timestamp
-        })
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
 
         data = {
-            "trip_ref": "trips/fake_trip_ref",
+            'trip_ref': 'trips/fake_trip_ref',
         }
-        r = self.client.post("/cancel_refund", headers=self.headers, json=data)
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
         # Check the result
         assert r.json()['status'] == 200
         assert r.json()['message'] == 'Refund processed.'
         assert r.json()['total_refunded'] == 0
         assert r.json()['refund_details'][0]['refunded_amount'] == 0
-        assert r.json()['refund_details'][0]['reason'] == ('Cancellation policy not recognized: Unknown Cancellation '
-                                                           'Policy - no refund - please contact support')
+        assert r.json()['refund_details'][0]['reason'] == (
+            'Cancellation policy not recognized: Unknown Cancellation ' 'Policy - no refund - please contact support'
+        )
         assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
         assert r.json()['refund_details'][1]['refunded_amount'] == 0
-        assert r.json()['refund_details'][1]['reason'] == ('Cancellation policy not recognized: Unknown Cancellation '
-                                                           'Policy - no refund - please contact support')
+        assert r.json()['refund_details'][1]['reason'] == (
+            'Cancellation policy not recognized: Unknown Cancellation ' 'Policy - no refund - please contact support'
+        )
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
-        assert r.json()['cancellation_policy'] == "Unknown Cancellation Policy"
+        assert r.json()['cancellation_policy'] == 'Unknown Cancellation Policy'
 
         self.assertEqual(r.status_code, 200)
+
 
 # class StripeExtraCharge(TestCase):
 #     def setUp(self) -> None:

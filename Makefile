@@ -14,3 +14,13 @@ test:
 .PHONY: start
 start:
 	uvicorn app.main:app --reload
+
+.PHONY: lint
+lint:
+	ruff check app/ tests/
+	ruff format app/ tests/ --check
+
+.PHONY: format
+format:
+	ruff check app/ tests/ --fix
+	ruff format app/ tests/

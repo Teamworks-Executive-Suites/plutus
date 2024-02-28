@@ -8,6 +8,7 @@ class Name(BaseModel):
 class Trip(BaseModel):
     trip_ref: str
 
+
 class ExtraCharge(BaseModel):
     trip_ref: str
     dispute_ref: str
@@ -24,4 +25,4 @@ class PropertyCal(BaseModel):
 
 
 class UnauthorizedMessage(BaseModel):
-    detail: str = "Bearer token missing or unknown"
+    detail: str = 'Bearer token missing or unknown'
