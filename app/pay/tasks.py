@@ -4,7 +4,6 @@ import stripe
 from datetime import timedelta, datetime
 
 from google.cloud.firestore_v1 import FieldFilter
-from devtools import debug
 from app.firebase_setup import db, current_time
 
 stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")

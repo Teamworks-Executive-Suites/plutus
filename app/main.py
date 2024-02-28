@@ -39,7 +39,6 @@ app = FastAPI(lifespan=lifespan)
 if bool(settings.logfire_token):
     logfire.configure()
     logfire.instrument_fastapi(app)
-    logfire.install_auto_tracing(modules=['app'])
 
 app.include_router(auth_router)
 app.include_router(cal_router)

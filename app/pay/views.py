@@ -3,7 +3,6 @@ from app.auth.views import get_token
 
 from app.models import Trip, Refund, ExtraCharge
 from app.pay.tasks import process_extra_charge, handle_refund, process_cancel_refund
-from devtools import debug
 
 stripe_router = APIRouter()
 

@@ -1,6 +1,5 @@
 import logging
 from google.cloud.firestore_v1 import FieldFilter
-from devtools import debug
 
 from app.firebase_setup import db, current_time
 

@@ -3,7 +3,6 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security.http import HTTPAuthorizationCredentials, HTTPBearer
 from starlette import status
-from devtools import debug
 
 from app.utils import settings
 
