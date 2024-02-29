@@ -23,11 +23,11 @@ To Start the FastAPI application, run the following command:
 uvicorn app.main:app --reload
 ```
 
-### Refund Deposit Endpoint
+### Refund Endpoint
 
-This endpoint handles refunding deposits for trips using the Stripe API and Firebase.
+This endpoint handles refunding a specific amount for trips using the Stripe API and Firebase.
 
-Endpoint: `/refund_deposit`
+Endpoint: `/refund`
 
 #### Request
 
@@ -36,7 +36,8 @@ POST /refund_deposit
 Content-Type: application/json
 
 {
-"trip_ref": "your_trip_reference"
+"trip_ref": "your_trip_reference",
+"amount": "your_amount"
 }
 ```
 
@@ -45,9 +46,60 @@ Content-Type: application/json
 - `200 OK`: Refund successful
 - `4xx` Status Codes: Error messages for different scenarios
 
+### Extra Charge Endpoint
+
+This endpoint handles charging the Stripe Customer's off-session card with the amount set in the Dispute.
+
+Endpoint: `/extra_charge`
+
+#### Request
+
+```bash 
+POST /extra_charge
+Content-Type: application/json
+
+{
+"trip_ref": "your_trip_reference",
+"dispute_ref": "the_dispute_reference",
+}
+```
+
+#### Response
+
+- `200 OK`: Charge successful
+- `4xx` Status Codes: Error messages for different scenarios
+
+### Cancel Refund Endpoint
+
+This endpoint handles the cancellation of a trip, refunding to customer the correct amount due to the property's Cancelation Policy.
+This enpoint also has a paramerter to provide a full refund to the customer for when the Host cancels the booking.
+
+Endpoint: `/cancel_refund`
+
+#### Request
+
+```bash
+POST /cancel_refund
+Content-Type: application/json
+
+{
+    "trip_ref": "your_trip_reference",
+    "full_refund": "boolean"
+}
+```
+
+#### Response
+
+- `200 OK`: Refund successful
+- `4xx` Status Codes: Error messages for different scenarios
+
+
+
+
 ### Get Property Calendar Endpoint
 
-This endpoint generates an iCalendar (.ics) file containing property trip events.
+This endpoint generates an iCalendar
+} (.ics) file containing property trip events.
 
 Endpoint: `/get_property_cal`
 
