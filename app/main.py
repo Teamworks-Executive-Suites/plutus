@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-if bool(settings.logfire_token):
+if bool(settings.logfire_token) and settings.testing is False and settings.dev_mode is False:
     logfire.configure()
     logfire.instrument_fastapi(app)
 

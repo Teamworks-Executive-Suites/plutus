@@ -95,9 +95,19 @@ Before using the endpoints, make sure to configure the necessary environment var
 - `GOOGLE_APPLICATION_CREDENTIALS`: Firebase configuration JSON string
 - `STRIPE_SECRET_KEY`: Your Stripe API key
 
+## Testing
+
+before running stripe tests make sure to have the following environment variables set:
+
+`export testing=True`
+
+to test the stripe tests use:
+
+`pytest -k {testname} -s'
+
 
 ## Logfire:
 
-[Logfire](https://dash.logfire.dev/anonymous/Plutus)
+[Logfire](https://dash.logfire.dev/PrenSJ2/plutus)
 
 run `logfire whoami to get the url with token`

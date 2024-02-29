@@ -198,7 +198,15 @@ def process_extra_charge(trip_ref, dispute_ref):
         return response
 
 
-def process_cancel_refund(trip_ref):
+def process_cancel_refund(trip_ref, full_refund=False):
+    """
+    Process a refund for a given trip based on the cancellation policy of the property.
+
+    params:
+    - trip_ref: The reference to the trip for which the refund is to be processed.
+    - full_refund: A boolean indicating whether a full refund is requested.
+    """
+
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
@@ -232,48 +240,51 @@ def process_cancel_refund(trip_ref):
             already_refunded = charge.amount_refunded
             refundable_amount = charge.amount - already_refunded
 
-            if cancellation_policy == 'Very Flexible':
-                if time_difference <= timedelta(hours=24):
-                    refund_amount = refundable_amount
-                    refund_reason = '24 or more before booking - 100% refund'
-                else:
-                    refund_amount = 0
-                    refund_reason = 'Less than 24 hours before booking - no refund'
-            elif cancellation_policy == 'Flexible':
-                if time_difference >= timedelta(days=7):
-                    refund_amount = refundable_amount
-                    refund_reason = '7 or more days before booking - 100% refund'
-                elif timedelta(hours=24) <= time_difference < timedelta(days=7):
-                    refund_amount = refundable_amount // 2
-                    refund_reason = 'Between 24 hours and 7 days before booking - 50% refund'
-                else:
-                    refund_amount = 0
-                    refund_reason = 'Less than 24 hours before booking - no refund'
-            elif cancellation_policy == 'Standard 30 Day':
-                if time_difference >= timedelta(days=30):
-                    refund_amount = refundable_amount
-                    refund_reason = '30 or more days before booking - 100% refund'
-                elif timedelta(days=7) <= time_difference < timedelta(days=30):
-                    refund_amount = refundable_amount // 2
-                    refund_reason = 'Between 7 and 30 days before booking - 50% refund'
-                else:
-                    refund_amount = 0
-                    refund_reason = 'Less than 7 days before booking - no refund'
-            elif cancellation_policy == 'Standard 90 Day':
-                if time_difference >= timedelta(days=90):
-                    refund_amount = refundable_amount
-                    refund_reason = '90 or more days before booking - 100% refund'
-                elif timedelta(days=30) <= time_difference < timedelta(days=90):
-                    refund_amount = refundable_amount // 2
-                    refund_reason = 'Between 30 and 90 days before booking - 50% refund'
-                else:
-                    refund_amount = 0
-                    refund_reason = 'Less than 30 days before booking - no refund'
+            if full_refund:
+                refund_amount = refundable_amount
+                refund_reason = 'Host cancelled Booking - Full Refund'
+
             else:
-                refund_amount = 0
-                refund_reason = (
-                    f'Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support'
-                )
+                if cancellation_policy == 'Very Flexible':
+                    if time_difference <= timedelta(hours=24):
+                        refund_amount = refundable_amount
+                        refund_reason = '24 or more before booking - 100% refund'
+                    else:
+                        refund_amount = 0
+                        refund_reason = 'Less than 24 hours before booking - no refund'
+                elif cancellation_policy == 'Flexible':
+                    if time_difference >= timedelta(days=7):
+                        refund_amount = refundable_amount
+                        refund_reason = '7 or more days before booking - 100% refund'
+                    elif timedelta(hours=24) <= time_difference < timedelta(days=7):
+                        refund_amount = refundable_amount // 2
+                        refund_reason = 'Between 24 hours and 7 days before booking - 50% refund'
+                    else:
+                        refund_amount = 0
+                        refund_reason = 'Less than 24 hours before booking - no refund'
+                elif cancellation_policy == 'Standard 30 Day':
+                    if time_difference >= timedelta(days=30):
+                        refund_amount = refundable_amount
+                        refund_reason = '30 or more days before booking - 100% refund'
+                    elif timedelta(days=7) <= time_difference < timedelta(days=30):
+                        refund_amount = refundable_amount // 2
+                        refund_reason = 'Between 7 and 30 days before booking - 50% refund'
+                    else:
+                        refund_amount = 0
+                        refund_reason = 'Less than 7 days before booking - no refund'
+                elif cancellation_policy == 'Standard 90 Day':
+                    if time_difference >= timedelta(days=90):
+                        refund_amount = refundable_amount
+                        refund_reason = '90 or more days before booking - 100% refund'
+                    elif timedelta(days=30) <= time_difference < timedelta(days=90):
+                        refund_amount = refundable_amount // 2
+                        refund_reason = 'Between 30 and 90 days before booking - 50% refund'
+                    else:
+                        refund_amount = 0
+                        refund_reason = 'Less than 30 days before booking - no refund'
+                else:
+                    refund_amount = 0
+                    refund_reason = f'Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support'
 
             if refund_amount > 0:
                 process_refund(charge.id, refund_amount)

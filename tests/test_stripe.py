@@ -321,6 +321,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -384,6 +385,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -449,6 +451,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -517,6 +520,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -585,6 +589,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -653,6 +658,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -721,6 +727,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -789,6 +796,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -857,6 +865,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -925,6 +934,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -993,6 +1003,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1061,6 +1072,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1129,6 +1141,7 @@ class StripeCancelRefund(TestCase):
 
         data = {
             'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1145,6 +1158,76 @@ class StripeCancelRefund(TestCase):
         assert r.json()['refund_details'][1]['reason'] == (
             'Cancellation policy not recognized: Unknown Cancellation ' 'Policy - no refund - please contact support'
         )
+        assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
+        assert r.json()['cancellation_policy'] == 'Unknown Cancellation Policy'
+
+        self.assertEqual(r.status_code, 200)
+
+    def test_simple_cancel_full_refund_13(self):
+        """
+        This test has 2 payment intents
+        full refund = True
+        Unknown Cancellation Policy
+        random number of days
+        full refund
+        :return:
+        """
+
+        # Add Cancellation Policy to the property document
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Unknown Cancellation Policy'}
+        )
+
+        # Create a Stripe PaymentIntent
+        pi = stripe.PaymentIntent.create(
+            amount=1099,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+
+        pi2 = stripe.PaymentIntent.create(
+            amount=501,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+
+        # Add payment to trip
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id, pi2.id]}
+        )
+
+        # Create a datetime object
+        trip_begin_datetime = current_time - timedelta(days=20)
+
+        # Convert the datetime object to a timestamp
+        trip_begin_timestamp = trip_begin_datetime.timestamp()
+
+        # Add tripBeginDateTime to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_timestamp}
+        )
+
+        data = {
+            'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': True,
+        }
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
+
+        # Check the result
+        assert r.json()['status'] == 200
+        assert r.json()['message'] == 'Refund processed.'
+        assert r.json()['total_refunded'] == 1600
+        assert r.json()['refund_details'][0]['refunded_amount'] == 1099
+        assert r.json()['refund_details'][0]['reason'] == ('Host cancelled Booking - Full Refund')
+        assert r.json()['refund_details'][0]['payment_intent_id'] == pi.id
+        assert r.json()['refund_details'][1]['refunded_amount'] == 501
+        assert r.json()['refund_details'][1]['reason'] == ('Host cancelled Booking - Full Refund')
         assert r.json()['refund_details'][1]['payment_intent_id'] == pi2.id
         assert r.json()['cancellation_policy'] == 'Unknown Cancellation Policy'
 

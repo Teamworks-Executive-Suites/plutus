@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
 from app.auth.views import get_token
-from app.models import ExtraCharge, Refund, Trip
+from app.models import CancelRefund, ExtraCharge, Refund
 from app.pay.tasks import handle_refund, process_cancel_refund, process_extra_charge
 
 stripe_router = APIRouter()
@@ -24,5 +24,5 @@ def refund(data: Refund, token: str = Depends(get_token)):
 
 
 @stripe_router.post('/cancel_refund')
-def cancel_refund(data: Trip, token: str = Depends(get_token)):
-    return process_cancel_refund(data.trip_ref)
+def cancel_refund(data: CancelRefund, token: str = Depends(get_token)):
+    return process_cancel_refund(data.trip_ref, data.full_refund)
