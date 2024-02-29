@@ -5,8 +5,9 @@ class Name(BaseModel):
     name: str
 
 
-class Trip(BaseModel):
+class CancelRefund(BaseModel):
     trip_ref: str
+    full_refund: bool
 
 
 class ExtraCharge(BaseModel):

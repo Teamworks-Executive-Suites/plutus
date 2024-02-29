@@ -6,7 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Dev and Testing
     testing: bool = False
-    dev: bool = False
+    dev_mode: bool = False
     log_level: str = 'INFO'
     test_token: str = 'test-token'
     master_token: str = ''
