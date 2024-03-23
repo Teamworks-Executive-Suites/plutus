@@ -18,8 +18,11 @@ def get_document_from_ref(ref):
     :return:
     """
     collection_id, document_id = ref.split('/')
-    document = db.collection(collection_id).document(document_id).get()
-    return document
+    try:
+        document = db.collection(collection_id).document(document_id).get()
+        return document
+    except Exception as e:
+        app_logger.error(f'An error occurred in get_document_from_ref for {ref}: {str(e)}')
 
 
 def get_dispute_by_trip_ref(trip_ref):
