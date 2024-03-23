@@ -18,8 +18,8 @@ config = {
         'logfire': {'class': 'logfire.integrations.logging.LogfireLoggingHandler'},
     },
     'loggers': {
-        'plutus': {'handlers': ['default'], 'level': logging_level, 'propagate': False},
-        'uvicorn': {'handlers': ['default'], 'level': logging_level, 'propagate': False},
+        'plutus': {'handlers': ['default', 'logfire'], 'level': logging_level, 'propagate': False},
+        'uvicorn': {'handlers': ['default', 'logfire'], 'level': logging_level, 'propagate': False},
         'uvicorn.error': {'level': logging_level},
         'uvicorn.access': {'handlers': ['access'], 'level': logging_level, 'propagate': False},
     },
