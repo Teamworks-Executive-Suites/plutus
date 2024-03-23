@@ -18,6 +18,7 @@ def get_document_from_ref(ref):
     :return:
     """
     collection_id, document_id = ref.split('/')
+    app_logger.info(f'Getting document from collection {collection_id} with ID {document_id}')
     try:
         document = db.collection(collection_id).document(document_id).get()
         return document
