@@ -214,12 +214,14 @@ def process_cancel_refund(trip_ref, full_refund=False):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
+        app_logger.info('Trip document not found.')
         return {'status': 404, 'message': 'Trip document not found.'}
 
     property_ref = trip.get('propertyRef')
     property = get_document_from_ref(f'properties/{property_ref}')
 
     if not property.exists:
+        app_logger.info('Property document not found.')
         return {'status': 404, 'message': 'Property document not found.'}
 
     cancellation_policy = property.get('cancellationPolicy')
