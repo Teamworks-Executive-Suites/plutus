@@ -63,12 +63,12 @@ def handle_refund(trip_ref, amount):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
-        app_logger.info('Trip document not found.')
+        app_logger.error('Trip document not found.')
         return {'status': 404, 'message': 'Trip document not found.'}
 
     payment_intent_ids = trip.get('stripePaymentIntents')
     if not payment_intent_ids:
-        app_logger.info('No payment intents found on trip.')
+        app_logger.error('No payment intents found on trip.')
         return {'status': 404, 'message': 'No payment intents found on trip.'}
 
     total_refunded = 0
@@ -76,7 +76,7 @@ def handle_refund(trip_ref, amount):
     remaining_refund = amount
     for payment_intent_id in payment_intent_ids:
         if remaining_refund <= 0:
-            app_logger.info('Refund amount is 0.')
+            app_logger.error('Refund amount is 0.')
             break
 
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
@@ -214,14 +214,14 @@ def process_cancel_refund(trip_ref, full_refund=False):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
-        app_logger.info('Trip document not found.')
+        app_logger.error('Trip document not found.')
         return {'status': 404, 'message': 'Trip document not found.'}
 
     property_ref = trip.get('propertyRef')
     property = get_document_from_ref(f'properties/{property_ref}')
 
     if not property.exists:
-        app_logger.info('Property document not found.')
+        app_logger.error('Property document not found.')
         return {'status': 404, 'message': 'Property document not found.'}
 
     cancellation_policy = property.get('cancellationPolicy')
@@ -233,6 +233,7 @@ def process_cancel_refund(trip_ref, full_refund=False):
 
     payment_intent_ids = trip.get('stripePaymentIntents')
     if not payment_intent_ids:
+        app_logger.error('No payment intents found on trip.')
         return {'status': 404, 'message': 'No payment intents found on trip.'}
 
     total_refunded = 0
@@ -320,5 +321,5 @@ def process_cancel_refund(trip_ref, full_refund=False):
         'refund_details': refund_details,
         'cancellation_policy': cancellation_policy,
     }
-
+    app_logger.info(response)
     return response
