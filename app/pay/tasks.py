@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime, timedelta
 
@@ -6,6 +5,7 @@ import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.firebase_setup import current_time, db
+from app.pay._utils import app_logger
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
@@ -47,6 +47,7 @@ def process_refund(charge_id, amount):
         )
         return refund.status == 'succeeded'
     except Exception as e:
+        app_logger.error(f'An error occurred in process_refund: {str(e)}')
         return f'An error occurred: {str(e)}'
 
 
@@ -57,15 +58,17 @@ def handle_refund(trip_ref, amount):
     :param amount:
     :return:
     """
-    logging.info('handle_refund called with trip_ref: %s', trip_ref)
+    app_logger.info('handle_refund called with trip_ref: %s', trip_ref)
 
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
+        app_logger.info('Trip document not found.')
         return {'status': 404, 'message': 'Trip document not found.'}
 
     payment_intent_ids = trip.get('stripePaymentIntents')
     if not payment_intent_ids:
+        app_logger.info('No payment intents found on trip.')
         return {'status': 404, 'message': 'No payment intents found on trip.'}
 
     total_refunded = 0
@@ -73,6 +76,7 @@ def handle_refund(trip_ref, amount):
     remaining_refund = amount
     for payment_intent_id in payment_intent_ids:
         if remaining_refund <= 0:
+            app_logger.info('Refund amount is 0.')
             break
 
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
@@ -89,7 +93,7 @@ def handle_refund(trip_ref, amount):
             refund_amount = min(remaining_refund, refundable_amount)
             refund_result = process_refund(charge.id, refund_amount)
 
-            logging.info(refund_result)  # This is for logging purposes, adjust as needed
+            app_logger.info(refund_result)  # This is for logging purposes, adjust as needed
 
             refund_details.append(
                 {
@@ -175,7 +179,7 @@ def process_extra_charge(trip_ref, dispute_ref):
         response['message'] = 'Extra charge processed successfully.'
         response['details']['payment_intent'] = extra_charge_pi
 
-        logging.info('Extra charge processed successfully: %s', extra_charge_pi)
+        app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
 
         return response
     except stripe.error.CardError as e:
@@ -185,7 +189,7 @@ def process_extra_charge(trip_ref, dispute_ref):
         response['details']['error_code'] = err.code
         response['details']['error_message'] = str(e)
 
-        logging.error('Failed to process extra charge due to a card error: %s', err.code)
+        app_logger.error('Failed to process extra charge due to a card error: %s', err.code)
 
         return response
     except Exception as e:
@@ -193,7 +197,7 @@ def process_extra_charge(trip_ref, dispute_ref):
         response['message'] = 'An unexpected error occurred while processing the extra charge.'
         response['details']['error_message'] = str(e)
 
-        logging.error('An unexpected error occurred while processing the extra charge: %s', str(e))
+        app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
 
         return response
 
@@ -219,7 +223,7 @@ def process_cancel_refund(trip_ref, full_refund=False):
         return {'status': 404, 'message': 'Property document not found.'}
 
     cancellation_policy = property.get('cancellationPolicy')
-    logging.info('Cancellation policy: %s', cancellation_policy)
+    app_logger.info('Cancellation policy: %s', cancellation_policy)
 
     trip_begin_time = trip.get('tripBeginDateTime')
     trip_begin_time = datetime.fromtimestamp(trip_begin_time, tz=current_time.tzinfo)
