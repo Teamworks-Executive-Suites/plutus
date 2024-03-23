@@ -1,14 +1,16 @@
-import logging
+import logging.config
 from contextlib import asynccontextmanager
 
 import logfire
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
+from logfire import PydanticPlugin
 
 from app.auth.views import auth_router
 from app.auto.tasks import auto_complete
 from app.cal.tasks import update_calendars
 from app.cal.views import cal_router
+from app.logging import config
 from app.pay.views import stripe_router
 from app.utils import settings
 
@@ -34,10 +36,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+# Logfire
 if bool(settings.logfire_token) and settings.testing is False and settings.dev_mode is False:
-    logfire.configure()
+    logfire.configure(pydantic_plugin=PydanticPlugin(record='all'))
     logfire.instrument_fastapi(app)
 
+# Configure logging
+logging.config.dictConfig(config)
+
+# Routers
 app.include_router(auth_router)
 app.include_router(cal_router)
 app.include_router(stripe_router)

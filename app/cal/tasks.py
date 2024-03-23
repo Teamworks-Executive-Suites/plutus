@@ -1,4 +1,3 @@
-import logging
 import os
 from datetime import datetime
 
@@ -7,11 +6,12 @@ from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
 from ics import Calendar, Event
 
+from app.cal._utils import app_logger
 from app.firebase_setup import current_time, db, tz
 
 
 def create_cal_for_property(propertyRef):
-    logging.info('create_cal_for_property')
+    app_logger.info('create_cal_for_property')
 
     collection_id, document_id = propertyRef.split('/')
     trips_ref = db.collection('trips')
@@ -38,7 +38,7 @@ def create_cal_for_property(propertyRef):
         if trip_begin_datetime > current_time:
             user_ref = trip.get('userRef').id
             user = db.collection('users').document(user_ref).get()
-            logging.info(f'{user.get("email")} | {property_ref.get("propertyName")}')
+            app_logger.info(f'{user.get("email")} | {property_ref.get("propertyName")}')
 
             cal_event = Event()
             cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
@@ -56,7 +56,7 @@ def create_cal_for_property(propertyRef):
 
 
 def create_trips_from_ics(property_ref, ics_link):
-    logging.info('create_trips_from_ics')
+    app_logger.info('create_trips_from_ics')
 
     collection_id, document_id = property_ref.split('/')
 
@@ -72,7 +72,7 @@ def create_trips_from_ics(property_ref, ics_link):
     trips_ref = db.collection('trips')
 
     for event in cal.walk('VEVENT'):
-        logging.info(event)
+        app_logger.info(event)
 
         # convert ical datetime to firestore datetime
         eventstart = event.get('DTSTART').dt
@@ -96,7 +96,7 @@ def create_trips_from_ics(property_ref, ics_link):
 
 
 def update_calendars():
-    logging.info('Updating Calendars')
+    app_logger.info('Updating Calendars')
 
     properties_ref = db.collection('properties')
     properties = properties_ref.stream()
