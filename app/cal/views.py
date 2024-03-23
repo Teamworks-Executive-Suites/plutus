@@ -1,11 +1,9 @@
-import logging
-
 from fastapi import APIRouter, Depends
 
 from app.auth.views import get_token
+from app.cal._utils import app_logger
 from app.cal.tasks import create_cal_for_property, create_trips_from_ics
 from app.models import PropertyCal
-from app.cal._utils import app_logger
 
 cal_router = APIRouter()
 

@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+import logfire
 import requests
 from google.cloud.firestore_v1 import FieldFilter
 from icalendar import Calendar as iCalCalendar
@@ -11,46 +12,46 @@ from app.firebase_setup import current_time, db, tz
 
 
 def create_cal_for_property(propertyRef):
-    app_logger.info('create_cal_for_property')
+    with logfire.span('create_cal_for_property'):
+        collection_id, document_id = propertyRef.split('/')
+        trips_ref = db.collection('trips')
+        property_ref = db.collection('properties').document(document_id).get()
+        property_trips = (
+            trips_ref.where(filter=FieldFilter('propertyRef', '==', property_ref.reference))
+            .where(filter=FieldFilter('isExternal', '==', False))
+            .stream()
+        )
 
-    collection_id, document_id = propertyRef.split('/')
-    trips_ref = db.collection('trips')
-    property_ref = db.collection('properties').document(document_id).get()
-    property_trips = (
-        trips_ref.where(filter=FieldFilter('propertyRef', '==', property_ref.reference))
-        .where(filter=FieldFilter('isExternal', '==', False))
-        .stream()
-    )
+        ics_file_path = f'app/static/calendars/{property_ref.get("propertyName")}.ics'
 
-    ics_file_path = f'app/static/calendars/{property_ref.get("propertyName")}.ics'
+        # If calendar file exists, load it, else create a new calendar
+        if os.path.exists(ics_file_path):
+            with open(ics_file_path, 'r') as ics_file:
+                cal = Calendar(ics_file.read())
+        else:
+            app_logger.info(f'Creating new calendar for {property_ref.get("propertyName")}')
+            cal = Calendar()
 
-    # If calendar file exists, load it, else create a new calendar
-    if os.path.exists(ics_file_path):
-        with open(ics_file_path, 'r') as ics_file:
-            cal = Calendar(ics_file.read())
-    else:
-        cal = Calendar()
+        for trip in property_trips:
+            trip_begin_datetime = trip.get('tripBeginDateTime')
 
-    for trip in property_trips:
-        trip_begin_datetime = trip.get('tripBeginDateTime')
+            # Check if the trip is in the future
+            if trip_begin_datetime > current_time:
+                user_ref = trip.get('userRef').id
+                user = db.collection('users').document(user_ref).get()
 
-        # Check if the trip is in the future
-        if trip_begin_datetime > current_time:
-            user_ref = trip.get('userRef').id
-            user = db.collection('users').document(user_ref).get()
-            app_logger.info(f'{user.get("email")} | {property_ref.get("propertyName")}')
+                cal_event = Event()
+                cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
+                cal_event.begin = trip_begin_datetime
+                cal_event.end = trip.get('tripEndDateTime')
 
-            cal_event = Event()
-            cal_event.name = f'{user.get("email")} | {property_ref.get("propertyName")}'
-            cal_event.begin = trip_begin_datetime
-            cal_event.end = trip.get('tripEndDateTime')
+                # Adding event to the calendar
+                app_logger.info(f'Adding event to calendar: {cal_event.name}')
+                cal.events.add(cal_event)
 
-            # Adding event to the calendar
-            cal.events.add(cal_event)
-
-    # Writing the updated calendar back to the file
-    with open(ics_file_path, 'w') as ics_file:
-        ics_file.writelines(cal)
+        # Writing the updated calendar back to the file
+        with open(ics_file_path, 'w') as ics_file:
+            ics_file.writelines(cal)
 
     return ics_file_path
 
@@ -96,21 +97,20 @@ def create_trips_from_ics(property_ref, ics_link):
 
 
 def update_calendars():
-    app_logger.info('Updating Calendars')
+    with logfire.span('update_calendars'):
+        properties_ref = db.collection('properties')
+        properties = properties_ref.stream()
 
-    properties_ref = db.collection('properties')
-    properties = properties_ref.stream()
+        for prop in properties:
+            # Sync External Calendars
+            try:
+                external_calendar_data = prop.get('externalCalendar')
+                if external_calendar_data and external_calendar_data.exists:
+                    create_trips_from_ics(prop.reference, external_calendar_data)
+            except KeyError:
+                pass  # Handle the case where the "externalCalendar" key doesn't exist
 
-    for prop in properties:
-        # Sync External Calendars
-        try:
-            external_calendar_data = prop.get('externalCalendar')
-            if external_calendar_data and external_calendar_data.exists:
-                create_trips_from_ics(prop.reference, external_calendar_data)
-        except KeyError:
-            pass  # Handle the case where the "externalCalendar" key doesn't exist
-
-        # Sync Internal Calendars
-        create_cal_for_property(prop.reference.path)
+            # Sync Internal Calendars
+            create_cal_for_property(prop.reference.path)
 
     return True
