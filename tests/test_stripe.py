@@ -4,6 +4,7 @@ from unittest import TestCase
 
 import stripe
 from fastapi.testclient import TestClient
+from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
 from app.firebase_setup import MOCK_DB, current_time
 from app.main import app
@@ -312,12 +313,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=1)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -376,12 +377,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=1)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -442,12 +443,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=2)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -511,12 +512,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=8)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -580,12 +581,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=5)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -649,12 +650,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(hours=5)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -718,12 +719,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=31)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -787,12 +788,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=8)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -856,12 +857,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=2)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -925,12 +926,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=92)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -994,12 +995,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=40)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -1063,12 +1064,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=20)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {
@@ -1132,14 +1133,13 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=20)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
-
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
@@ -1206,12 +1206,12 @@ class StripeCancelRefund(TestCase):
         # Create a datetime object
         trip_begin_datetime = current_time - timedelta(days=20)
 
-        # Convert the datetime object to a timestamp
-        trip_begin_timestamp = trip_begin_datetime.timestamp()
+        # Convert the datetime object to a DatetimeWithNanoseconds object
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
 
         # Add tripBeginDateTime to the trip document
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'tripBeginDateTime': trip_begin_timestamp}
+            {'tripBeginDateTime': trip_begin_datetime}
         )
 
         data = {

@@ -229,7 +229,7 @@ def process_cancel_refund(trip_ref, full_refund=False):
     app_logger.info('Cancellation policy: %s', cancellation_policy)
 
     trip_begin_time = trip.get('tripBeginDateTime')
-    trip_begin_time = datetime.fromtimestamp(trip_begin_time).astimezone(current_time.tzinfo)
+    trip_begin_time = trip_begin_time.astimezone(current_time.tzinfo)
     time_difference = current_time - trip_begin_time  # from start to now
 
     payment_intent_ids = trip.get('stripePaymentIntents')
