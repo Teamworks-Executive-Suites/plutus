@@ -1,6 +1,8 @@
+import json
 import os
 from datetime import datetime, timedelta
 
+import logfire
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
@@ -44,15 +46,16 @@ def process_refund(charge_id, amount):
     :param amount:
     :return:
     """
-    try:
-        refund = stripe.Refund.create(
-            charge=charge_id,
-            amount=amount,
-        )
-        return refund.status == 'succeeded'
-    except Exception as e:
-        app_logger.error(f'An error occurred in process_refund: {str(e)}')
-        return f'An error occurred: {str(e)}'
+    with logfire.span('process_refund'):
+        try:
+            refund = stripe.Refund.create(
+                charge=charge_id,
+                amount=amount,
+            )
+            return refund.status == 'succeeded'
+        except Exception as e:
+            app_logger.error(f'An error occurred in process_refund: {str(e)}')
+            return f'An error occurred: {str(e)}'
 
 
 def handle_refund(trip_ref, amount):
@@ -62,63 +65,64 @@ def handle_refund(trip_ref, amount):
     :param amount:
     :return:
     """
-    app_logger.info('handle_refund called with trip_ref: %s', trip_ref)
+    with logfire.span('handle_refund'):
+        app_logger.info('handle_refund called with trip_ref: %s', trip_ref)
 
-    trip = get_document_from_ref(trip_ref)
+        trip = get_document_from_ref(trip_ref)
 
-    if not trip.exists:
-        app_logger.error('Trip document not found.')
-        return {'status': 404, 'message': 'Trip document not found.'}
+        if not trip.exists:
+            app_logger.error('Trip document not found.')
+            return {'status': 404, 'message': 'Trip document not found.'}
 
-    payment_intent_ids = trip.get('stripePaymentIntents')
-    if not payment_intent_ids:
-        app_logger.error('No payment intents found on trip.')
-        return {'status': 404, 'message': 'No payment intents found on trip.'}
+        payment_intent_ids = trip.get('stripePaymentIntents')
+        if not payment_intent_ids:
+            app_logger.error('No payment intents found on trip.')
+            return {'status': 404, 'message': 'No payment intents found on trip.'}
 
-    total_refunded = 0
-    refund_details = []
-    remaining_refund = amount
-    for payment_intent_id in payment_intent_ids:
-        if remaining_refund <= 0:
-            app_logger.error('Refund amount is 0.')
-            break
+        total_refunded = 0
+        refund_details = []
+        remaining_refund = amount
+        for payment_intent_id in payment_intent_ids:
+            if remaining_refund <= 0:
+                app_logger.error('Refund amount is 0.')
+                break
 
-        charges = stripe.Charge.list(payment_intent=payment_intent_id)
-        for charge in charges.auto_paging_iter():
-            if charge.status != 'succeeded' or remaining_refund <= 0:
-                continue
+            charges = stripe.Charge.list(payment_intent=payment_intent_id)
+            for charge in charges.auto_paging_iter():
+                if charge.status != 'succeeded' or remaining_refund <= 0:
+                    continue
 
-            already_refunded = charge.amount_refunded
-            refundable_amount = charge.amount - already_refunded
+                already_refunded = charge.amount_refunded
+                refundable_amount = charge.amount - already_refunded
 
-            if refundable_amount <= 0:
-                continue
+                if refundable_amount <= 0:
+                    continue
 
-            refund_amount = min(remaining_refund, refundable_amount)
-            refund_result = process_refund(charge.id, refund_amount)
+                refund_amount = min(remaining_refund, refundable_amount)
+                refund_result = process_refund(charge.id, refund_amount)
 
-            app_logger.info(refund_result)  # This is for logging purposes, adjust as needed
+                app_logger.info(refund_result)  # This is for logging purposes, adjust as needed
 
-            refund_details.append(
-                {
-                    'refunded_amount': refund_amount,
-                    'charge_id': charge.id,
-                    'payment_intent_id': payment_intent_id,
-                }
-            )
-            total_refunded += refund_amount
-            remaining_refund -= refund_amount
+                refund_details.append(
+                    {
+                        'refunded_amount': refund_amount,
+                        'charge_id': charge.id,
+                        'payment_intent_id': payment_intent_id,
+                    }
+                )
+                total_refunded += refund_amount
+                remaining_refund -= refund_amount
 
-    response = {
-        'status': 200 if remaining_refund == 0 else 206,
-        'message': 'Refund processed successfully.'
-        if remaining_refund == 0
-        else f'Partial refund processed. Unable to refund {remaining_refund} out of requested {amount}.',
-        'total_refunded': total_refunded,
-        'refund_details': refund_details,
-    }
-    app_logger.info(response)
-    return response
+        response = {
+            'status': 200 if remaining_refund == 0 else 206,
+            'message': 'Refund processed successfully.'
+            if remaining_refund == 0
+            else f'Partial refund processed. Unable to refund {remaining_refund} out of requested {amount}.',
+            'total_refunded': total_refunded,
+            'refund_details': refund_details,
+        }
+        app_logger.info(json.dumps(response))
+        return response
 
 
 def process_extra_charge(trip_ref, dispute_ref):
@@ -131,83 +135,83 @@ def process_extra_charge(trip_ref, dispute_ref):
     Returns:
     - A dictionary containing the result of the extra charge process or an error message.
     """
+    with logfire.span('process_extra_charge'):
+        # Initiate a response dictionary
+        response = {'status': None, 'message': None, 'details': {}}
 
-    # Initiate a response dictionary
-    response = {'status': None, 'message': None, 'details': {}}
+        # Retrieve the trip document
+        trip = get_document_from_ref(trip_ref)
 
-    # Retrieve the trip document
-    trip = get_document_from_ref(trip_ref)
+        if not trip.exists:
+            response['status'] = 404
+            response['message'] = 'Trip document not found.'
+            app_logger.error(response)
+            return response
 
-    if not trip.exists:
-        response['status'] = 404
-        response['message'] = 'Trip document not found.'
-        app_logger.error(response)
-        return response
+        # Retrieve the dispute associated with the trip
+        # dispute = get_dispute_by_trip_ref(trip_ref)
 
-    # Retrieve the dispute associated with the trip
-    # dispute = get_dispute_by_trip_ref(trip_ref)
+        dispute = get_document_from_ref(dispute_ref)
 
-    dispute = get_document_from_ref(dispute_ref)
+        if not dispute:
+            response['status'] = 404
+            response['message'] = 'No dispute found for this trip.'
+            app_logger.error(response)
+            return response
 
-    if not dispute:
-        response['status'] = 404
-        response['message'] = 'No dispute found for this trip.'
-        app_logger.error(response)
-        return response
+        # Avoid code duplication by retrieving PaymentIntent once
+        first_payment_intent = stripe.PaymentIntent.retrieve(trip.get('stripePaymentIntents')[0])
+        stripe_customer = first_payment_intent.customer
+        payment_method = first_payment_intent.payment_method
 
-    # Avoid code duplication by retrieving PaymentIntent once
-    first_payment_intent = stripe.PaymentIntent.retrieve(trip.get('stripePaymentIntents')[0])
-    stripe_customer = first_payment_intent.customer
-    payment_method = first_payment_intent.payment_method
+        try:
+            # Create a new PaymentIntent for the extra charge
+            extra_charge_pi = stripe.PaymentIntent.create(
+                amount=int(dispute.get('disputeAmount') * 100),  # Ensure the amount is an integer
+                currency='usd',
+                automatic_payment_methods={'enabled': True},
+                customer=stripe_customer,
+                payment_method=payment_method,
+                off_session=True,
+                confirm=True,
+            )
 
-    try:
-        # Create a new PaymentIntent for the extra charge
-        extra_charge_pi = stripe.PaymentIntent.create(
-            amount=int(dispute.get('disputeAmount') * 100),  # Ensure the amount is an integer
-            currency='usd',
-            automatic_payment_methods={'enabled': True},
-            customer=stripe_customer,
-            payment_method=payment_method,
-            off_session=True,
-            confirm=True,
-        )
+            # Update dispute with the new PaymentIntent ID
+            dispute.reference.update({'paymentIntent': extra_charge_pi.id})
 
-        # Update dispute with the new PaymentIntent ID
-        dispute.reference.update({'paymentIntent': extra_charge_pi.id})
+            # Update the trip with the new PaymentIntent ID
+            current_payment_intents = trip.get('stripePaymentIntents')
+            current_payment_intents.append(extra_charge_pi.id)
+            trip.reference.update({'stripePaymentIntents': current_payment_intents})
 
-        # Update the trip with the new PaymentIntent ID
-        current_payment_intents = trip.get('stripePaymentIntents')
-        current_payment_intents.append(extra_charge_pi.id)
-        trip.reference.update({'stripePaymentIntents': current_payment_intents})
+            # Update response for successful extra charge
+            response['status'] = 200
+            response['message'] = 'Extra charge processed successfully.'
+            response['details']['payment_intent'] = extra_charge_pi
 
-        # Update response for successful extra charge
-        response['status'] = 200
-        response['message'] = 'Extra charge processed successfully.'
-        response['details']['payment_intent'] = extra_charge_pi
+            app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
 
-        app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
+            app_logger.error(response)
+            return response
+        except stripe.error.CardError as e:
+            err = e.error
+            response['status'] = 400
+            response['message'] = 'Failed to process extra charge due to a card error.'
+            response['details']['error_code'] = err.code
+            response['details']['error_message'] = str(e)
 
-        app_logger.error(response)
-        return response
-    except stripe.error.CardError as e:
-        err = e.error
-        response['status'] = 400
-        response['message'] = 'Failed to process extra charge due to a card error.'
-        response['details']['error_code'] = err.code
-        response['details']['error_message'] = str(e)
+            app_logger.error('Failed to process extra charge due to a card error: %s', err.code)
+            app_logger.error(response)
 
-        app_logger.error('Failed to process extra charge due to a card error: %s', err.code)
-        app_logger.error(response)
+            return response
+        except Exception as e:
+            response['status'] = 500
+            response['message'] = 'An unexpected error occurred while processing the extra charge.'
+            response['details']['error_message'] = str(e)
 
-        return response
-    except Exception as e:
-        response['status'] = 500
-        response['message'] = 'An unexpected error occurred while processing the extra charge.'
-        response['details']['error_message'] = str(e)
-
-        app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
-        app_logger.error(response)
-        return response
+            app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
+            app_logger.error(response)
+            return response
 
 
 def process_cancel_refund(trip_ref, full_refund=False):
