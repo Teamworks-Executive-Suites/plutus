@@ -280,7 +280,8 @@ class StripeCancelRefund(TestCase):
             self.fake_firestore.db['properties']['fake_property_ref']
         )
         # Add property_ref to the trip document
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'propertyRef': 'fake_property_ref'})
+        property_ref_object = self.mock_firestore.collection('properties').document('fake_property_ref').get()
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'propertyRef': property_ref_object})
 
     def test_simple_cancel_refund(self):
         """
