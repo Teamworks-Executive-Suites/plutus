@@ -81,7 +81,6 @@ def handle_refund(trip_ref, amount):
     remaining_refund = amount
     for payment_intent_id in payment_intent_ids:
         if remaining_refund <= 0:
-            app_logger.error('Refund amount is 0.')
             break
 
         charges = stripe.Charge.list(payment_intent=payment_intent_id)
@@ -220,7 +219,7 @@ def process_cancel_refund(trip_ref, full_refund=False):
         return {'status': 404, 'message': 'Trip document not found.'}
 
     property_ref = trip.get('propertyRef')
-    property = get_document_from_ref(f'properties/{property_ref}')
+    property = get_document_from_ref(property_ref)
 
     if not property.exists:
         app_logger.error('Property document not found.')
