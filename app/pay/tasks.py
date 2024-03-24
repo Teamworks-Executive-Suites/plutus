@@ -101,7 +101,6 @@ def handle_refund(trip_ref, amount):
                 refund_amount = min(remaining_refund, refundable_amount)
                 refund_result = process_refund(charge.id, refund_amount)
 
-                app_logger.info(refund_result)  # This is for logging purposes, adjust as needed
 
                 refund_details.append(
                     {
@@ -121,7 +120,6 @@ def handle_refund(trip_ref, amount):
             'total_refunded': total_refunded,
             'refund_details': refund_details,
         }
-        app_logger.info(json.dumps(response))
         return response
 
 
@@ -145,7 +143,7 @@ def process_extra_charge(trip_ref, dispute_ref):
         if not trip.exists:
             response['status'] = 404
             response['message'] = 'Trip document not found.'
-            app_logger.error(response)
+            app_logger.error('Trip document not found')
             return response
 
         # Retrieve the dispute associated with the trip
@@ -156,7 +154,7 @@ def process_extra_charge(trip_ref, dispute_ref):
         if not dispute:
             response['status'] = 404
             response['message'] = 'No dispute found for this trip.'
-            app_logger.error(response)
+            app_logger.error('No dispute found for this trip')
             return response
 
         # Avoid code duplication by retrieving PaymentIntent once
@@ -191,7 +189,6 @@ def process_extra_charge(trip_ref, dispute_ref):
 
             app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
 
-            app_logger.error(response)
             return response
         except stripe.error.CardError as e:
             err = e.error
@@ -201,7 +198,6 @@ def process_extra_charge(trip_ref, dispute_ref):
             response['details']['error_message'] = str(e)
 
             app_logger.error('Failed to process extra charge due to a card error: %s', err.code)
-            app_logger.error(response)
 
             return response
         except Exception as e:
@@ -210,7 +206,6 @@ def process_extra_charge(trip_ref, dispute_ref):
             response['details']['error_message'] = str(e)
 
             app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
-            app_logger.error(response)
             return response
 
 
@@ -333,5 +328,4 @@ def process_cancel_refund(trip_ref, full_refund=False):
         'refund_details': refund_details,
         'cancellation_policy': cancellation_policy,
     }
-    app_logger.info(response)
     return response
