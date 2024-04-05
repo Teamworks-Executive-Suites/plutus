@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     log_level: str = 'INFO'
     test_token: str = 'test-token'
     master_token: str = ''
+    url = 'http://localhost:8000'
 
     logfire_token: Optional[str] = None
 
