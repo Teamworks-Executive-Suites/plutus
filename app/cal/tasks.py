@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import logfire
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import timedelta
 from googleapiclient.errors import HttpError
@@ -8,7 +9,12 @@ from googleapiclient.errors import HttpError
 from app.cal._utils import app_logger
 from app.models import TripData
 from app.utils import settings
-from app.firebase_setup import db, cred
+from app.firebase_setup import db
+
+
+creds = service_account.Credentials.from_service_account_info(
+            settings.firebase_credentials, scopes=['https://www.googleapis.com/auth/calendar']
+        ).with_subject('plutus_google_cal')
 
 
 def create_or_update_trip_from_event(calendar_id, event):
@@ -41,7 +47,7 @@ def initalise_trips_from_cal(property_ref, calendar_id):
     property_ref = db.collection(collection_id).document(document_id).get()
 
     # Call the Google Calendar API to fetch the future events
-    service = build('calendar', 'v3', credentials=cred)
+    service = build('calendar', 'v3', credentials=creds)
     now = datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
 
     # Set up the webhook
@@ -123,7 +129,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                 }
 
                 # Call the Google Calendar API to update or create the event
-                service = build('calendar', 'v3', credentials=cred)
+                service = build('calendar', 'v3', credentials=creds)
                 if 'eventId' in trip_data:
                     app_logger.info(f'Updating event: {trip_data["eventId"]}')
                     service.events().update(calendarId=calendar_id, eventId=trip_data['eventId'],
