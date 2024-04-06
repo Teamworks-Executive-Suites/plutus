@@ -9,7 +9,6 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.auth.views import auth_router
 from app.auto.tasks import auto_complete
-from app.cal.tasks import update_calendars
 from app.cal.views import cal_router
 from app.logging import config
 from app.pay.views import stripe_router
@@ -23,12 +22,10 @@ async def lifespan(app: FastAPI):
     logging.info('startup')
 
     # Run the tasks immediately on startup
-    update_calendars()
     auto_complete()
 
     # Schedule the tasks to run every hour
     scheduler = BackgroundScheduler()
-    scheduler.add_job(update_calendars, 'interval', hours=1)
     scheduler.add_job(auto_complete, 'interval', hours=1)
     scheduler.start()
 
