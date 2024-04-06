@@ -47,6 +47,12 @@ def initalize_trips_from_cal(property_ref, calendar_id):
     service = build('calendar', 'v3', credentials=creds)
     now = datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
 
+
+    # test calendar list
+    calendars = service.calendarList().list().execute()
+    for calendar_list_entry in calendars['items']:
+        app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
+
     # Set up the webhook
     with logfire.span('setting up webhook for calendar'):
         app_logger.info(f'Setting up webhook and setting the channel_id: {property_ref}')
