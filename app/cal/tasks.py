@@ -58,7 +58,8 @@ def initalize_trips_from_cal(property_ref, calendar_id):
     # stop webhook channel if it exists
     try:
         service.channels().stop(body={
-            'id': property_ref
+            'id': property_ref,
+            'resourceId': property_ref
         }).execute()
     except HttpError as e:
         app_logger.info(f'No webhook channel to stop: {e}')
