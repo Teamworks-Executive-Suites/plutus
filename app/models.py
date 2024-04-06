@@ -39,6 +39,15 @@ class Event(BaseModel):
     start: dict
     end: dict
 
+class TripData(BaseModel):
+    isExternal: bool
+    propertyRef: str
+    tripBeginDateTime: datetime
+    tripEndDateTime: datetime
+    eventId: str
+
+
+
 
 class UnauthorizedMessage(BaseModel):
     detail: str = 'Bearer token missing or unknown'
