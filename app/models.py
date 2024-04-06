@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
 
 
 class Name(BaseModel):
@@ -22,7 +24,29 @@ class Refund(BaseModel):
 
 class PropertyCal(BaseModel):
     property_ref: str
-    cal_link: str
+    cal_id: str
+
+class TripCal(BaseModel):
+    cal_id: str
+    trip_ref: str
+
+class Event(BaseModel):
+    kind: str = Field(..., pattern="^calendar#event$")
+    id: str
+    status: str
+    created: datetime
+    updated: datetime
+    start: dict
+    end: dict
+
+class TripData(BaseModel):
+    isExternal: bool
+    propertyRef: str
+    tripBeginDateTime: datetime
+    tripEndDateTime: datetime
+    eventId: str
+
+
 
 
 class UnauthorizedMessage(BaseModel):
