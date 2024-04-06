@@ -55,6 +55,14 @@ def initalize_trips_from_cal(property_ref, calendar_id):
     for calendar_list_entry in calendars['items']:
         app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
 
+    # stop webhook channel if it exists
+    try:
+        service.channels().stop(body={
+            'id': property_ref
+        }).execute()
+    except HttpError as e:
+        app_logger.info(f'No webhook channel to stop: {e}')
+
     # Set up the webhook
     with logfire.span('setting up webhook for calendar'):
         app_logger.info(f'Setting up webhook and setting the channel_id: {property_ref}')
