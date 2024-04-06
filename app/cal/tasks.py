@@ -40,11 +40,11 @@ def create_or_update_trip_from_event(calendar_id, event):
         db.collection('trips').add(trip_data)
 
 
-def initalise_trips_from_cal(property_ref, calendar_id):
+def initalize_trips_from_cal(property_ref, calendar_id):
     app_logger.info(f'Initialising trips from calendar: {calendar_id}, property: {property_ref}')
     # Fetch the property document from Firestore
     collection_id, document_id = property_ref.split('/')
-    property_ref = db.collection(collection_id).document(document_id).get()
+    property_doc = db.collection(collection_id).document(document_id).get()
 
     # Call the Google Calendar API to fetch the future events
     service = build('calendar', 'v3', credentials=creds)
@@ -52,7 +52,7 @@ def initalise_trips_from_cal(property_ref, calendar_id):
 
     # Set up the webhook
     with logfire.span('setting up webhook for calendar'):
-        channel_id = property_ref
+        channel_id = property_doc.get['externalCalendar']
         webhook_url = f'{settings.url}/cal_webhook?calendar_id={calendar_id}'
         service.events().watch(calendarId=calendar_id, body={
             'id': channel_id,
@@ -72,7 +72,7 @@ def initalise_trips_from_cal(property_ref, calendar_id):
                 # Convert the event data to Firestore trip format
                 trip_data = TripData(
                     isExternal=True,
-                    propertyRef=property_ref.reference,
+                    propertyRef=property_ref,
                     tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')),
                     tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')),
                     eventId=event['id'],  # Save the event ID on the trip
