@@ -17,11 +17,13 @@ cal_router = APIRouter()
 
 @cal_router.post('/cal_webhook')
 async def receive_webhook(request: Request, calendar_id: str):
+    app_logger.info('Received webhook with calendar_id: %s', calendar_id)
     data = await request.json()
     if data.get('kind') != 'calendar#event':
         app_logger.info('Received non-event webhook')
     event = Event(**data)
     if calendar_id and event.id:
+        app_logger.info('Creating or updating trip from event')
         create_or_update_trip_from_event(calendar_id, event)
     app_logger.info('Received event webhook')
 
