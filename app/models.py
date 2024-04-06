@@ -31,7 +31,7 @@ class TripCal(BaseModel):
     trip_ref: str
 
 class Event(BaseModel):
-    kind: str = Field(..., regex="^calendar#event$")
+    kind: str = Field(..., pattern="^calendar#event$")
     id: str
     status: str
     created: datetime
