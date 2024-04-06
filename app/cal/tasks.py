@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import logfire
+from devtools import debug
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import timedelta
@@ -14,7 +15,7 @@ from app.firebase_setup import db
 
 creds = service_account.Credentials.from_service_account_info(
             settings.firebase_credentials, scopes=['https://www.googleapis.com/auth/calendar']
-        ).with_subject(settings.g_client_email)
+        )
 
 
 def create_or_update_trip_from_event(calendar_id, event):
@@ -50,7 +51,7 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
     # test calendar list
     calendars = service.calendarList().list().execute()
-    print(calendars)
+    debug(calendars)
     for calendar_list_entry in calendars['items']:
         app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
 

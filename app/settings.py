@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     logfire_token: Optional[str] = None
 
     # Google
-    g_calendar_email: str = 'seb.prentice757@gmail.com'
-
     g_project_id: str = 'teamworks-3b262'
     g_client_email: str = 'firebase-adminsdk-2xapk@teamworks-3b262.iam.gserviceaccount.com'
     g_private_key_id: str = ''
