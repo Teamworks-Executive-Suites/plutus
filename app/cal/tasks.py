@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 import logfire
@@ -44,6 +45,9 @@ def create_or_update_trip_from_event(calendar_id, event):
 def initalize_trips_from_cal(property_ref, calendar_id):
     app_logger.info(f'Initialising trips from calendar: {calendar_id}, property: {property_ref}')
 
+
+    property_doc = db.collection('properties').document(property_ref).get()
+
     # Call the Google Calendar API to fetch the future events
     service = build('calendar', 'v3', credentials=creds)
     now = datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
@@ -55,24 +59,19 @@ def initalize_trips_from_cal(property_ref, calendar_id):
     for calendar_list_entry in calendars['items']:
         app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
 
-    # stop webhook channel if it exists
-    try:
-        service.channels().stop(body={
-            'id': property_ref,
-            'resourceId': property_ref
-        }).execute()
-    except HttpError as e:
-        app_logger.info(f'No webhook channel to stop: {e}')
 
     # Set up the webhook
     with logfire.span('setting up webhook for calendar'):
-        app_logger.info(f'Setting up webhook and setting the channel_id: {property_ref}')
+        channel_id = str(uuid.uuid4())
+        app_logger.info(f'Setting up webhook and setting the channel_id: {channel_id}')
         webhook_url = f'{settings.url}/cal_webhook?calendar_id={calendar_id}'
-        service.events().watch(calendarId=calendar_id, body={
-            'id': property_ref,
+        channel = service.events().watch(calendarId=calendar_id, body={
+            'id': channel_id,
             'type': 'web_hook',
             'address': webhook_url
         }).execute()
+
+        property_doc.update({'channelId': channel['resourceId']})
 
     with logfire.span('fetching events from calendar'):
         page_token = None
@@ -83,6 +82,9 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
             # For each event, create a trip document
             for event in events:
+
+                debug(event)
+
                 # Convert the event data to Firestore trip format
                 trip_data = TripData(
                     isExternal=True,
@@ -104,7 +106,10 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 def create_or_update_event_from_trip(property_ref, trip_ref):
     app_logger.info(f'Creating or updating event from trip: {trip_ref}, property: {property_ref}')
     # Fetch the specific property document
-    property_doc = db.collection('properties').document(property_ref).get()
+
+    collection_id, document_id = property_ref.split('/')
+    property_doc = db.collection(collection_id).document(document_id).get()
+
     if property_doc.exists:
         app_logger.info(f'Property document exists for trip: {property_ref}')
         property_data = property_doc.to_dict()
@@ -112,12 +117,14 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
         property_name = property_data['propertyName']  # Fetch the property name
 
         # Fetch the specific trip document
-        trip_doc = db.collection('trips').document(trip_ref).get()
+        collection_id, document_id = trip_ref.split('/')
+        trip_doc = db.collection(collection_id).document(document_id).get()
         if trip_doc.exists:
             trip_data = trip_doc.to_dict()
 
             # Fetch the specific user document
-            user_doc = db.collection('users').document(trip_data['userRef']).get()
+            collection_id, document_id = trip_data['userRef'].split('/')
+            user_doc = db.collection(collection_id).document(document_id).get()
             if user_doc.exists:
                 user_data = user_doc.to_dict()
                 guest_name = user_data['displayName']
