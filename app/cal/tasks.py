@@ -14,7 +14,7 @@ from app.firebase_setup import db
 
 creds = service_account.Credentials.from_service_account_info(
             settings.firebase_credentials, scopes=['https://www.googleapis.com/auth/calendar']
-        )
+        ).with_subject(settings.g_client_email)
 
 
 def create_or_update_trip_from_event(calendar_id, event):
