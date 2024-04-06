@@ -45,8 +45,9 @@ def create_or_update_trip_from_event(calendar_id, event):
 def initalize_trips_from_cal(property_ref, calendar_id):
     app_logger.info(f'Initialising trips from calendar: {calendar_id}, property: {property_ref}')
 
-
-    property_doc = db.collection('properties').document(property_ref).get()
+    # get the property document
+    collection_id, document_id = property_ref.split('/')
+    property_doc = db.collection(collection_id).document(document_id).get()
 
     # Call the Google Calendar API to fetch the future events
     service = build('calendar', 'v3', credentials=creds)
