@@ -52,7 +52,7 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
     # Set up the webhook
     with logfire.span('setting up webhook for calendar'):
-        channel_id = property_doc.get['externalCalendar']
+        channel_id = property_doc.get('externalCalendar')
         webhook_url = f'{settings.url}/cal_webhook?calendar_id={calendar_id}'
         service.events().watch(calendarId=calendar_id, body={
             'id': channel_id,
