@@ -50,6 +50,7 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
     # test calendar list
     calendars = service.calendarList().list().execute()
+    print(calendars.__dict__)
     for calendar_list_entry in calendars['items']:
         app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
 
