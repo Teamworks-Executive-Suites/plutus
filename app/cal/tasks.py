@@ -47,7 +47,7 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
     # get the property document
     collection_id, document_id = property_ref.split('/')
-    property_doc = db.collection(collection_id).document(document_id).get()
+    property_doc_ref = db.collection(collection_id).document(document_id)
 
     # Call the Google Calendar API to fetch the future events
     service = build('calendar', 'v3', credentials=creds)
@@ -72,7 +72,7 @@ def initalize_trips_from_cal(property_ref, calendar_id):
             'address': webhook_url
         }).execute()
 
-        property_doc.update({'channelId': channel['resourceId']})
+        property_doc_ref.update({'channelId': channel['resourceId']})
 
     with logfire.span('fetching events from calendar'):
         page_token = None
