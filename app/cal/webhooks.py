@@ -1,3 +1,5 @@
+import logfire
+from devtools import debug
 from fastapi import APIRouter, Request, HTTPException
 from googleapiclient.errors import HttpError
 
@@ -18,6 +20,8 @@ cal_webhook_router = APIRouter()
 @cal_webhook_router.post('/cal_webhook')
 async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
+    debug(request)
+    logfire.debug(request)
     data = await request.json()
     if data.get('kind') != 'calendar#event':
         app_logger.info('Received non-event webhook')
