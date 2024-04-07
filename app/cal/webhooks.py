@@ -21,7 +21,6 @@ cal_webhook_router = APIRouter()
 async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
     debug(request)
-    logfire.debug(request)
     data = await request.json()
     if data.get('kind') != 'calendar#event':
         app_logger.info('Received non-event webhook')
