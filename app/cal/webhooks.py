@@ -76,7 +76,7 @@ def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_
     try:
         app_logger.info('Deleting channel: %s', data.id)
         # Delete the channel
-        delete_calendar_watch_channel(data.id, data.resource_id)
+        delete_calendar_watch_channel(data.id, data.resourceId)
         app_logger.info('Webhook channel successfully deleted.')
         return {'message': 'Webhook channel successfully deleted'}
     except HttpError as e:
