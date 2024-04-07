@@ -71,7 +71,7 @@ def sync_calendar(property_ref):
                     trip_data_dict = trip_data.dict()
 
                     # Add the trip to Firestore and get the new trip reference
-                    new_trip_ref = db.collection('trips').add(trip_data_dict)
+                    new_trip_ref, _ = db.collection('trips').add(trip_data_dict)
                     app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'], new_trip_ref.id)
 
                 # Store the nextSyncToken from the response
