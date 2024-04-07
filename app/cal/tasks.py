@@ -15,8 +15,36 @@ from app.utils import settings
 creds = service_account.Credentials.from_service_account_info(
     settings.firebase_credentials, scopes=['https://www.googleapis.com/auth/calendar']
 )
-# Get the current time
-now = datetime.utcnow()
+
+
+def renew_notification_channel(calendar_id, channel_id, channel_type, channel_address):
+    service = build('calendar', 'v3', credentials=creds)
+
+    # Fetch the current notification channel
+    channel = service.events().watch(calendarId=calendar_id, body={
+        'id': channel_id,
+        'type': channel_type,
+        'address': channel_address
+    }).execute()
+
+    # Get the current time and the expiration time of the channel
+    now = datetime.utcnow()
+    expiration_time = datetime.fromtimestamp(int(channel['expiration']) / 1000)  # Convert from milliseconds to seconds
+
+    # If the channel is close to its expiration (e.g., within 24 hours), renew it
+    if expiration_time - now < timedelta(hours=24):
+        # Create a new channel with a unique id
+        new_channel_id = channel_id + '-renewed' + str(uuid.uuid4())
+        new_channel = service.events().watch(calendarId=calendar_id, body={
+            'id': new_channel_id,
+            'type': channel_type,
+            'address': channel_address
+        }).execute()
+
+        print(f'Renewed notification channel. Old id: {channel_id}, new id: {new_channel_id}')
+
+        return new_channel
+
 
 def sync_calendar(property_ref):
     app_logger.info('Syncing calendar for property: %s', property_ref)
@@ -55,6 +83,8 @@ def sync_calendar(property_ref):
                 )
                 events = events_result.get('items', [])
 
+                # Get the current time
+                now = datetime.utcnow()
                 # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
                 # and 'tripBeginDateTime' is in the future
                 all_external_trips = (
@@ -98,8 +128,8 @@ def sync_calendar(property_ref):
                     if trip_id not in [event['id'] for event in events]:
                         # If a trip exists in the database that does not have a corresponding event in the Google
                         # Calendar, delete that trip
-                        db.collection('trips').document(trip_id).delete()
-                        app_logger.info('Deleted trip with id: %s', trip_id)
+                        deleted_trip_ref = db.collection('trips').document(trip_id).delete()
+                        app_logger.info('Deleted trip with id: %s, trip deleted ref: %s', trip_id, deleted_trip_ref[1].id)
 
                 # Store the nextSyncToken from the response
                 next_sync_token = events_result.get('nextSyncToken')

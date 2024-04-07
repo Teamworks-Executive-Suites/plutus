@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 from firebase_functions.firestore_fn import (
     Change,
@@ -12,9 +14,10 @@ from app.cal._utils import app_logger
 from app.cal.tasks import (
     create_or_update_event_from_trip,
     delete_calendar_watch_channel,
-    sync_calendar,
+    sync_calendar, renew_notification_channel,
 )
 from app.models import DeleteWebhookChannel
+from app.utils import settings
 
 cal_webhook_router = APIRouter()
 
@@ -44,9 +47,23 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received resource_state: %s', resource_state)
     app_logger.info('Received message_number: %s', message_number)
 
+    # Check if the channel expiration is within 1 week
+    if channel_expiration:
+        expiration_time = datetime.fromtimestamp(int(channel_expiration) / 1000)  # Convert from milliseconds to seconds
+        now = datetime.utcnow()
+        if expiration_time - now < timedelta(weeks=1):
+            channel_address = settings.url + calendar_id
+            # Renew the notification channel
+            renew_notification_channel(calendar_id, channel_id, 'web_hook', channel_address)
+
     if resource_id:
         try:
-            sync_calendar(calendar_id)
+            if '-' in calendar_id:
+                property_ref = calendar_id.split('-')[0]
+            else:
+                property_ref = calendar_id
+
+            sync_calendar(property_ref)
         except HttpError as e:
             app_logger.error('Error syncing calendar: %s', e)
             raise HTTPException(status_code=400, detail=str(e))
