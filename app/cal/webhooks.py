@@ -1,4 +1,5 @@
 import requests
+from devtools import debug
 from fastapi import APIRouter, Depends, HTTPException, Request
 from firebase_functions.firestore_fn import (
     Change,
@@ -55,6 +56,7 @@ async def receive_webhook(request: Request, calendar_id: str):
             raise HTTPException(status_code=400, detail='Error fetching resource')
 
         try:
+            debug(data)
             event = Event(**data)
         except Exception as e:
             app_logger.error('Error creating Event: %s', e)

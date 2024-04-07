@@ -2,7 +2,6 @@ import uuid
 from datetime import datetime, timedelta
 
 import logfire
-from devtools import debug
 from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -66,7 +65,6 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
     # test calendar list
     calendars = service.calendarList().list().execute()
-    debug(calendars)
     for calendar_list_entry in calendars['items']:
         app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
 
@@ -95,7 +93,6 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
             # For each event, create a trip document
             for event in events:
-                debug(event)
 
                 # Convert the event data to Firestore trip format
                 trip_data = TripData(
