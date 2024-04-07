@@ -1,5 +1,3 @@
-import requests
-from devtools import debug
 from fastapi import APIRouter, Depends, HTTPException, Request
 from firebase_functions.firestore_fn import (
     Change,
@@ -13,8 +11,8 @@ from app.auth.views import get_token
 from app.cal._utils import app_logger
 from app.cal.tasks import (
     create_or_update_event_from_trip,
-    create_or_update_trip_from_event,
     delete_calendar_watch_channel,
+    sync_calendar,
 )
 from app.models import DeleteWebhookChannel
 
@@ -46,30 +44,13 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received resource_state: %s', resource_state)
     app_logger.info('Received message_number: %s', message_number)
 
-    if resource_uri:
+    if resource_id:
         try:
-            response = requests.get(resource_uri)
-            app_logger.info('requesting resource_uri: %s', resource_uri)
-            data = response.json()
-        except Exception as e:
-            app_logger.error('Error fetching resource: %s', e)
-            raise HTTPException(status_code=400, detail='Error fetching resource')
+            sync_calendar(calendar_id)
+        except HttpError as e:
+            app_logger.error('Error syncing calendar: %s', e)
+            raise HTTPException(status_code=400, detail=str(e))
 
-        try:
-            debug(data)
-            event = Event(**data)
-        except Exception as e:
-            app_logger.error('Error creating Event: %s', e)
-            raise HTTPException(status_code=400, detail='Invalid event data')
-
-        try:
-            if calendar_id and event.id:
-                app_logger.info('Creating or updating trip from event')
-                create_or_update_trip_from_event(calendar_id, event)
-            app_logger.info('Received event webhook')
-        except Exception as e:
-            app_logger.error('Error in create_or_update_trip_from_event: %s', e)
-            raise HTTPException(status_code=500, detail='Error processing event')
 
 
 @cal_webhook_router.post('/delete_webhook_channel')

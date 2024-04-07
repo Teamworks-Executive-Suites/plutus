@@ -17,6 +17,95 @@ creds = service_account.Credentials.from_service_account_info(
 )
 
 
+def sync_calendar(property_ref):
+    app_logger.info('Syncing calendar for property: %s', property_ref)
+
+    # Fetch the specific property document
+    collection_id, document_id = property_ref.split('/')
+    property_doc_ref = db.collection(collection_id).document(document_id)
+
+    # Fetch the property document
+    property_doc = property_doc_ref.get()
+    if not property_doc.exists:
+        app_logger.error('Property document does not exist for: %s', property_ref)
+        raise HTTPException(status_code=400, detail='Property not found')
+
+    calendar_id = property_doc.get('externalCalendar')
+    next_sync_token = property_doc.get('nextSyncToken')
+
+    # Call the Google Calendar API to fetch the events
+    service = build('calendar', 'v3', credentials=creds)
+    try:
+        with logfire.span('fetching events from calendar'):
+            page_token = None
+            while True:
+                events_result = service.events().list(calendarId=calendar_id, syncToken=next_sync_token,
+                                                      pageToken=page_token).execute()
+                events = events_result.get('items', [])
+
+                # For each event, create a trip document
+                for event in events:
+                    # Convert the event data to Firestore trip format
+                    trip_data = TripData(
+                        isExternal=True,
+                        propertyRef=property_ref,
+                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')),
+                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')),
+                        eventId=event['id'],  # Save the event ID on the trip
+                    )
+
+                    # Convert the trip_data to a dictionary
+                    trip_data_dict = trip_data.dict()
+
+                    # Add the trip to Firestore
+                    db.collection('trips').add(trip_data_dict)
+                    app_logger.info('Added trip from event: %s', event['id'])
+
+                # Store the nextSyncToken from the response
+                next_sync_token = events_result.get('nextSyncToken')
+
+                # Save the nextSyncToken to use in the next sync request
+                # Update the property document with the new sync token
+                property_doc_ref.update({'nextSyncToken': next_sync_token})
+
+                page_token = events_result.get('nextPageToken')
+                if not page_token:
+                    break
+
+    except HttpError as e:
+        if e.resp.status == 410:
+            # A 410 status code, "Gone", indicates that the sync token is invalid.
+            app_logger.info('Invalid sync token, clearing event store and re-syncing.')
+            clear_event_store()
+            sync_calendar(property_ref)
+        else:
+            app_logger.error('Error syncing calendar: %s', e)
+            raise HTTPException(status_code=400, detail=str(e))
+
+
+def clear_event_store(property_ref):
+    # Get a reference to the 'trips' collection
+    trips_ref = db.collection('trips')
+
+    # Get the current time
+    now = datetime.utcnow()
+
+    # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
+    # and 'tripBeginDateTime' is in the future
+    docs = (trips_ref
+            .where('propertyRef', '==', property_ref)
+            .where('isExternal', '==', True)
+            .where('tripBeginDateTime', '>', now)
+            .stream()
+            )
+
+    # Delete each document
+    for doc in docs:
+        doc.reference.delete()
+
+    app_logger.info('Event store successfully cleared.')
+
+
 def delete_calendar_watch_channel(id, resource_id):
     app_logger.info('Deleting calendar watch channel: %s', id)
     # Call the Google Calendar API to delete the channel
@@ -61,7 +150,6 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
     # Call the Google Calendar API to fetch the future events
     service = build('calendar', 'v3', credentials=creds)
-    now = datetime.utcnow().isoformat() + 'Z'  # 'Z' indicates UTC time
 
     # test calendar list
     calendars = service.calendarList().list().execute()
@@ -71,8 +159,8 @@ def initalize_trips_from_cal(property_ref, calendar_id):
     # Set up the webhook
     with logfire.span('setting up webhook for calendar'):
         channel_id = str(uuid.uuid4())
-        app_logger.info('Setting up webhook and setting the channel_id: %s', channel_id)
-        webhook_url = f'{settings.url}/cal_webhook?calendar_id={calendar_id}'
+        app_logger.info('Setting up webhook and setting the channel_id: %s', property_ref)
+        webhook_url = f'{settings.url}/cal_webhook?calendar_id={property_ref}'
         channel = (
             service.events()
             .watch(calendarId=calendar_id, body={'id': channel_id, 'type': 'web_hook', 'address': webhook_url})
@@ -81,38 +169,7 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
         property_doc_ref.update({'channelId': channel['resourceId']})
 
-    with logfire.span('fetching events from calendar'):
-        page_token = None
-        while True:
-            events_result = (
-                service.events()
-                .list(calendarId=calendar_id, timeMin=now, singleEvents=True, orderBy='startTime', pageToken=page_token)
-                .execute()
-            )
-            events = events_result.get('items', [])
-
-            # For each event, create a trip document
-            for event in events:
-
-                # Convert the event data to Firestore trip format
-                trip_data = TripData(
-                    isExternal=True,
-                    propertyRef=property_ref,
-                    tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')),
-                    tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')),
-                    eventId=event['id'],  # Save the event ID on the trip
-                )
-
-                # Convert the trip_data to a dictionary
-                trip_data_dict = trip_data.dict()
-
-                # Add the trip to Firestore
-                db.collection('trips').add(trip_data_dict)
-                app_logger.info('Added trip from event: %s', event['id'])
-
-            page_token = events_result.get('nextPageToken')
-            if not page_token:
-                break
+    sync_calendar(property_ref)
 
 
 def create_or_update_event_from_trip(property_ref, trip_ref):
