@@ -21,6 +21,10 @@ cal_webhook_router = APIRouter()
 async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
     try:
+        body = await request.body()
+        if not body:
+            app_logger.error('Empty request body')
+            raise HTTPException(status_code=400, detail="Empty request body")
         data = await request.json()
     except Exception as e:
         app_logger.error(f'Error parsing JSON: {e}')
