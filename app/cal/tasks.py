@@ -83,7 +83,8 @@ def sync_calendar(property_ref):
                         tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
                         - timedelta(minutes=30),
                         tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(minutes=30),
-                        eventId=event['id'],  # Save the event ID on the trip
+                        eventId=event['id'],
+                        eventSummary=event['summary'],
                     )
 
                     # Convert the trip_data to a dictionary
