@@ -25,7 +25,7 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
 
     headers = request.headers
-    app_logger.info(f'Received headers: {headers}')
+    app_logger.info('Received headers: %s', headers)
 
     # Extract the data from the headers
     channel_id = headers.get('X-Goog-Channel-ID')
@@ -37,13 +37,14 @@ async def receive_webhook(request: Request, calendar_id: str):
     message_number = headers.get('X-Goog-Message-Number')
 
     # Log the extracted data
-    app_logger.info(f'Channel ID: {channel_id}')
-    app_logger.info(f'Channel Token: {channel_token}')
-    app_logger.info(f'Channel Expiration: {channel_expiration}')
-    app_logger.info(f'Resource ID: {resource_id}')
-    app_logger.info(f'Resource URI: {resource_uri}')
-    app_logger.info(f'Resource State: {resource_state}')
-    app_logger.info(f'Message Number: {message_number}')
+    app_logger.info('Received channel_id: %s', channel_id)
+    app_logger.info('Received channel_token: %s', channel_token)
+    app_logger.info('Received channel_expiration: %s', channel_expiration)
+    app_logger.info('Received resource_id: %s', resource_id)
+    app_logger.info('Received resource_uri: %s', resource_uri)
+    app_logger.info('Received resource_state: %s', resource_state)
+    app_logger.info('Received message_number: %s', message_number)
+
 
     if resource_uri:
         try:
@@ -51,13 +52,13 @@ async def receive_webhook(request: Request, calendar_id: str):
             app_logger.info('requesting resource_uri: %s', resource_uri)
             data = response.json()
         except Exception as e:
-            app_logger.error(f'Error fetching resource: {e}')
+            app_logger.error('Error fetching resource: %s', e)
             raise HTTPException(status_code=400, detail='Error fetching resource')
 
         try:
             event = Event(**data)
         except Exception as e:
-            app_logger.error(f'Error creating Event: {e}')
+            app_logger.error('Error creating Event: %s', e)
             raise HTTPException(status_code=400, detail='Invalid event data')
 
         try:
@@ -66,7 +67,7 @@ async def receive_webhook(request: Request, calendar_id: str):
                 create_or_update_trip_from_event(calendar_id, event)
             app_logger.info('Received event webhook')
         except Exception as e:
-            app_logger.error(f'Error in create_or_update_trip_from_event: {e}')
+            app_logger.error('Error in create_or_update_trip_from_event: %s', e)
             raise HTTPException(status_code=500, detail='Error processing event')
 
 
@@ -76,11 +77,11 @@ def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_
     try:
         app_logger.info('Deleting channel: %s', data.channel_id)
         # Delete the channel
-        delete_calendar_watch_channel(data.channel_id, data.resource_id)
+        delete_calendar_watch_channel(data.id, data.resource_id)
         app_logger.info('Webhook channel successfully deleted.')
         return {'message': 'Webhook channel successfully deleted'}
     except HttpError as e:
-        app_logger.error(f'Error deleting webhook channel: {e}')
+        app_logger.error('Error deleting webhook channel: %s', e)
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -93,5 +94,5 @@ def firestore_trigger(event: Event[Change[DocumentSnapshot]]) -> None:
     try:
         create_or_update_event_from_trip(trip_data['propertyRef'], trip_data['reference'])
     except HttpError as e:
-        app_logger.error(f'Error creating event from trip: {e}')
+        app_logger.error('Error creating event from trip: %s', e)
         raise HTTPException(status_code=400, detail=str(e))

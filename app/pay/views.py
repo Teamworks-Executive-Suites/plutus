@@ -10,7 +10,7 @@ stripe_router = APIRouter()
 
 @stripe_router.post('/extra_charge')
 def extra_charge(data: ExtraCharge, token: str = Depends(get_token)):
-    app_logger.info(f'Extra charge for trip {data.trip_ref} with dispute {data.dispute_ref}')
+    app_logger.info('Extra charge for trip %s with dispute %s', data.trip_ref, data.dispute_ref)
     return process_extra_charge(data.trip_ref, data.dispute_ref)
 
 
@@ -22,14 +22,14 @@ def refund(data: Refund, token: str = Depends(get_token)):
     :param token:
     :return:
     """
-    app_logger.info(f'Refund for trip {data.trip_ref} with amount {data.amount}')
+    app_logger.info('Refund for trip %s with amount %s', data.trip_ref, data.amount)
     return handle_refund(data.trip_ref, data.amount)
 
 
 @stripe_router.post('/cancel_refund')
 def cancel_refund(data: CancelRefund, token: str = Depends(get_token)):
     if data.full_refund:
-        app_logger.info(f'Full refund for trip {data.trip_ref}')
+        app_logger.info('Full refund for trip %s', data.trip_ref)
     else:
-        app_logger.info(f'Partial refund for trip {data.trip_ref}')
+        app_logger.info('Partial refund for trip %s', data.trip_ref)
     return process_cancel_refund(data.trip_ref, data.full_refund)

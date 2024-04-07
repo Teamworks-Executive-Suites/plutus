@@ -137,7 +137,7 @@ class FakeFirestore:
 #         if document_id in self.data:
 #             return FakeDocument(self.data[document_id])
 #         else:
-#             raise ValueError(f"Document {document_id} does not exist in the mock data.")
+#             raise ValueError("Document %S does not exist in the mock data.", document_id)
 #
 #
 # class FakeClient:
@@ -150,7 +150,7 @@ class FakeFirestore:
 #         if collection_id in self.data:
 #             return FakeCollection(self.data[collection_id])
 #         else:
-#             raise ValueError(f"Collection {collection_id} does not exist in the mock data.")
+#             raise ValueError("Collection %s does not exist in the mock data.", collection_id)
 #
 
 

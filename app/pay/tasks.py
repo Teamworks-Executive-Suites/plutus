@@ -18,12 +18,12 @@ def get_document_from_ref(ref):
     :return:
     """
     collection_id, document_id = ref.split('/')
-    app_logger.info(f'Getting document from collection {collection_id} with ID {document_id}')
+    app_logger.info('Getting document from collection %s with ID %s', collection_id, document_id)
     try:
         document = db.collection(collection_id).document(document_id).get()
         return document
     except Exception as e:
-        app_logger.error(f'An error occurred in get_document_from_ref for {ref}: {str(e)}')
+        app_logger.error('An error occurred in get_document_from_ref for %s: %s', ref, str(e))
 
 
 def get_dispute_by_trip_ref(trip_ref):
@@ -49,10 +49,10 @@ def process_refund(charge_id, amount):
             charge=charge_id,
             amount=amount,
         )
-        app_logger.info(f'Refund processed: {refund}')
+        app_logger.info('Refund processed: %s', refund)
         return refund.status == 'succeeded'
     except Exception as e:
-        app_logger.error(f'An error occurred in process_refund: {str(e)}')
+        app_logger.error('An error occurred in process_refund: %s', str(e))
         return f'An error occurred: {str(e)}'
 
 

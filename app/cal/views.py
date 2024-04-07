@@ -18,5 +18,5 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
         app_logger.info('Google Calendar ID successfully set.')
         return {'propertyRef': data.property_ref, 'message': 'Google Calendar ID successfully set'}
     except HttpError as e:
-        app_logger.error(f'Error setting Google Calendar ID: {e}')
+        app_logger.error('Error setting Google Calendar ID: %s', e)
         raise HTTPException(status_code=400, detail=str(e))
