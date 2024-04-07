@@ -21,11 +21,11 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     service = build('calendar', 'v3', credentials=creds)
 
     # Fetch the current notification channel
-    channel = service.events().watch(calendarId=calendar_id, body={
-        'id': channel_id,
-        'type': channel_type,
-        'address': channel_address
-    }).execute()
+    channel = (
+        service.events()
+        .watch(calendarId=calendar_id, body={'id': channel_id, 'type': channel_type, 'address': channel_address})
+        .execute()
+    )
 
     # Get the current time and the expiration time of the channel
     now = datetime.utcnow()
@@ -35,11 +35,13 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     if expiration_time - now < timedelta(hours=24):
         # Create a new channel with a unique id
         new_channel_id = channel_id + '-renewed' + str(uuid.uuid4())
-        new_channel = service.events().watch(calendarId=calendar_id, body={
-            'id': new_channel_id,
-            'type': channel_type,
-            'address': channel_address
-        }).execute()
+        new_channel = (
+            service.events()
+            .watch(
+                calendarId=calendar_id, body={'id': new_channel_id, 'type': channel_type, 'address': channel_address}
+            )
+            .execute()
+        )
 
         print(f'Renewed notification channel. Old id: {channel_id}, new id: {new_channel_id}')
 
@@ -103,8 +105,8 @@ def sync_calendar(property_ref):
                         isExternal=True,
                         propertyRef=property_ref,
                         # Add a buffer time of 30 minutes to tripBeginDateTime and tripEndDateTime
-                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')) - timedelta(
-                            minutes=30),
+                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
+                        - timedelta(minutes=30),
                         tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(minutes=30),
                         eventId=event['id'],  # Save the event ID on the trip
                     )
@@ -117,7 +119,9 @@ def sync_calendar(property_ref):
                     if existing_trip_ref:
                         # If a trip with the same eventId exists, update it
                         existing_trip_ref[0].reference.update(trip_data_dict)
-                        app_logger.info('Updated trip from event: %s', event['id'])
+                        app_logger.info(
+                            'Updated trip from event: %s, updated trip ref: %s', event['id'], existing_trip_ref[0].id
+                        )
                     else:
                         # If no trip with the same eventId exists, create a new one
                         new_trip_ref = db.collection('trips').add(trip_data_dict)
@@ -129,7 +133,9 @@ def sync_calendar(property_ref):
                         # If a trip exists in the database that does not have a corresponding event in the Google
                         # Calendar, delete that trip
                         deleted_trip_ref = db.collection('trips').document(trip_id).delete()
-                        app_logger.info('Deleted trip with id: %s, trip deleted ref: %s', trip_id, deleted_trip_ref[1].id)
+                        app_logger.info(
+                            'Deleted trip from event: %s, trip deleted ref: %s', trip_id, deleted_trip_ref[1].id
+                        )
 
                 # Store the nextSyncToken from the response
                 next_sync_token = events_result.get('nextSyncToken')

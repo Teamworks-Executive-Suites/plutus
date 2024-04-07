@@ -14,7 +14,8 @@ from app.cal._utils import app_logger
 from app.cal.tasks import (
     create_or_update_event_from_trip,
     delete_calendar_watch_channel,
-    sync_calendar, renew_notification_channel,
+    renew_notification_channel,
+    sync_calendar,
 )
 from app.models import DeleteWebhookChannel
 from app.utils import settings
