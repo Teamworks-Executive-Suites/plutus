@@ -31,7 +31,12 @@ def sync_calendar(property_ref):
         raise HTTPException(status_code=400, detail='Property not found')
 
     calendar_id = property_doc.get('externalCalendar')
-    next_sync_token = property_doc.get('nextSyncToken', '')  # default to empty string if not found
+    next_sync_token = property_doc.get('nextSyncToken')
+
+    # If nextSyncToken does not exist in the document, assign a default value
+    if next_sync_token is None:
+        app_logger.info('nextSyncToken does not exist')
+        next_sync_token = ''
 
     # Call the Google Calendar API to fetch the events
     service = build('calendar', 'v3', credentials=creds)
