@@ -9,6 +9,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from app.auth.views import auth_router
 from app.auto.tasks import auto_complete
 from app.cal.views import cal_router
+from app.cal.webhooks import cal_webhook_router
 from app.logging import config
 from app.pay.views import stripe_router
 from app.utils import settings
@@ -50,4 +51,5 @@ logging.config.dictConfig(config)
 # Routers
 app.include_router(auth_router)
 app.include_router(cal_router)
+app.include_router(cal_webhook_router)
 app.include_router(stripe_router)

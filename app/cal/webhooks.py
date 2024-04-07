@@ -12,10 +12,10 @@ from firebase_functions.firestore_fn import (
     DocumentSnapshot,
 )
 
-cal_router = APIRouter()
+cal_webhook_router = APIRouter()
 
 
-@cal_router.post('/cal_webhook')
+@cal_webhook_router.post('/cal_webhook')
 async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
     data = await request.json()
