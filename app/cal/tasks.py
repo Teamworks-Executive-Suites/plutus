@@ -18,12 +18,12 @@ creds = service_account.Credentials.from_service_account_info(
 )
 
 
-def delete_calendar_watch_channel(channel_id, resource_id):
-    app_logger.info('Deleting calendar watch channel: %s', channel_id)
+def delete_calendar_watch_channel(id, resource_id):
+    app_logger.info('Deleting calendar watch channel: %s', id)
     # Call the Google Calendar API to delete the channel
     service = build('calendar', 'v3', credentials=creds)
     try:
-        service.channels().stop(body={'id': channel_id, 'resourceId': resource_id}).execute()
+        service.channels().stop(body={'id': id, 'resourceId': resource_id}).execute()
         app_logger.info('Calendar watch channel successfully deleted.')
     except HttpError as e:
         app_logger.error('Error deleting calendar watch channel: %s', e)

@@ -45,7 +45,6 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received resource_state: %s', resource_state)
     app_logger.info('Received message_number: %s', message_number)
 
-
     if resource_uri:
         try:
             response = requests.get(resource_uri)
@@ -75,7 +74,7 @@ async def receive_webhook(request: Request, calendar_id: str):
 def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_token)):
     app_logger.info('Deleting webhook channel...')
     try:
-        app_logger.info('Deleting channel: %s', data.channel_id)
+        app_logger.info('Deleting channel: %s', data.id)
         # Delete the channel
         delete_calendar_watch_channel(data.id, data.resource_id)
         app_logger.info('Webhook channel successfully deleted.')
