@@ -1,4 +1,5 @@
 import logfire
+import requests
 from devtools import debug
 from fastapi import APIRouter, Request, HTTPException
 from googleapiclient.errors import HttpError
@@ -42,31 +43,29 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info(f'Resource State: {resource_state}')
     app_logger.info(f'Message Number: {message_number}')
 
+    if resource_uri:
+        try:
+            response = requests.get(resource_uri)
+            app_logger.info('requesting resource_uri: %s', resource_uri)
+            data = response.json()
+        except Exception as e:
+            app_logger.error(f'Error fetching resource: {e}')
+            raise HTTPException(status_code=400, detail="Error fetching resource")
 
-    try:
-        body = await request.body()
-        if not body:
-            app_logger.error('Empty request body')
-            raise HTTPException(status_code=400, detail="Empty request body")
-        data = await request.json()
-    except Exception as e:
-        app_logger.error(f'Error parsing JSON: {e}')
-        raise HTTPException(status_code=400, detail="Invalid JSON")
+        try:
+            event = Event(**data)
+        except Exception as e:
+            app_logger.error(f'Error creating Event: {e}')
+            raise HTTPException(status_code=400, detail="Invalid event data")
 
-    try:
-        event = Event(**data)
-    except Exception as e:
-        app_logger.error(f'Error creating Event: {e}')
-        raise HTTPException(status_code=400, detail="Invalid event data")
-
-    try:
-        if calendar_id and event.id:
-            app_logger.info('Creating or updating trip from event')
-            create_or_update_trip_from_event(calendar_id, event)
-        app_logger.info('Received event webhook')
-    except Exception as e:
-        app_logger.error(f'Error in create_or_update_trip_from_event: {e}')
-        raise HTTPException(status_code=500, detail="Error processing event")
+        try:
+            if calendar_id and event.id:
+                app_logger.info('Creating or updating trip from event')
+                create_or_update_trip_from_event(calendar_id, event)
+            app_logger.info('Received event webhook')
+        except Exception as e:
+            app_logger.error(f'Error in create_or_update_trip_from_event: {e}')
+            raise HTTPException(status_code=500, detail="Error processing event")
 
 
 @on_document_written(document="trips/{tripId}")
