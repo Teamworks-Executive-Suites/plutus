@@ -47,8 +47,11 @@ def sync_calendar(property_ref):
         with logfire.span('fetching events from calendar'):
             page_token = None
             while True:
-                events_result = service.events().list(calendarId=calendar_id, syncToken=next_sync_token,
-                                                      pageToken=page_token).execute()
+                events_result = (
+                    service.events()
+                    .list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token)
+                    .execute()
+                )
                 events = events_result.get('items', [])
 
                 # For each event, create a trip document
@@ -57,17 +60,19 @@ def sync_calendar(property_ref):
                     trip_data = TripData(
                         isExternal=True,
                         propertyRef=property_ref,
-                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')),
-                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')),
+                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
+                        - timedelta(minutes=settings.buffer_time),
+                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime'))
+                        + timedelta(minutes=settings.buffer_time),
                         eventId=event['id'],  # Save the event ID on the trip
                     )
 
                     # Convert the trip_data to a dictionary
                     trip_data_dict = trip_data.dict()
 
-                    # Add the trip to Firestore
-                    db.collection('trips').add(trip_data_dict)
-                    app_logger.info('Added trip from event: %s', event['id'])
+                    # Add the trip to Firestore and get the new trip reference
+                    new_trip_ref = db.collection('trips').add(trip_data_dict)
+                    app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'], new_trip_ref.id)
 
                 # Store the nextSyncToken from the response
                 next_sync_token = events_result.get('nextSyncToken')
@@ -100,12 +105,12 @@ def clear_event_store(property_ref):
 
     # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
     # and 'tripBeginDateTime' is in the future
-    docs = (trips_ref
-            .where('propertyRef', '==', property_ref)
-            .where('isExternal', '==', True)
-            .where('tripBeginDateTime', '>', now)
-            .stream()
-            )
+    docs = (
+        trips_ref.where('propertyRef', '==', property_ref)
+        .where('isExternal', '==', True)
+        .where('tripBeginDateTime', '>', now)
+        .stream()
+    )
 
     # Delete each document
     for doc in docs:

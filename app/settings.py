@@ -4,15 +4,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Dev and Testing
     testing: bool = False
     dev_mode: bool = False
     log_level: str = 'INFO'
     test_token: str = 'test-token'
     master_token: str = ''
-    url: str = 'http://localhost:8000'
-
     logfire_token: Optional[str] = None
+
+    url: str = 'http://localhost:8000'
+    buffer_time: int = 30
 
     # Google
     g_project_id: str = 'teamworks-3b262'
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     g_auth_provider_x509_cert_url: str = 'https://www.googleapis.com/oauth2/v1/certs'
     g_client_x509_cert_url: str = 'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2xapk%40teamworks-3b262.iam.gserviceaccount.com'
 
-    # # Firebase Creds
+    # Firebase Creds
     @property
     def firebase_credentials(self):
         return {

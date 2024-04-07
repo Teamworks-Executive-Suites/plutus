@@ -52,7 +52,6 @@ async def receive_webhook(request: Request, calendar_id: str):
             raise HTTPException(status_code=400, detail=str(e))
 
 
-
 @cal_webhook_router.post('/delete_webhook_channel')
 def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_token)):
     app_logger.info('Deleting webhook channel...')
