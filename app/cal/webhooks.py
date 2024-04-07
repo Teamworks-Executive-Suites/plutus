@@ -1,19 +1,21 @@
-import logfire
 import requests
-from devtools import debug
-from fastapi import APIRouter, Request, HTTPException
-from googleapiclient.errors import HttpError
-
-from app.cal._utils import app_logger
-from app.cal.tasks import create_or_update_trip_from_event, create_or_update_event_from_trip
-from app.models import Event
-
+from fastapi import APIRouter, Depends, HTTPException, Request
 from firebase_functions.firestore_fn import (
-    on_document_written,
-    Event,
     Change,
     DocumentSnapshot,
+    Event,
+    on_document_written,
 )
+from googleapiclient.errors import HttpError
+
+from app.auth.views import get_token
+from app.cal._utils import app_logger
+from app.cal.tasks import (
+    create_or_update_event_from_trip,
+    create_or_update_trip_from_event,
+    delete_calendar_watch_channel,
+)
+from app.models import DeleteWebhookChannel
 
 cal_webhook_router = APIRouter()
 
@@ -50,13 +52,13 @@ async def receive_webhook(request: Request, calendar_id: str):
             data = response.json()
         except Exception as e:
             app_logger.error(f'Error fetching resource: {e}')
-            raise HTTPException(status_code=400, detail="Error fetching resource")
+            raise HTTPException(status_code=400, detail='Error fetching resource')
 
         try:
             event = Event(**data)
         except Exception as e:
             app_logger.error(f'Error creating Event: {e}')
-            raise HTTPException(status_code=400, detail="Invalid event data")
+            raise HTTPException(status_code=400, detail='Invalid event data')
 
         try:
             if calendar_id and event.id:
@@ -65,10 +67,24 @@ async def receive_webhook(request: Request, calendar_id: str):
             app_logger.info('Received event webhook')
         except Exception as e:
             app_logger.error(f'Error in create_or_update_trip_from_event: {e}')
-            raise HTTPException(status_code=500, detail="Error processing event")
+            raise HTTPException(status_code=500, detail='Error processing event')
 
 
-@on_document_written(document="trips/{tripId}")
+@cal_webhook_router.post('/delete_webhook_channel')
+def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_token)):
+    app_logger.info('Deleting webhook channel...')
+    try:
+        app_logger.info('Deleting channel: %s', data.channel_id)
+        # Delete the channel
+        delete_calendar_watch_channel(data.channel_id, data.resource_id)
+        app_logger.info('Webhook channel successfully deleted.')
+        return {'message': 'Webhook channel successfully deleted'}
+    except HttpError as e:
+        app_logger.error(f'Error deleting webhook channel: {e}')
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@on_document_written(document='trips/{tripId}')
 def firestore_trigger(event: Event[Change[DocumentSnapshot]]) -> None:
     # Fetch the specific trip document
     trip_data = event.data.after.to_dict()

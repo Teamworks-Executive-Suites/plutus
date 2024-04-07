@@ -8,6 +8,7 @@ from app.models import PropertyCal
 
 cal_router = APIRouter()
 
+
 # Set Google Calendar ID
 @cal_router.post('/set_google_calendar_id')
 def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):

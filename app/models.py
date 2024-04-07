@@ -34,7 +34,7 @@ class TripCal(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'
 
 
 class Event(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
-    kind: str = Field(..., pattern="^calendar#event$")
+    kind: str = Field(..., pattern='^calendar#event$')
     id: str
     status: str
     created: datetime
@@ -49,6 +49,11 @@ class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all
     tripBeginDateTime: datetime
     tripEndDateTime: datetime
     eventId: str
+
+
+class DeleteWebhookChannel(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+    id: str
+    resourceId: str
 
 
 class UnauthorizedMessage(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
