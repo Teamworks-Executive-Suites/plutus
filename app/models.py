@@ -1,38 +1,39 @@
 from datetime import datetime
 
+from logfire.integrations.pydantic_plugin import PluginSettings
 from pydantic import BaseModel, Field
 
 
-class Name(BaseModel):
+class Name(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     name: str
 
 
-class CancelRefund(BaseModel):
+class CancelRefund(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     trip_ref: str
     full_refund: bool
 
 
-class ExtraCharge(BaseModel):
+class ExtraCharge(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     trip_ref: str
     dispute_ref: str
 
 
-class Refund(BaseModel):
+class Refund(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     trip_ref: str
     amount: int
 
 
-class PropertyCal(BaseModel):
+class PropertyCal(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     property_ref: str
     cal_id: str
 
 
-class TripCal(BaseModel):
+class TripCal(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     cal_id: str
     trip_ref: str
 
 
-class Event(BaseModel):
+class Event(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     kind: str = Field(..., pattern="^calendar#event$")
     id: str
     status: str
@@ -42,7 +43,7 @@ class Event(BaseModel):
     end: dict
 
 
-class TripData(BaseModel):
+class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     isExternal: bool
     propertyRef: str
     tripBeginDateTime: datetime
@@ -50,5 +51,5 @@ class TripData(BaseModel):
     eventId: str
 
 
-class UnauthorizedMessage(BaseModel):
+class UnauthorizedMessage(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     detail: str = 'Bearer token missing or unknown'

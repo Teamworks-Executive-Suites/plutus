@@ -95,8 +95,11 @@ def initalize_trips_from_cal(property_ref, calendar_id):
                     eventId=event['id'],  # Save the event ID on the trip
                 )
 
+                # Convert the trip_data to a dictionary
+                trip_data_dict = trip_data.dict()
+
                 # Add the trip to Firestore
-                db.collection('trips').add(trip_data)
+                db.collection('trips').add(trip_data_dict)
                 app_logger.info(f'Added trip from event: {event["id"]}')
 
             page_token = events_result.get('nextPageToken')
