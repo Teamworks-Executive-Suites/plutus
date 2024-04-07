@@ -20,6 +20,29 @@ cal_webhook_router = APIRouter()
 @cal_webhook_router.post('/cal_webhook')
 async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
+
+    headers = request.headers
+    app_logger.info(f'Received headers: {headers}')
+
+    # Extract the data from the headers
+    channel_id = headers.get('X-Goog-Channel-ID')
+    channel_token = headers.get('X-Goog-Channel-Token')
+    channel_expiration = headers.get('X-Goog-Channel-Expiration')
+    resource_id = headers.get('X-Goog-Resource-ID')
+    resource_uri = headers.get('X-Goog-Resource-URI')
+    resource_state = headers.get('X-Goog-Resource-State')
+    message_number = headers.get('X-Goog-Message-Number')
+
+    # Log the extracted data
+    app_logger.info(f'Channel ID: {channel_id}')
+    app_logger.info(f'Channel Token: {channel_token}')
+    app_logger.info(f'Channel Expiration: {channel_expiration}')
+    app_logger.info(f'Resource ID: {resource_id}')
+    app_logger.info(f'Resource URI: {resource_uri}')
+    app_logger.info(f'Resource State: {resource_state}')
+    app_logger.info(f'Message Number: {message_number}')
+
+
     try:
         body = await request.body()
         if not body:
