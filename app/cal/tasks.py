@@ -30,8 +30,11 @@ def sync_calendar(property_ref):
         app_logger.error('Property document does not exist for: %s', property_ref)
         raise HTTPException(status_code=400, detail='Property not found')
 
-    calendar_id = property_doc.get('externalCalendar')
-    next_sync_token = property_doc.get('nextSyncToken')
+    # Convert the DocumentSnapshot to a dictionary
+    property_doc_dict = property_doc.to_dict()
+
+    calendar_id = property_doc_dict.get('externalCalendar')
+    next_sync_token = property_doc_dict.get('nextSyncToken')
 
     # If nextSyncToken does not exist in the document, assign a default value
     if next_sync_token is None:
