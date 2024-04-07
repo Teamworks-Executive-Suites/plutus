@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     g_auth_provider_x509_cert_url: str = 'https://www.googleapis.com/oauth2/v1/certs'
     g_client_x509_cert_url: str = 'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2xapk%40teamworks-3b262.iam.gserviceaccount.com'
 
+    # Twilio
+    t_account_sid: str = ''
+    t_auth_token: str = ''
+    t_from_number: str = ''
+    t_messaging_service_sid: str = ''
+
     # Firebase Creds
     @property
     def firebase_credentials(self):

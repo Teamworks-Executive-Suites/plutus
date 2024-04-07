@@ -24,10 +24,7 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     new_channel_id = str(uuid.uuid4())
     new_channel = (
         service.events()
-        .watch(
-            calendarId=calendar_id,
-            body={'id': new_channel_id, 'type': channel_type, 'address': channel_address}
-        )
+        .watch(calendarId=calendar_id, body={'id': new_channel_id, 'type': channel_type, 'address': channel_address})
         .execute()
     )
 
