@@ -73,19 +73,6 @@ def sync_calendar(property_ref):
                 )
                 events = events_result.get('items', [])
 
-                # Get the current time
-                now = datetime.utcnow()
-                # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
-                # and 'tripBeginDateTime' is in the future
-                all_external_trips = (
-                    db.collection('trips')
-                    .where('propertyRef', '==', property_ref)
-                    .where('isExternal', '==', True)
-                    .where('tripBeginDateTime', '>', now)
-                    .stream()
-                )
-                all_external_trip_ids = [trip.to_dict()['eventId'] for trip in all_external_trips]
-
                 # For each event, create or update a trip document
                 for event in events:
                     # Convert the event data to Firestore trip format
@@ -115,6 +102,19 @@ def sync_calendar(property_ref):
                         new_trip_ref = db.collection('trips').add(trip_data_dict)
                         app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'], new_trip_ref[1].id)
 
+                # Get the current time
+                now = datetime.utcnow()
+                # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
+                # and 'tripBeginDateTime' is in the future
+                all_external_trips = (
+                    db.collection('trips')
+                    .where('propertyRef', '==', property_ref)
+                    .where('isExternal', '==', True)
+                    .where('tripBeginDateTime', '>', now)
+                    .stream()
+                )
+                all_external_trip_ids = [trip.to_dict()['eventId'] for trip in all_external_trips]
+
                 # Check for deleted events
                 for trip_id in all_external_trip_ids:
                     if trip_id not in [event['id'] for event in events]:
@@ -122,7 +122,7 @@ def sync_calendar(property_ref):
                         # Calendar, delete that trip
                         deleted_trip_ref = db.collection('trips').document(trip_id).delete()
                         app_logger.info(
-                            'Deleted trip from event: %s, trip deleted ref: %s', trip_id, deleted_trip_ref[1].id
+                            'Deleted trip ref: %s', trip_id
                         )
 
                 # Store the nextSyncToken from the response
