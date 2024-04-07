@@ -20,32 +20,20 @@ creds = service_account.Credentials.from_service_account_info(
 def renew_notification_channel(calendar_id, channel_id, channel_type, channel_address):
     service = build('calendar', 'v3', credentials=creds)
 
-    # Fetch the current notification channel
-    channel = (
+    # Create a new channel with a unique id
+    new_channel_id = str(uuid.uuid4())
+    new_channel = (
         service.events()
-        .watch(calendarId=calendar_id, body={'id': channel_id, 'type': channel_type, 'address': channel_address})
+        .watch(
+            calendarId=calendar_id,
+            body={'id': new_channel_id, 'type': channel_type, 'address': channel_address}
+        )
         .execute()
     )
 
-    # Get the current time and the expiration time of the channel
-    now = datetime.utcnow()
-    expiration_time = datetime.fromtimestamp(int(channel['expiration']) / 1000)  # Convert from milliseconds to seconds
+    app_logger.info('Renewed notification channel. Old id: %s, new id: %s', channel_id, new_channel['id'])
 
-    # If the channel is close to its expiration (e.g., within 24 hours), renew it
-    if expiration_time - now < timedelta(hours=24):
-        # Create a new channel with a unique id
-        new_channel_id = channel_id + '-renewed' + str(uuid.uuid4())
-        new_channel = (
-            service.events()
-            .watch(
-                calendarId=calendar_id, body={'id': new_channel_id, 'type': channel_type, 'address': channel_address}
-            )
-            .execute()
-        )
-
-        print(f'Renewed notification channel. Old id: {channel_id}, new id: {new_channel_id}')
-
-        return new_channel
+    return new_channel
 
 
 def sync_calendar(property_ref):
