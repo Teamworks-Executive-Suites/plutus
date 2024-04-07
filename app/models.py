@@ -26,9 +26,11 @@ class PropertyCal(BaseModel):
     property_ref: str
     cal_id: str
 
+
 class TripCal(BaseModel):
     cal_id: str
     trip_ref: str
+
 
 class Event(BaseModel):
     kind: str = Field(..., pattern="^calendar#event$")
@@ -39,14 +41,13 @@ class Event(BaseModel):
     start: dict
     end: dict
 
+
 class TripData(BaseModel):
     isExternal: bool
     propertyRef: str
     tripBeginDateTime: datetime
     tripEndDateTime: datetime
     eventId: str
-
-
 
 
 class UnauthorizedMessage(BaseModel):

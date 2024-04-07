@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 import logfire
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
-from logfire import PydanticPlugin
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.auth.views import auth_router
@@ -40,7 +39,7 @@ if bool(settings.logfire_token) and settings.testing is False and settings.dev_m
     logfire.configure(
         send_to_logfire=True,
         token=settings.logfire_token,
-        pydantic_plugin=PydanticPlugin(record='all')
+        pydantic_plugin=logfire.PydanticPlugin(record='all')
     )
 
     FastAPIInstrumentor.instrument_app(app)
