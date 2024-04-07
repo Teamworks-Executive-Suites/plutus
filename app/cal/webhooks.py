@@ -86,6 +86,7 @@ def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_
 
 @on_document_written(document='trips/{tripId}')
 def firestore_trigger(event: Event[Change[DocumentSnapshot]]) -> None:
+    app_logger.info('Received Firestore trigger for trip document: %s', event.data.after.id)
     # Fetch the specific trip document
     trip_data = event.data.after.to_dict()
 

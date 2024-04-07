@@ -84,7 +84,7 @@ def sync_calendar(property_ref):
                         - timedelta(minutes=30),
                         tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(minutes=30),
                         eventId=event['id'],
-                        eventSummary=event['summary'],
+                        eventSummary=event['summary'],  # Save the event summary on the trip
                     )
 
                     # Convert the trip_data to a dictionary
@@ -103,27 +103,27 @@ def sync_calendar(property_ref):
                         new_trip_ref = db.collection('trips').add(trip_data_dict)
                         app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'], new_trip_ref[1].id)
 
-                # Get the current time
-                now = datetime.utcnow()
-                # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
-                # and 'tripBeginDateTime' is in the future
-                all_external_trips = [
-                    {"eventId": trip.to_dict()['eventId'], "ref": trip.reference}
-                    for trip in db.collection('trips')
-                    .where('propertyRef', '==', property_ref)
-                    .where('isExternal', '==', True)
-                    .where('tripBeginDateTime', '>', now)
-                    .stream()
-                ]
-
-                # Check for deleted events
-                for trip in all_external_trips:
-                    if trip['eventId'] not in [event['id'] for event in events]:
-                        # If a trip exists in the database that does not have a corresponding event in the Google
-                        # Calendar, delete that trip
-                        db.collection('trips').document(trip['ref'].id).delete()
-                        app_logger.info('Deleted trip from event: %s, new trip ref: %s', trip['eventId'],
-                                        trip['ref'].id)
+                # # Get the current time
+                # now = datetime.utcnow()
+                # # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
+                # # and 'tripBeginDateTime' is in the future
+                # all_external_trips = [
+                #     {"eventId": trip.to_dict()['eventId'], "ref": trip.reference}
+                #     for trip in db.collection('trips')
+                #     .where('propertyRef', '==', property_ref)
+                #     .where('isExternal', '==', True)
+                #     .where('tripBeginDateTime', '>', now)
+                #     .stream()
+                # ]
+                #
+                # # Check for deleted events
+                # for trip in all_external_trips:
+                #     if trip['eventId'] not in [event['id'] for event in events]:
+                #         # If a trip exists in the database that does not have a corresponding event in the Google
+                #         # Calendar, delete that trip
+                #         db.collection('trips').document(trip['ref'].id).delete()
+                #         app_logger.info('Deleted trip from event: %s, new trip ref: %s', trip['eventId'],
+                #                         trip['ref'].id)
 
                 # Store the nextSyncToken from the response
                 next_sync_token = events_result.get('nextSyncToken')
