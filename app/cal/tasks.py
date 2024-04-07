@@ -15,7 +15,8 @@ from app.utils import settings
 creds = service_account.Credentials.from_service_account_info(
     settings.firebase_credentials, scopes=['https://www.googleapis.com/auth/calendar']
 )
-
+# Get the current time
+now = datetime.utcnow()
 
 def sync_calendar(property_ref):
     app_logger.info('Syncing calendar for property: %s', property_ref)
@@ -54,24 +55,51 @@ def sync_calendar(property_ref):
                 )
                 events = events_result.get('items', [])
 
-                # For each event, create a trip document
+                # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
+                # and 'tripBeginDateTime' is in the future
+                all_external_trips = (
+                    db.collection('trips')
+                    .where('propertyRef', '==', property_ref)
+                    .where('isExternal', '==', True)
+                    .where('tripBeginDateTime', '>', now)
+                    .stream()
+                )
+                all_external_trip_ids = [trip.to_dict()['eventId'] for trip in all_external_trips]
+
+                # For each event, create or update a trip document
                 for event in events:
                     # Convert the event data to Firestore trip format
                     trip_data = TripData(
                         isExternal=True,
                         propertyRef=property_ref,
-                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
-                        - timedelta(minutes=settings.buffer_time),
-                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime'))
-                        + timedelta(minutes=settings.buffer_time),
+                        # Add a buffer time of 30 minutes to tripBeginDateTime and tripEndDateTime
+                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')) - timedelta(
+                            minutes=30),
+                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(minutes=30),
                         eventId=event['id'],  # Save the event ID on the trip
                     )
 
                     # Convert the trip_data to a dictionary
                     trip_data_dict = trip_data.dict()
 
-                    db.collection('trips').add(trip_data_dict)
-                    app_logger.info('Added trip from event: %s', event['id'])
+                    # Check if a trip with the same eventId already exists
+                    existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
+                    if existing_trip_ref:
+                        # If a trip with the same eventId exists, update it
+                        existing_trip_ref[0].reference.update(trip_data_dict)
+                        app_logger.info('Updated trip from event: %s', event['id'])
+                    else:
+                        # If no trip with the same eventId exists, create a new one
+                        new_trip_ref = db.collection('trips').add(trip_data_dict)
+                        app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'], new_trip_ref[1].id)
+
+                # Check for deleted events
+                for trip_id in all_external_trip_ids:
+                    if trip_id not in [event['id'] for event in events]:
+                        # If a trip exists in the database that does not have a corresponding event in the Google
+                        # Calendar, delete that trip
+                        db.collection('trips').document(trip_id).delete()
+                        app_logger.info('Deleted trip with id: %s', trip_id)
 
                 # Store the nextSyncToken from the response
                 next_sync_token = events_result.get('nextSyncToken')
