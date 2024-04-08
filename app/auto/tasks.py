@@ -78,7 +78,7 @@ def complete_trip_sms(trip_ref: str, property_ref: str):
     if host_number and guest_number:
         property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
         send_sms(host_number, f'Your trip {trip_ref} has been completed. View here: {property_link}')
-        send_sms(guest_number, f'Your trip {trip_ref} has been completed🙃. Please review the host. View here: {property_link}')
+        send_sms(guest_number, f'Your trip {trip_ref} has been completed. Please review the host. View here: {property_link}')
 
 def send_reminder_sms(trip_ref: str, property_ref: str, time: int):
     host_number, guest_number = get_contact_details(trip_ref, property_ref)

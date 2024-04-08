@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     url: str = 'http://localhost:8000'
     buffer_time: int = 30
+    app_url: str = 'https://app.bookteamworks.com'
 
     # Google
     g_project_id: str = 'teamworks-3b262'
