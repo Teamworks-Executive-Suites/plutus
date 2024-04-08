@@ -139,7 +139,7 @@ def auto_complete_and_notify():
 
                         # Check if current time is one day before the start time of the trip
                         if trip.get('upcoming') and (
-                                current_time > (trip.get('tripStartDateTime') - timedelta(hours=24))):
+                                current_time > (trip.get('tripBeginDateTime') - timedelta(hours=24))):
                             try:
                                 send_reminder_sms(trip.reference, prop.reference, 24)
 
@@ -149,7 +149,7 @@ def auto_complete_and_notify():
                                 )
 
                         # Check if current time is one hour before the start time of the trip
-                        if trip.get('upcoming') and (current_time > trip.get('tripStartDateTime') + timedelta(hours=1)):
+                        if trip.get('upcoming') and (current_time > trip.get('tripBeginDateTime') + timedelta(hours=1)):
                             try:
                                 send_reminder_sms(trip.reference, prop.reference, 1)
 
