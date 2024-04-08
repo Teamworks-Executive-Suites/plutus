@@ -1,4 +1,5 @@
 import base64
+import json
 from datetime import timedelta
 
 import logfire
@@ -106,13 +107,13 @@ def auto_complete_and_notify():
             trips = db.collection('trips').where(filter=FieldFilter('propertyRef', '==', prop.reference)).stream()
 
             for trip in trips:
+
+                app_logger.info('Processing trip %s for property %s', trip.id, prop.id)
+                app_logger.info('Trip data: %s', json.dumps(trip.to_dict()))
+
                 if not trip.exists:
                     app_logger.error('Trip document not found for property %s', prop.id)
                     continue  # Changed from return to continue to process the next trip
-
-                if 'tripEndDateTime' not in trip.to_dict():
-                    app_logger.error('tripEndDateTime not found for trip %s', trip.id)
-                    continue
 
                 if (not trip.get('complete') or trip.get('upcoming')) and (current_time > trip.get('tripEndDateTime')):
                     try:
