@@ -285,7 +285,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                 user_doc = db.collection(collection_id).document(document_id).get()
                 if user_doc.exists:
                     user_data = user_doc.to_dict()
-                    guest_name = user_data['company'] or user_data['display_name'] or 'Guest'
+                    guest_name = user_data['display_name'] or 'Guest'
                     app_logger.ingo('Guest name: %s', guest_name)
 
                     # Construct the booking link
@@ -297,7 +297,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     # Add 30-minute buffer time to either side of the event
                     event_data = {
                         'id': trip_data['eventId'],
-                        'summary': f'TW - Office Booking for {guest_name}',  # Generate the event name
+                        'summary': f'Office Booking for {guest_name} | Teamworks',  # Generate the event name
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
                         # Add the event description
                         'start': {
