@@ -105,49 +105,59 @@ def auto_complete_and_notify():
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
             # Iterate through every trip in property
-            trips = db.collection('trips').where(filter=FieldFilter('propertyRef', '==', prop.reference)).stream()
 
-            app_logger.info('Processing property %s', prop.id)
+            with logfire.span('Processing property: %s', prop.id):
 
-            for trip in trips:
+                trips = db.collection('trips').where(filter=FieldFilter('propertyRef', '==', prop.reference)).stream()
 
-                app_logger.info('Processing trip %s', trip.id)
-                app_logger.info('Trip data: %s', str(trip.to_dict()))
+                for trip in trips:
 
-                if not trip.exists:
-                    app_logger.error('Trip document not found for property %s', prop.id)
-                    continue  # Changed from return to continue to process the next trip
+                    with logfire.span('Processing trip: %s', trip.id):
 
-                if (not trip.get('complete') or trip.get('upcoming')) and (current_time > trip.get('tripEndDateTime')):
-                    try:
-                        trip.reference.update({'complete': True, 'upcoming': False})
-                        app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
+                        app_logger.info('Trip data: %s', str(trip.to_dict()))
 
-                        complete_trip_sms(trip.reference, prop.reference)
+                        if not trip.exists:
+                            app_logger.error('Trip document not found for property %s', prop.id)
+                            continue
+                        app_logger.info('Processing trip %s', trip.id)
+                        app_logger.info('Trip data: %s', str(trip.to_dict()))
 
-                    except Exception as e:
-                        app_logger.error('Failed to update trip %s for property %S: %s', trip.id, prop.id, e)
+                        if not trip.exists:
+                            app_logger.error('Trip document not found for property %s', prop.id)
+                            continue  # Changed from return to continue to process the next trip
 
-                # Check if current time is one day before the start time of the trip
-                if trip.get('upcoming') and (current_time > (trip.get('tripStartDateTime') - timedelta(hours=24))):
-                    try:
-                        send_reminder_sms(trip.reference, prop.reference, 24)
+                        if (not trip.get('complete') or trip.get('upcoming')) and (
+                                current_time > trip.get('tripEndDateTime')):
+                            try:
+                                trip.reference.update({'complete': True, 'upcoming': False})
+                                app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
 
-                    except Exception as e:
-                        app_logger.error(
-                            'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
-                        )
+                                complete_trip_sms(trip.reference, prop.reference)
 
-                # Check if current time is one hour before the start time of the trip
-                if trip.get('upcoming') and (current_time > trip.get('tripStartDateTime') + timedelta(hours=1)):
-                    try:
-                        send_reminder_sms(trip.reference, prop.reference, 1)
+                            except Exception as e:
+                                app_logger.error('Failed to update trip %s for property %S: %s', trip.id, prop.id, e)
 
-                    except Exception as e:
-                        app_logger.error(
-                            'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
-                        )
-                else:
-                    app_logger.info('No trips to action on for property %s', prop.id)
+                        # Check if current time is one day before the start time of the trip
+                        if trip.get('upcoming') and (
+                                current_time > (trip.get('tripStartDateTime') - timedelta(hours=24))):
+                            try:
+                                send_reminder_sms(trip.reference, prop.reference, 24)
+
+                            except Exception as e:
+                                app_logger.error(
+                                    'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
+                                )
+
+                        # Check if current time is one hour before the start time of the trip
+                        if trip.get('upcoming') and (current_time > trip.get('tripStartDateTime') + timedelta(hours=1)):
+                            try:
+                                send_reminder_sms(trip.reference, prop.reference, 1)
+
+                            except Exception as e:
+                                app_logger.error(
+                                    'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
+                                )
+                        else:
+                            app_logger.info('No trips to action on for property %s', prop.id)
 
     return True  # Added a return statement for consistency
