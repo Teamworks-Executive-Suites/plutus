@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import logfire
 import requests
+
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.auto._utils import app_logger
@@ -109,9 +110,9 @@ def auto_complete_and_notify():
             app_logger.info('Processing property %s', prop.id)
 
             for trip in trips:
-                
+
                 app_logger.info('Processing trip %s', trip.id)
-                app_logger.info('Trip data: %s', json.dumps(trip.to_dict()))
+                app_logger.info('Trip data: %s', str(trip.to_dict()))
 
                 if not trip.exists:
                     app_logger.error('Trip document not found for property %s', prop.id)
