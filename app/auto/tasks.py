@@ -106,13 +106,13 @@ def auto_complete_and_notify():
         for prop in properties_ref:
             # Iterate through every trip in property
 
-            with logfire.span('Processing property: %s', prop.id):
+            with logfire.span(f'Processing property: {prop.id}'):
 
                 trips = db.collection('trips').where(filter=FieldFilter('propertyRef', '==', prop.reference)).stream()
 
                 for trip in trips:
 
-                    with logfire.span('Processing trip: %s', trip.id):
+                    with logfire.span(f'Processing trip: {trip.id}'):
 
                         app_logger.info('Trip data: %s', str(trip.to_dict()))
 
