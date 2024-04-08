@@ -24,7 +24,7 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
 # Create or Update Event from Trip
 @cal_router.post('/event_from_trip')
 def process_create_or_update_event_from_trip(data: EventFromTrip, token: str = Depends(get_token)):
-    app_logger.info('Creating or updating event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref)
+    app_logger.info('Process creating or updating event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref)
     # Call the create_or_update_event_from_trip function
     try:
         create_or_update_event_from_trip(data.property_ref, data.trip_ref)
@@ -37,7 +37,7 @@ def process_create_or_update_event_from_trip(data: EventFromTrip, token: str = D
 # Delete Event from Trip
 @cal_router.delete('/event_from_trip')
 def process_delete_event_from_trip(data: EventFromTrip, token: str = Depends(get_token)):
-    app_logger.info('Deleting event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref)
+    app_logger.info('Process deleting event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref)
     # Call the create_or_update_event_from_trip function
     try:
         delete_event_from_trip(data.property_ref, data.trip_ref)
