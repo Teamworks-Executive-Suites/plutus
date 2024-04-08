@@ -12,8 +12,9 @@ class Settings(BaseSettings):
     logfire_token: Optional[str] = None
 
     url: str = 'http://localhost:8000'
-    buffer_time: int = 30
     app_url: str = 'https://app.bookteamworks.com'
+
+    buffer_time: int = 30
 
     # Google
     g_project_id: str = 'teamworks-3b262'

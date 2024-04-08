@@ -264,18 +264,25 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
     """
     with logfire.span('create_or_update_event_from_trip'):
         # Fetch the specific property document
-        collection_id, document_id = property_ref.split('/')
-        property_doc = db.collection(collection_id).document(document_id).get()
+        property_collection_id, property_document_id = property_ref.split('/')
+        property_doc = db.collection(property_collection_id).document(property_document_id).get()
 
         if property_doc.exists:
             app_logger.info('Property document exists for trip: %s', property_ref)
             property_data = property_doc.to_dict()
             calendar_id = property_data['externalCalendar']
+
+            if calendar_id:
+                app_logger.info('Calendar ID: %s', calendar_id)
+            else:
+                app_logger.error('No external calendar set for property: %s', property_ref)
+                raise HTTPException(status_code=400, detail='No external calendar set for property')
+
             property_name = property_data['propertyName']  # Fetch the property name
 
             # Fetch the specific trip document
-            collection_id, document_id = trip_ref.split('/')
-            trip_doc = db.collection(collection_id).document(document_id).get()
+            trip_collection_id, trip_document_id = trip_ref.split('/')
+            trip_doc = db.collection(trip_collection_id).document(trip_document_id).get()
             if trip_doc.exists:
                 trip_data = trip_doc.to_dict()
 
@@ -290,7 +297,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
 
                     # Construct the booking link
                     booking_link = (
-                        f'https://app.bookteamworks.com/tripDetails?tripPassed={trip_ref}&property={property_ref}'
+                        f'{settings.app_url}/tripDetails?tripPassed={trip_document_id}&property={property_document_id}'
                     )
 
                     # Convert the trip data to Google Calendar event format
