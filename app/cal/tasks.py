@@ -281,7 +281,8 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
             trip_data = trip_doc.to_dict()
 
             # Fetch the specific user document
-            collection_id, document_id = trip_data['userRef'].split('/')
+            app_logger.info('UserRef: %s', trip_data['userRef'])
+            collection_id, document_id = trip_data['userRef'].path.split('/')
             user_doc = db.collection(collection_id).document(document_id).get()
             if user_doc.exists:
                 user_data = user_doc.to_dict()

@@ -114,8 +114,6 @@ def auto_complete_and_notify():
                         if not trip.exists:
                             app_logger.error('Trip document not found for property %s', prop.id)
                             continue
-                        app_logger.info('Processing trip %s', trip.id)
-                        app_logger.info('Trip data: %s', str(trip.to_dict()))
 
                         if not trip.exists:
                             app_logger.error('Trip document not found for property %s', prop.id)
