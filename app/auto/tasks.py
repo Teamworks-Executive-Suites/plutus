@@ -1,4 +1,5 @@
 import base64
+from datetime import timedelta
 
 import logfire
 import requests
@@ -7,8 +8,6 @@ from google.cloud.firestore_v1 import FieldFilter
 from app.auto._utils import app_logger
 from app.firebase_setup import current_time, db
 from app.utils import settings
-
-from datetime import timedelta
 
 
 def send_sms(to: str, body: str):
@@ -73,12 +72,17 @@ def get_contact_details(trip_ref: str, property_ref: str):
     guest_number = guest_doc.get('phone_number')
     return host_number, guest_number
 
+
 def complete_trip_sms(trip_ref: str, property_ref: str):
     host_number, guest_number = get_contact_details(trip_ref, property_ref)
     if host_number and guest_number:
         property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
         send_sms(host_number, f'Your trip {trip_ref} has been completed. View here: {property_link}')
-        send_sms(guest_number, f'Your trip {trip_ref} has been completed🙃. Please review the host. View here: {property_link}')
+        send_sms(
+            guest_number,
+            f'Your trip {trip_ref} has been completed🙃. Please review the host. View here: {property_link}',
+        )
+
 
 def send_reminder_sms(trip_ref: str, property_ref: str, time: int):
     host_number, guest_number = get_contact_details(trip_ref, property_ref)
@@ -122,7 +126,9 @@ def auto_complete_and_notify():
                         send_reminder_sms(trip.reference, prop.reference, 24)
 
                     except Exception as e:
-                        app_logger.error('Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e)
+                        app_logger.error(
+                            'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
+                        )
 
                 # Check if current time is one hour before the start time of the trip
                 if trip.get('upcoming') and (current_time > trip.get('tripStartDateTime') + timedelta(hours=1)):
@@ -130,6 +136,10 @@ def auto_complete_and_notify():
                         send_reminder_sms(trip.reference, prop.reference, 1)
 
                     except Exception as e:
-                        app_logger.error('Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e)
+                        app_logger.error(
+                            'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
+                        )
+                else:
+                    app_logger.info('No trips to action on for property %s', prop.id)
 
     return True  # Added a return statement for consistency

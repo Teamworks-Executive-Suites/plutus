@@ -52,6 +52,11 @@ class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all
     eventSummary: str
 
 
+class EventFromTrip(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+    trip_ref: str
+    property_ref: str
+
+
 class DeleteWebhookChannel(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     id: str
     resourceId: str
