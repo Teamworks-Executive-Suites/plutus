@@ -106,9 +106,11 @@ def auto_complete_and_notify():
             # Iterate through every trip in property
             trips = db.collection('trips').where(filter=FieldFilter('propertyRef', '==', prop.reference)).stream()
 
-            for trip in trips:
+            app_logger.info('Processing property %s', prop.id)
 
-                app_logger.info('Processing trip %s for property %s', trip.id, prop.id)
+            for trip in trips:
+                
+                app_logger.info('Processing trip %s', trip.id)
                 app_logger.info('Trip data: %s', json.dumps(trip.to_dict()))
 
                 if not trip.exists:
