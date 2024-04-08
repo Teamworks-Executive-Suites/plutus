@@ -1,21 +1,14 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from firebase_functions.firestore_fn import (
-    Change,
-    DocumentSnapshot,
-    Event,
-    on_document_written,
-)
 from googleapiclient.errors import HttpError
 
 from app.auth.views import get_token
 from app.cal._utils import app_logger
 from app.cal.tasks import (
-    create_or_update_event_from_trip,
     delete_calendar_watch_channel,
     renew_notification_channel,
-    sync_calendar,
+    sync_calendar_events,
 )
 from app.models import DeleteWebhookChannel
 from app.utils import settings
@@ -64,7 +57,7 @@ async def receive_webhook(request: Request, calendar_id: str):
             else:
                 property_ref = calendar_id
 
-            sync_calendar(property_ref)
+            sync_calendar_events(property_ref)
         except HttpError as e:
             app_logger.error('Error syncing calendar: %s', e)
             raise HTTPException(status_code=400, detail=str(e))
@@ -81,18 +74,4 @@ def delete_webhook_channel(data: DeleteWebhookChannel, token: str = Depends(get_
         return {'message': 'Webhook channel successfully deleted'}
     except HttpError as e:
         app_logger.error('Error deleting webhook channel: %s', e)
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@on_document_written(document='trips/{tripId}')
-def firestore_trigger(event: Event[Change[DocumentSnapshot]]) -> None:
-    app_logger.info('Received Firestore trigger for trip document: %s', event.data.after.id)
-    # Fetch the specific trip document
-    trip_data = event.data.after.to_dict()
-
-    # Call the create_or_update_event_from_trip function
-    try:
-        create_or_update_event_from_trip(trip_data['propertyRef'], trip_data['reference'])
-    except HttpError as e:
-        app_logger.error('Error creating event from trip: %s', e)
         raise HTTPException(status_code=400, detail=str(e))

@@ -33,7 +33,7 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     return new_channel
 
 
-def sync_calendar(property_ref):
+def sync_calendar_events(property_ref):
     app_logger.info('Syncing calendar for property: %s', property_ref)
 
     # Fetch the specific property document
@@ -138,7 +138,7 @@ def sync_calendar(property_ref):
             # A 410 status code, "Gone", indicates that the sync token is invalid.
             app_logger.info('Invalid sync token, clearing event store and re-syncing.')
             clear_event_store()
-            sync_calendar(property_ref)
+            sync_calendar_events(property_ref)
         else:
             app_logger.error('Error syncing calendar: %s', e)
             raise HTTPException(status_code=400, detail=str(e))
@@ -230,74 +230,137 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
         property_doc_ref.update({'channelId': channel['resourceId']})
 
-    sync_calendar(property_ref)
+    sync_calendar_events(property_ref)
+    create_events_for_future_trips(property_ref)
+
+
+def create_events_for_future_trips(property_ref):
+    app_logger.info('Creating events for future non-external trips without event ID for property: %s', property_ref)
+
+    # Get the current time
+    now = datetime.utcnow()
+
+    # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is False,
+    # 'eventId' does not exist, and 'tripBeginDateTime' is in the future
+    future_trips = (
+        db.collection('trips')
+        .where('propertyRef', '==', property_ref)
+        .where('isExternal', '==', False)
+        .where('tripBeginDateTime', '>', now)
+        .stream()
+    )
+
+    # For each future trip, create an event and call create_or_update_event_from_trip
+    for trip in future_trips:
+        trip_data = trip.to_dict()
+        if 'eventId' not in trip_data:
+            # Call create_or_update_event_from_trip to create the event
+            create_or_update_event_from_trip(property_ref, trip.reference)
 
 
 def create_or_update_event_from_trip(property_ref, trip_ref):
-    app_logger.info('Creating or updating event from trip: %s , property: %s', trip_ref, property_ref)
-    # Fetch the specific property document
+    """
+    Create or update an event on the Google Calendar associated with the property
+    """
+    with logfire.span('create_or_update_event_from_trip'):
+        # Fetch the specific property document
+        collection_id, document_id = property_ref.split('/')
+        property_doc = db.collection(collection_id).document(document_id).get()
 
-    collection_id, document_id = property_ref.split('/')
-    property_doc = db.collection(collection_id).document(document_id).get()
+        if property_doc.exists:
+            app_logger.info('Property document exists for trip: %s', property_ref)
+            property_data = property_doc.to_dict()
+            calendar_id = property_data['externalCalendar']
+            property_name = property_data['propertyName']  # Fetch the property name
 
-    if property_doc.exists:
-        app_logger.info('Property document exists for trip: %s', property_ref)
-        property_data = property_doc.to_dict()
-        calendar_id = property_data['externalCalendar']
-        property_name = property_data['propertyName']  # Fetch the property name
+            # Fetch the specific trip document
+            collection_id, document_id = trip_ref.split('/')
+            trip_doc = db.collection(collection_id).document(document_id).get()
+            if trip_doc.exists:
+                trip_data = trip_doc.to_dict()
 
-        # Fetch the specific trip document
-        collection_id, document_id = trip_ref.split('/')
-        trip_doc = db.collection(collection_id).document(document_id).get()
-        if trip_doc.exists:
-            trip_data = trip_doc.to_dict()
+                # Fetch the specific user document
+                app_logger.info('UserRef: %s', trip_data['userRef'].path)
+                collection_id, document_id = trip_data['userRef'].path.split('/')
+                user_doc = db.collection(collection_id).document(document_id).get()
+                if user_doc.exists:
+                    user_data = user_doc.to_dict()
+                    guest_name = user_data['display_name'] or 'Guest'
+                    app_logger.info('Guest name: %s', guest_name)
 
-            # Fetch the specific user document
-            collection_id, document_id = trip_data['userRef'].split('/')
-            user_doc = db.collection(collection_id).document(document_id).get()
-            if user_doc.exists:
-                user_data = user_doc.to_dict()
-                guest_name = user_data['displayName']
+                    # Construct the booking link
+                    booking_link = (
+                        f'https://app.bookteamworks.com/tripDetails?tripPassed={trip_ref}&property={property_ref}'
+                    )
 
-                # Construct the booking link
-                booking_link = (
-                    f'https://app.bookteamworks.com/tripDetails?tripPassed={trip_ref}&property={property_ref}'
-                )
+                    # Convert the trip data to Google Calendar event format
+                    # Add 30-minute buffer time to either side of the event
+                    event_data = {
+                        'summary': f'Office Booking for {guest_name} | Teamworks',  # Generate the event name
+                        'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
+                        # Add the event description
+                        'start': {
+                            'dateTime': (trip_data['tripBeginDateTime'] - timedelta(minutes=30)).isoformat(),
+                            'timeZone': 'UTC',
+                        },
+                        'end': {
+                            'dateTime': (trip_data['tripEndDateTime'] + timedelta(minutes=30)).isoformat(),
+                            'timeZone': 'UTC',
+                        },
+                    }
 
-                # Convert the trip data to Google Calendar event format
-                # Add 30-minute buffer time to either side of the event
-                event_data = {
-                    'id': trip_data['eventId'],
-                    'summary': f'TW - Office Booking for {guest_name}',  # Generate the event name
-                    'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
-                    # Add the event description
-                    'start': {
-                        'dateTime': (trip_data['tripBeginDateTime'] - timedelta(minutes=30)).isoformat(),
-                        'timeZone': 'UTC',
-                    },
-                    'end': {
-                        'dateTime': (trip_data['tripEndDateTime'] + timedelta(minutes=30)).isoformat(),
-                        'timeZone': 'UTC',
-                    },
-                }
+                    # Call the Google Calendar API to update or create the event
+                    service = build('calendar', 'v3', credentials=creds)
+                    if 'eventId' in trip_data:
+                        app_logger.info('Updating event: %s', trip_data['eventId'])
+                        event_data['id'] = trip_data['eventId']
+                        service.events().update(
+                            calendarId=calendar_id, eventId=trip_data['eventId'], body=event_data
+                        ).execute()
+                    else:
+                        # get the event id and add it to the trip document
+                        event = service.events().insert(calendarId=calendar_id, body=event_data).execute()
+                        app_logger.info('Created event: %s', event['id'])
+                        trip_doc.reference.update({'eventId': event['id']})
 
-                # Call the Google Calendar API to update or create the event
-                service = build('calendar', 'v3', credentials=creds)
-                if 'eventId' in trip_data:
-                    app_logger.info('Updating event: %s', trip_data['eventId'])
-                    service.events().update(
-                        calendarId=calendar_id, eventId=trip_data['eventId'], body=event_data
-                    ).execute()
                 else:
-                    app_logger.info('Creating a new event')
-                    service.events().insert(calendarId=calendar_id, body=event_data).execute()
-
+                    app_logger.error('User document does not exist for: %s', trip_data['userRef'])
+                    raise HttpError
             else:
-                app_logger.error('User document does not exist for: %s', trip_data['userRef'])
+                app_logger.error('Trip document does not exist for: %s', trip_ref)
                 raise HttpError
         else:
-            app_logger.error('Trip document does not exist for: %s', trip_ref)
+            app_logger.error('Property document does not exist for: %s', property_ref)
             raise HttpError
-    else:
-        app_logger.error('Property document does not exist for: %s', property_ref)
-        raise HttpError
+
+
+def delete_event_from_trip(property_ref, trip_ref):
+    """
+    Delete an event from the Google Calendar associated with the property
+    """
+    with logfire.span('delete_event_from_trip'):
+        app_logger.info('Deleting event from trip: %s , property: %s', trip_ref, property_ref)
+        # Fetch the specific property document
+        collection_id, document_id = property_ref.split('/')
+        property_doc = db.collection(collection_id).document(document_id).get()
+
+        if property_doc.exists:
+            app_logger.info('Property document exists for trip: %s', property_ref)
+            property_data = property_doc.to_dict()
+            calendar_id = property_data['externalCalendar']
+
+            # Fetch the specific trip document
+            collection_id, document_id = trip_ref.split('/')
+            trip_doc = db.collection(collection_id).document(document_id).get()
+            if trip_doc.exists:
+                trip_data = trip_doc.to_dict()
+
+                # Call the Google Calendar API to delete the event
+                service = build('calendar', 'v3', credentials=creds)
+                service.events().delete(calendarId=calendar_id, eventId=trip_data['eventId']).execute()
+            else:
+                app_logger.error('Trip document does not exist for: %s', trip_ref)
+                raise HttpError
+        else:
+            app_logger.error('Property document does not exist for: %s', property_ref)
+            raise HttpError
