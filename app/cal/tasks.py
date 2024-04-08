@@ -296,7 +296,6 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     # Convert the trip data to Google Calendar event format
                     # Add 30-minute buffer time to either side of the event
                     event_data = {
-                        'id': trip_data['eventId'],
                         'summary': f'Office Booking for {guest_name} | Teamworks',  # Generate the event name
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
                         # Add the event description
@@ -314,12 +313,15 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     service = build('calendar', 'v3', credentials=creds)
                     if 'eventId' in trip_data:
                         app_logger.info('Updating event: %s', trip_data['eventId'])
+                        event_data['id'] = trip_data['eventId']
                         service.events().update(
                             calendarId=calendar_id, eventId=trip_data['eventId'], body=event_data
                         ).execute()
                     else:
-                        app_logger.info('Creating a new event')
-                        service.events().insert(calendarId=calendar_id, body=event_data).execute()
+                        # get the event id and add it to the trip document
+                        event = service.events().insert(calendarId=calendar_id, body=event_data).execute()
+                        app_logger.info('Created event: %s', event['id'])
+                        trip_doc.reference.update({'eventId': event['id']})
 
                 else:
                     app_logger.error('User document does not exist for: %s', trip_data['userRef'])
