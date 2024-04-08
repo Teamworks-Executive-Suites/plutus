@@ -1,10 +1,8 @@
 import base64
-import json
 from datetime import timedelta
 
 import logfire
 import requests
-
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.auto._utils import app_logger
@@ -107,13 +105,10 @@ def auto_complete_and_notify():
             # Iterate through every trip in property
 
             with logfire.span(f'Processing property: {prop.id}'):
-
                 trips = db.collection('trips').where(filter=FieldFilter('propertyRef', '==', prop.reference)).stream()
 
                 for trip in trips:
-
                     with logfire.span(f'Processing trip: {trip.id}'):
-
                         app_logger.info('Trip data: %s', str(trip.to_dict()))
 
                         if not trip.exists:
@@ -127,7 +122,8 @@ def auto_complete_and_notify():
                             continue  # Changed from return to continue to process the next trip
 
                         if (not trip.get('complete') or trip.get('upcoming')) and (
-                                current_time > trip.get('tripEndDateTime')):
+                            current_time > trip.get('tripEndDateTime')
+                        ):
                             try:
                                 trip.reference.update({'complete': True, 'upcoming': False})
                                 app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
@@ -137,26 +133,33 @@ def auto_complete_and_notify():
                             except Exception as e:
                                 app_logger.error('Failed to update trip %s for property %S: %s', trip.id, prop.id, e)
 
-                        # Check if current time is one day before the start time of the trip
-                        if trip.get('upcoming') and (
-                                current_time > (trip.get('tripBeginDateTime') - timedelta(hours=24))):
-                            try:
-                                send_reminder_sms(trip.reference, prop.reference, 24)
+                        if 'tripStartDateTime' in trip and trip.get('upcoming'):
+                            time_difference = trip.get('tripStartDateTime') - current_time
 
-                            except Exception as e:
-                                app_logger.error(
-                                    'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
-                                )
+                            with logfire.span(f'Time till trip starts: {time_difference}'):
+                                # Check if current time is exactly one day before the start time of the trip
+                                if timedelta(hours=23) < time_difference < timedelta(hours=25):
+                                    try:
+                                        send_reminder_sms(trip.reference, prop.reference, 24)
+                                    except Exception as e:
+                                        app_logger.error(
+                                            'Failed to send reminder SMS for trip %s for property %S: %s',
+                                            trip.id,
+                                            prop.id,
+                                            e,
+                                        )
 
-                        # Check if current time is one hour before the start time of the trip
-                        if trip.get('upcoming') and (current_time > trip.get('tripBeginDateTime') + timedelta(hours=1)):
-                            try:
-                                send_reminder_sms(trip.reference, prop.reference, 1)
-
-                            except Exception as e:
-                                app_logger.error(
-                                    'Failed to send reminder SMS for trip %s for property %S: %s', trip.id, prop.id, e
-                                )
+                                # Check if current time is exactly one hour before the start time of the trip
+                                if timedelta(minutes=59) < time_difference < timedelta(hours=1):
+                                    try:
+                                        send_reminder_sms(trip.reference, prop.reference, 1)
+                                    except Exception as e:
+                                        app_logger.error(
+                                            'Failed to send reminder SMS for trip %s for property %S: %s',
+                                            trip.id,
+                                            prop.id,
+                                            e,
+                                        )
                         else:
                             app_logger.info('No trips to action on for property %s', prop.id)
 
