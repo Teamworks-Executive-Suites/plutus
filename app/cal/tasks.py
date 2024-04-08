@@ -286,7 +286,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                 if user_doc.exists:
                     user_data = user_doc.to_dict()
                     guest_name = user_data['display_name'] or 'Guest'
-                    app_logger.ingo('Guest name: %s', guest_name)
+                    app_logger.info('Guest name: %s', guest_name)
 
                     # Construct the booking link
                     booking_link = (
