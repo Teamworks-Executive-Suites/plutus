@@ -58,6 +58,11 @@ if you want to adjust the buffer time before and after calendar events, you can 
 
 - `BUFFER_TIME`: Buffer time in minutes
 
+
+## How to connect a Google Calendar to a Teamworks office and Peerspace office
+
+Look at the instructions [here](https://github.com/Teamworks-Executive-Suites/teamworks/issues/75#issuecomment-2041655913)
+
 ## Testing
 
 before running stripe tests make sure to have the following environment variables set:
