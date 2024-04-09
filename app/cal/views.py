@@ -24,11 +24,17 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
 # Create or Update Event from Trip
 @cal_router.post('/event_from_trip')
 def process_create_or_update_event_from_trip(data: EventFromTrip, token: str = Depends(get_token)):
-    app_logger.info('Process creating or updating event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref)
+    app_logger.info(
+        'Process creating or updating event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref
+    )
     # Call the create_or_update_event_from_trip function
     try:
         create_or_update_event_from_trip(data.property_ref, data.trip_ref)
-        return {'tripRef': data.trip_ref, 'propertyRef': data.property_ref, 'message': 'Event successfully created'}
+        return {
+            'tripRef': data.trip_ref,
+            'propertyRef': data.property_ref,
+            'message': 'Event successfully created or updated',
+        }
     except Exception as e:
         app_logger.error('Error creating event from trip: %s', e)
         raise HTTPException(status_code=400, detail=str(e))
