@@ -250,6 +250,10 @@ def create_events_for_future_trips(property_ref):
             .stream()
         )
 
+        if not future_trips:
+            app_logger.info('No future trips found for property: %s', property_ref)
+            return
+
         # For each future trip, create an event and call create_or_update_event_from_trip
         for trip in future_trips:
             trip_data = trip.to_dict()
