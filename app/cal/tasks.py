@@ -235,27 +235,31 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
 
 def create_events_for_future_trips(property_ref):
-    app_logger.info('Creating events for future non-external trips without event ID for property: %s', property_ref)
+    with logfire.span(f'create_events_for_future_trips for property: {property_ref}'):
 
-    # Get the current time
-    now = datetime.utcnow()
+        # Get the current time
+        now = datetime.utcnow()
 
-    # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is False,
-    # 'eventId' does not exist, and 'tripBeginDateTime' is in the future
-    future_trips = (
-        db.collection('trips')
-        .where('propertyRef', '==', property_ref)
-        .where('isExternal', '==', False)
-        .where('tripBeginDateTime', '>', now)
-        .stream()
-    )
+        # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is False,
+        # 'eventId' does not exist, and 'tripBeginDateTime' is in the future
+        future_trips = (
+            db.collection('trips')
+            .where('propertyRef', '==', property_ref)
+            .where('isExternal', '==', False)
+            .where('tripBeginDateTime', '>', now)
+            .stream()
+        )
 
-    # For each future trip, create an event and call create_or_update_event_from_trip
-    for trip in future_trips:
-        trip_data = trip.to_dict()
-        if 'eventId' not in trip_data:
-            # Call create_or_update_event_from_trip to create the event
-            create_or_update_event_from_trip(property_ref, trip.reference)
+        # For each future trip, create an event and call create_or_update_event_from_trip
+        for trip in future_trips:
+            trip_data = trip.to_dict()
+            app_logger.info('Trip data: %s', str(trip_data))
+            if 'eventId' not in trip_data:
+                # Call create_or_update_event_from_trip to create the event
+                app_logger.info('Creating event for trip: %s', trip.reference)
+                create_or_update_event_from_trip(property_ref, trip.reference)
+            else:
+                app_logger.info('Event already exists for trip: %s', trip.reference)
 
 
 def create_or_update_event_from_trip(property_ref, trip_ref):
