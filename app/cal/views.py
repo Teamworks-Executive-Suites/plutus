@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from googleapiclient.errors import HttpError
 
 from app.auth.views import get_token
 from app.cal._utils import app_logger
-from app.cal.tasks import create_or_update_event_from_trip, delete_event_from_trip, initalize_trips_from_cal
+from app.cal.tasks import create_or_update_event_from_trip, delete_event_from_trip, initalize_trips_from_cal, \
+    delete_calendar_watch_channel
 from app.models import EventFromTrip, PropertyCal
 
 cal_router = APIRouter()
@@ -16,9 +18,18 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
         initalize_trips_from_cal(data.property_ref, data.cal_id)
         app_logger.info('Google Calendar ID successfully set.')
         return {'propertyRef': data.property_ref, 'message': 'Google Calendar ID successfully set'}
-    except Exception as e:
-        app_logger.error('Error setting Google Calendar ID: %s', e)
-        raise HTTPException(status_code=400, detail=str(e))
+    except HttpError as e:
+        error_message = str(e)
+        app_logger.error('Error setting Google Calendar ID: %s', error_message)
+        if "Channel id not unique" in error_message:
+            app_logger.info('Channel id not unique error encountered. Deleting the channel...')
+            calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
+            delete_calendar_watch_channel(data.property_ref, calendar_resource_id)
+            app_logger.info('Channel successfully deleted.')
+            app_logger.info('Retrying to set Google Calendar ID...')
+            initalize_trips_from_cal(data.property_ref, data.cal_id)
+            app_logger.info('Google Calendar ID successfully set.')
+        raise HTTPException(status_code=400, detail=error_message)
 
 
 # Create or Update Event from Trip
