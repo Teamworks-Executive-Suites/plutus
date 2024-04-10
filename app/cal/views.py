@@ -1,3 +1,4 @@
+import logfire
 from fastapi import APIRouter, Depends, HTTPException
 from googleapiclient.errors import HttpError
 
@@ -13,7 +14,7 @@ cal_router = APIRouter()
 # Set Google Calendar ID
 @cal_router.post('/set_google_calendar_id')
 def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
-    app_logger.info('Setting Google Calendar ID...')
+    app_logger.info('Setting Google Calendar ID for property: %s', data.property_ref)
     try:
         initalize_trips_from_cal(data.property_ref, data.cal_id)
         app_logger.info('Google Calendar ID successfully set.')
@@ -22,13 +23,14 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
         error_message = str(e)
         app_logger.error('Error setting Google Calendar ID: %s', error_message)
         if "Channel id not unique" in error_message:
-            app_logger.info('Channel id not unique error encountered. Deleting the channel...')
-            calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
-            delete_calendar_watch_channel(data.property_ref, calendar_resource_id)
-            app_logger.info('Channel successfully deleted.')
-            app_logger.info('Retrying to set Google Calendar ID...')
-            initalize_trips_from_cal(data.property_ref, data.cal_id)
-            app_logger.info('Google Calendar ID successfully set.')
+            with logfire.span('Channel id not unique'):
+                app_logger.info('Channel id not unique error encountered. Deleting the channel...')
+                calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
+                delete_calendar_watch_channel(data.property_ref, calendar_resource_id)
+                app_logger.info('Channel successfully deleted.')
+                app_logger.info('Retrying to set Google Calendar ID...')
+                initalize_trips_from_cal(data.property_ref, data.cal_id)
+                app_logger.info('Google Calendar ID successfully set.')
         raise HTTPException(status_code=400, detail=error_message)
 
 
