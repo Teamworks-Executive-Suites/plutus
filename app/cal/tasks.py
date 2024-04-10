@@ -101,9 +101,6 @@ def sync_calendar_events(property_ref):
                             'Updated trip from event: %s, updated trip ref: %s', event['id'],
                             existing_trip_ref[0].id
                         )
-                    else:
-                        app_logger.info('Event does not have start key: %s', event)
-                        delete_trip_from_event(property_ref, event['id'])
 
                     # Get the current time
                     now = datetime.utcnow()
