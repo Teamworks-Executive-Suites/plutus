@@ -15,6 +15,8 @@ from app.utils import settings
 
 cal_webhook_router = APIRouter()
 
+# Dictionary for processed message numbers
+processed_message_numbers = {}
 
 @cal_webhook_router.post('/cal_webhook')
 async def receive_webhook(request: Request, calendar_id: str):
@@ -22,6 +24,16 @@ async def receive_webhook(request: Request, calendar_id: str):
 
     headers = request.headers
     app_logger.info('Received headers: %s', headers)
+
+    # Extract the data from the headers
+    message_number = headers.get('X-Goog-Message-Number')
+
+    # Check if the message number is in the dictionary
+    if message_number in processed_message_numbers:
+        app_logger.info('Duplicate webhook ignored: %s', message_number)
+        processed_message_numbers[message_number] += 1
+        app_logger.info('Number of times this webhook received so far: %s', processed_message_numbers[message_number])
+        return
 
     # Extract the data from the headers
     channel_id = headers.get('X-Goog-Channel-ID')
@@ -61,6 +73,9 @@ async def receive_webhook(request: Request, calendar_id: str):
         except HttpError as e:
             app_logger.error('Error syncing calendar: %s', e)
             raise HTTPException(status_code=400, detail=str(e))
+
+    # Add the message number to the dictionary with a count of 1
+    processed_message_numbers[message_number] = 1
 
 
 @cal_webhook_router.post('/delete_webhook_channel')

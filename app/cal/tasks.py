@@ -73,39 +73,55 @@ def sync_calendar_events(property_ref):
                 # For each event, create or update a trip document
                 for event in events:
                     # Convert the event data to Firestore trip format
-                    if 'start' in events:
-                        trip_data = TripData(
-                            isExternal=True,
-                            propertyRef=property_ref,
-                            # Add a buffer time of 30 minutes to tripBeginDateTime and tripEndDateTime
-                            tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
-                                              - timedelta(minutes=30),
-                            tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(
-                                minutes=30),
-                            eventId=event['id'],
-                            eventSummary=event['summary'],  # Save the event summary on the trip
+                    trip_data = TripData(
+                        isExternal=True,
+                        propertyRef=property_ref,
+                        # Add a buffer time of 30 minutes to tripBeginDateTime and tripEndDateTime
+                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
+                                          - timedelta(minutes=30),
+                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(
+                            minutes=30),
+                        eventId=event['id'],
+                        eventSummary=event['summary'],  # Save the event summary on the trip
+                    )
+
+                    # Convert the trip_data to a dictionary
+                    trip_data_dict = trip_data.dict()
+
+                    # Check if a trip with the same eventId already exists
+                    existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
+                    if existing_trip_ref:
+                        # If a trip with the same eventId exists, update it
+                        existing_trip_ref[0].reference.update(trip_data_dict)
+                        app_logger.info(
+                            'Updated trip from event: %s, updated trip ref: %s', event['id'],
+                            existing_trip_ref[0].id
                         )
-
-                        # Convert the trip_data to a dictionary
-                        trip_data_dict = trip_data.dict()
-
-                        # Check if a trip with the same eventId already exists
-                        existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
-                        if existing_trip_ref:
-                            # If a trip with the same eventId exists, update it
-                            existing_trip_ref[0].reference.update(trip_data_dict)
-                            app_logger.info(
-                                'Updated trip from event: %s, updated trip ref: %s', event['id'],
-                                existing_trip_ref[0].id
-                            )
-                        else:
-                            # If no trip with the same eventId exists, create a new one
-                            new_trip_ref = db.collection('trips').add(trip_data_dict)
-                            app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'],
-                                            new_trip_ref[1].id)
                     else:
                         app_logger.info('Event does not have start key: %s', event)
                         delete_trip_from_event(property_ref, event['id'])
+
+                    # Get the current time
+                    now = datetime.utcnow()
+                    # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
+                    # and 'tripBeginDateTime' is in the future
+                    all_external_trips = [
+                        {"eventId": trip.to_dict()['eventId'], "ref": trip.reference}
+                        for trip in db.collection('trips')
+                        .where('propertyRef', '==', property_ref)
+                        .where('isExternal', '==', True)
+                        .where('tripBeginDateTime', '>', now)
+                        .stream()
+                    ]
+
+                    # Check for deleted events
+                    for trip in all_external_trips:
+                        if trip['eventId'] not in [event['id'] for event in events]:
+                            # If a trip exists in the database that does not have a corresponding event in the Google
+                            # Calendar, delete that trip
+                            db.collection('trips').document(trip['ref'].id).delete()
+                            app_logger.info('Deleted trip from event: %s, new trip ref: %s', trip['eventId'],
+                                            trip['ref'].id)
 
                 # Store the nextSyncToken from the response
                 next_sync_token = events_result.get('nextSyncToken')
