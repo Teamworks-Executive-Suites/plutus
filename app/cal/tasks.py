@@ -104,7 +104,7 @@ def sync_calendar_events(property_ref):
                             app_logger.info('Added trip from event: %s, new trip ref: %s', event['id'],
                                             new_trip_ref[1].id)
                     else:
-                        app_logger.log('Event does not have start key: %s', event)
+                        app_logger.info('Event does not have start key: %s', event)
                         delete_trip_from_event(property_ref, event['id'])
 
                 # Store the nextSyncToken from the response

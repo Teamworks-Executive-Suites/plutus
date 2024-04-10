@@ -128,7 +128,7 @@ def auto_complete_and_notify():
                                 complete_trip_sms(trip.reference, prop.reference)
 
                             except Exception as e:
-                                app_logger.error('Failed to update trip %s for property %S: %s', trip.id, prop.id, e)
+                                app_logger.error('Failed to update trip %s for property %s: %s', trip.id, prop.id, e)
 
                         if 'tripBeginDateTime' in trip.to_dict() and trip.get('upcoming'):
                             time_difference = trip.get('tripBeginDateTime') - current_time
@@ -140,7 +140,7 @@ def auto_complete_and_notify():
                                         send_reminder_sms(trip.reference, prop.reference, 24)
                                     except Exception as e:
                                         app_logger.error(
-                                            'Failed to send reminder SMS for trip %s for property %S: %s',
+                                            'Failed to send reminder SMS for trip %s for property %s: %s',
                                             trip.id,
                                             prop.id,
                                             e,
@@ -152,7 +152,7 @@ def auto_complete_and_notify():
                                         send_reminder_sms(trip.reference, prop.reference, 1)
                                     except Exception as e:
                                         app_logger.error(
-                                            'Failed to send reminder SMS for trip %s for property %S: %s',
+                                            'Failed to send reminder SMS for trip %s for property %s: %s',
                                             trip.id,
                                             prop.id,
                                             e,
