@@ -75,7 +75,6 @@ def sync_calendar_events(property_ref):
                     # Convert the event data to Firestore trip format
                     if 'start' not in event:
                         app_logger.info('Event does not have start key: %s', event['id'])
-                        debug(event)
                         continue
                     trip_data = TripData(
                         isExternal=True,
