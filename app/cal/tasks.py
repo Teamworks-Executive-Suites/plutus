@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 
 import logfire
+from devtools import debug
 from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -74,6 +75,9 @@ def sync_calendar_events(property_ref):
                 for event in events:
                     # Convert the event data to Firestore trip format
                     debug(event.__dict__)
+                    if 'start' not in event:
+                        app_logger.info('Event does not have start key: %s', event['id'])
+                        continue
                     trip_data = TripData(
                         isExternal=True,
                         propertyRef=property_ref,
