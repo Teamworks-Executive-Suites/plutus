@@ -124,9 +124,9 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     return trip_data
 
 
-def process_event(event, property_ref):
+def process_event(event: GCalEvent, property_ref: str):
     trip_data = convert_event_to_trip_data(event, property_ref)
-    existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
+    existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
     if existing_trip_ref:
         update_existing_trip(existing_trip_ref[0], trip_data, event)
     else:
