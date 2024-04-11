@@ -76,6 +76,7 @@ def sync_calendar_events(property_ref):
                     if 'start' not in event:
                         app_logger.info('Event does not have start key: %s', event['id'])
                         continue
+
                     trip_data = TripData(
                         isExternal=True,
                         propertyRef=property_ref,
@@ -101,6 +102,12 @@ def sync_calendar_events(property_ref):
                             existing_trip_ref[0].id
                         )
 
+                    else:
+                        # Add the trip to the database
+                        db.collection('trips').add(trip_data_dict)
+
+
+                    # check if any of the events have been deleted
                     # Get the current time
                     now = datetime.utcnow()
                     # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
@@ -138,7 +145,7 @@ def sync_calendar_events(property_ref):
         if e.resp.status == 410:
             # A 410 status code, "Gone", indicates that the sync token is invalid.
             app_logger.info('Invalid sync token, clearing event store and re-syncing.')
-            clear_event_store()
+            clear_event_store(property_ref)
             sync_calendar_events(property_ref)
         else:
             app_logger.error('Error syncing calendar: %s', e)
@@ -154,7 +161,7 @@ def clear_event_store(property_ref):
 
     # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
     # and 'tripBeginDateTime' is in the future
-    docs = (
+    trips = (
         trips_ref.where('propertyRef', '==', property_ref)
         .where('isExternal', '==', True)
         .where('tripBeginDateTime', '>', now)
@@ -162,8 +169,8 @@ def clear_event_store(property_ref):
     )
 
     # Delete each document
-    for doc in docs:
-        doc.reference.delete()
+    for trip in trips:
+        trip.reference.delete()
 
     app_logger.info('Event store successfully cleared.')
 
@@ -178,29 +185,6 @@ def delete_calendar_watch_channel(id, resource_id):
     except HttpError as e:
         app_logger.error('Error deleting calendar watch channel: %s', e)
         raise HTTPException(status_code=400, detail=str(e))
-
-
-def create_or_update_trip_from_event(calendar_id, event):
-    app_logger.info('Creating or updating trip from event: %s', event['id'])
-    # Convert the event data to Firestore trip format
-    trip_data = TripData(
-        isExternal=True,
-        propertyRef=calendar_id,
-        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime')),
-        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')),
-        eventId=event['id'],  # Save the event ID on the trip
-    )
-
-    # Fetch the specific trip document associated with the event id
-    trip_ref = db.collection('trips').document(event['id']).get()
-    if trip_ref.exists:
-        app_logger.info('Trip document exists for event: %s', trip_ref.id)
-        # The trip document exists, so update it
-        trip_ref.update(trip_data)
-    else:
-        app_logger.info('Trip document does not exist for event, so we create it: %s', event['id'])
-        # The trip document does not exist, so create it
-        db.collection('trips').add(trip_data)
 
 
 def initalize_trips_from_cal(property_ref, calendar_id):
