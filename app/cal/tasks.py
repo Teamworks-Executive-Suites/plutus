@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from app.cal._utils import app_logger
 from app.firebase_setup import db
-from app.models import TripData, GCalEvent
+from app.models import TripData, GCalEvent, CancelledGCalEvent
 from app.utils import settings
 
 creds = service_account.Credentials.from_service_account_info(
@@ -66,17 +66,21 @@ def sync_calendar_events(property_ref):
 
             events = events_result.get('items', [])
             for event in events:
-                validated_event = GCalEvent.parse_obj(event)
-
-                if 'start' not in event or 'end' not in event:
-                    app_logger.info('Event missing start/end date: %s', event['id'])
+                try:
+                    # Validate the event data with the appropriate model
+                    if event['status'] == 'cancelled':
+                        validated_event = CancelledGCalEvent.parse_obj(event)
+                    else:
+                        validated_event = GCalEvent.parse_obj(event)
+                except ValidationError as ve:
+                    app_logger.error('Event validation error: %s, Event: %s', ve, event['id'])
                     continue
 
-                # Process each event, similar to your original logic
+                # Process each event
                 process_event(validated_event, property_ref)
 
             next_sync_token = events_result.get('nextSyncToken')
-            property_doc_ref.update({'nextSyncToken': next_sync_token})
+            property_doc_ref.update({f'nextSyncToken': next_sync_token})
 
             page_token = events_result.get('nextPageToken')
             if not page_token:
@@ -87,7 +91,7 @@ def sync_calendar_events(property_ref):
             clear_event_store(property_ref)
             sync_calendar_events(property_ref)
         else:
-            app_logger.error(f'Error syncing calendar: {e}')
+            app_logger.error('Error syncing calendar: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -119,7 +123,23 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     return trip_data
 
 
-def process_event(event: GCalEvent, property_ref: str):
+def process_event(event: dict, property_ref: str):
+    if event['status'] == 'cancelled':
+        cancelled_event = CancelledGCalEvent.parse_obj(event)
+        handle_cancelled_event(cancelled_event, property_ref)
+    else:
+        validated_event = GCalEvent.parse_obj(event)
+        handle_validated_event(validated_event, property_ref)
+
+
+def handle_cancelled_event(event: CancelledGCalEvent, property_ref: str):
+    existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
+    if existing_trip_ref:
+        existing_trip_ref[0].reference.delete()
+        app_logger.info(f'Deleted trip for cancelled event: {event.id}')
+
+
+def handle_validated_event(event: GCalEvent, property_ref: str):
     trip_data = convert_event_to_trip_data(event, property_ref)
     existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
     if existing_trip_ref:

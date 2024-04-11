@@ -102,3 +102,10 @@ class GCalEvent(BaseModel):
     sequence: int
     reminders: Reminders
     eventType: str
+
+
+class CancelledGCalEvent(BaseModel):
+    kind: str
+    etag: str
+    id: str
+    status: str
