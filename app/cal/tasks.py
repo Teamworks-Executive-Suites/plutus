@@ -1,6 +1,7 @@
 import json
 import uuid
 from datetime import datetime, timedelta
+from typing import Union
 
 import logfire
 from devtools import debug
@@ -123,13 +124,11 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     return trip_data
 
 
-def process_event(event: dict, property_ref: str):
-    if event['status'] == 'cancelled':
-        cancelled_event = CancelledGCalEvent.parse_obj(event)
-        handle_cancelled_event(cancelled_event, property_ref)
+def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_ref: str):
+    if event.status == 'cancelled':
+        handle_cancelled_event(event, property_ref)
     else:
-        validated_event = GCalEvent.parse_obj(event)
-        handle_validated_event(validated_event, property_ref)
+        handle_validated_event(event, property_ref)
 
 
 def handle_cancelled_event(event: CancelledGCalEvent, property_ref: str):
