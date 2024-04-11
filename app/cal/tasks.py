@@ -97,12 +97,10 @@ def sync_calendar_events(property_ref):
 
 
 def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
-    start_datetime_str = event.start.get('dateTime')
-    end_datetime_str = event.end.get('dateTime')
+    start_datetime_str = event.start.dateTime
+    end_datetime_str = event.end.dateTime
 
     # Parse the start and end datetime strings from the event
-    # This assumes that your events use the 'dateTime' key for specifying their timing
-    # If your data might include 'date' for all-day events, you'll need to adjust this logic
     start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
     end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
 
