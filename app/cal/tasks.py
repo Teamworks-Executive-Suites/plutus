@@ -41,6 +41,10 @@ def sync_calendar_events(property_doc_ref: Any):
     # Fetch the specific property document
     # collection_id, document_id = property_ref.split('/')
     # property_doc_ref = db.collection(collection_id).document(document_id)
+
+    if isinstance(property_doc_ref, str):
+        property_doc_ref = db.document(property_doc_ref)
+
     property_doc = property_doc_ref.get()
 
     if not property_doc.exists:
