@@ -96,9 +96,9 @@ def sync_calendar_events(property_ref):
             raise HTTPException(status_code=500, detail=str(e))
 
 
-def convert_event_to_trip_data(event, property_ref):
-    start_datetime_str = event['start'].get('dateTime')
-    end_datetime_str = event['end'].get('dateTime')
+def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
+    start_datetime_str = event.start.get('dateTime')
+    end_datetime_str = event.end.get('dateTime')
 
     # Parse the start and end datetime strings from the event
     # This assumes that your events use the 'dateTime' key for specifying their timing
@@ -119,30 +119,30 @@ def convert_event_to_trip_data(event, property_ref):
         propertyRef=property_ref,
         tripBeginDateTime=trip_begin,
         tripEndDateTime=trip_end,
-        eventId=event.get('id'),
-        eventSummary=event.get('summary', '')  # Use an empty string if 'summary' is missing
+        eventId=event.id,
+        eventSummary=event.summary or ''  # Use an empty string if 'summary' is missing
     )
 
     return trip_data
 
 
 def process_event(event, property_ref):
-    trip_data_dict = convert_event_to_trip_data(event, property_ref).dict()
+    trip_data = convert_event_to_trip_data(event, property_ref)
     existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
     if existing_trip_ref:
-        update_existing_trip(existing_trip_ref[0], trip_data_dict, event)
+        update_existing_trip(existing_trip_ref[0], trip_data, event)
     else:
-        create_new_trip(trip_data_dict, event)
+        create_new_trip(trip_data, event)
 
 
-def update_existing_trip(trip_ref, trip_data, event):
-    trip_ref.reference.update(trip_data)
-    app_logger.info(f'Updated trip for event: {event["id"]}, trip ref: {trip_ref.id}')
+def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
+    trip_ref.reference.update(trip_data.dict())
+    app_logger.info(f'Updated trip for event: {event.id}, trip ref: {trip_ref.id}')
 
 
-def create_new_trip(trip_data, event):
-    trip_ref = db.collection('trips').add(trip_data)
-    app_logger.info(f'Created new trip for event: {event["id"]}, trip ref: {trip_ref[1].id}')
+def create_new_trip(trip_data: TripData, event: GCalEvent):
+    trip_ref = db.collection('trips').add(trip_data.dict())
+    app_logger.info(f'Created new trip for event: {event.id}, trip ref: {trip_ref[1].id}')
 
 
 def clear_event_store(property_ref):
