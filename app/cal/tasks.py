@@ -66,12 +66,7 @@ def sync_calendar_events(property_ref):
 
             events = events_result.get('items', [])
             for event in events:
-                try:
-                    # Validate the event data with GCalEvent model
-                    validated_event = GCalEvent.parse_obj(event)
-                except ValidationError as ve:
-                    app_logger.error('Event validation error: %s, Event: %s', ve, event['id'])
-                    continue
+                validated_event = GCalEvent.parse_obj(event)
 
                 if 'start' not in event or 'end' not in event:
                     app_logger.info('Event missing start/end date: %s', event['id'])
