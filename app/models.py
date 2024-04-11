@@ -46,6 +46,7 @@ class Event(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})
 
 class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     isExternal: bool
+    isInquiry: bool
     propertyRef: Any
     tripBeginDateTime: datetime
     tripEndDateTime: datetime
