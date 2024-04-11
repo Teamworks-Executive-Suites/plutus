@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from logfire.integrations.pydantic_plugin import PluginSettings
 from pydantic import BaseModel, Field
@@ -45,7 +46,7 @@ class Event(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})
 
 class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     isExternal: bool
-    propertyRef: str
+    propertyRef: Any
     tripBeginDateTime: datetime
     tripEndDateTime: datetime
     eventId: str
@@ -66,26 +67,26 @@ class UnauthorizedMessage(BaseModel, plugin_settings=PluginSettings(logfire={'re
     detail: str = 'Bearer token missing or unknown'
 
 
-class Creator(BaseModel):
+class Creator(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     email: str
 
 
-class Organizer(BaseModel):
+class Organizer(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     email: str
     displayName: str
     self: bool
 
 
-class DateTime(BaseModel):
+class DateTime(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     dateTime: str
     timeZone: str
 
 
-class Reminders(BaseModel):
+class Reminders(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     useDefault: bool
 
 
-class GCalEvent(BaseModel):
+class GCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     kind: str
     etag: str
     id: str
@@ -104,7 +105,7 @@ class GCalEvent(BaseModel):
     eventType: str
 
 
-class CancelledGCalEvent(BaseModel):
+class CancelledGCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     kind: str
     etag: str
     id: str

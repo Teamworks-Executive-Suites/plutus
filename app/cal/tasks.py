@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import Union
+from typing import Union, Any
 
 import logfire
 from fastapi import HTTPException
@@ -35,16 +35,16 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     return new_channel
 
 
-def sync_calendar_events(property_ref):
-    app_logger.info(f'Syncing calendar for property: {property_ref}')
+def sync_calendar_events(property_doc_ref: Any):
+    app_logger.info(f'Syncing calendar for property: {property_doc_ref}')
 
     # Fetch the specific property document
-    collection_id, document_id = property_ref.split('/')
-    property_doc_ref = db.collection(collection_id).document(document_id)
+    # collection_id, document_id = property_ref.split('/')
+    # property_doc_ref = db.collection(collection_id).document(document_id)
     property_doc = property_doc_ref.get()
 
     if not property_doc.exists:
-        app_logger.error(f'Property document does not exist for: {property_ref}')
+        app_logger.error('Property document does not exist for: %s', property_doc_ref)
         raise HTTPException(status_code=404, detail='Property not found')
 
     property_doc_dict = property_doc.to_dict()
@@ -74,7 +74,7 @@ def sync_calendar_events(property_ref):
                     continue
 
                 # Process each event
-                process_event(validated_event, property_ref)
+                process_event(validated_event, property_doc_ref)
 
             next_sync_token = events_result.get('nextSyncToken')
             property_doc_ref.update({'nextSyncToken': next_sync_token})
@@ -85,14 +85,14 @@ def sync_calendar_events(property_ref):
     except HttpError as e:
         if e.resp.status == 410:
             app_logger.info('Invalid sync token, clearing event store and re-syncing.')
-            clear_event_store(property_ref)
-            sync_calendar_events(property_ref)
+            clear_event_store(property_doc_ref.path)
+            sync_calendar_events(property_doc_ref)
         else:
             app_logger.error('Error syncing calendar: %s', e)
             raise HTTPException(status_code=500, detail=str(e))
 
 
-def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
+def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
     start_datetime_str = event.start.dateTime
     end_datetime_str = event.end.dateTime
 
@@ -116,7 +116,8 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     # Creating the TripData instance
     trip_data = TripData(
         isExternal=is_external,
-        propertyRef=property_ref,
+        isInquiry=False,
+        propertyRef=property_doc_ref,
         tripBeginDateTime=trip_begin,
         tripEndDateTime=trip_end,
         eventId=event.id,
@@ -126,22 +127,22 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     return trip_data
 
 
-def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_ref: str):
+def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_doc_ref: Any):
     if event.status == 'cancelled':
-        handle_cancelled_event(event, property_ref)
+        handle_cancelled_event(event)
     else:
-        handle_validated_event(event, property_ref)
+        handle_validated_event(event, property_doc_ref)
 
 
-def handle_cancelled_event(event: CancelledGCalEvent, property_ref: str):
+def handle_cancelled_event(event: CancelledGCalEvent):
     existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
     if existing_trip_ref:
         existing_trip_ref[0].reference.delete()
         app_logger.info(f'Deleted trip for cancelled event: {event.id}')
 
 
-def handle_validated_event(event: GCalEvent, property_ref: str):
-    trip_data = convert_event_to_trip_data(event, property_ref)
+def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
+    trip_data = convert_event_to_trip_data(event, property_doc_ref)
     existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
     if existing_trip_ref:
         update_existing_trip(existing_trip_ref[0], trip_data, event)
@@ -159,7 +160,7 @@ def create_new_trip(trip_data: TripData, event: GCalEvent):
     app_logger.info(f'Created new trip for event: {event.id}, trip ref: {trip_ref[1].id}')
 
 
-def clear_event_store(property_ref):
+def clear_event_store(property_ref: str):
     # Get a reference to the 'trips' collection
     trips_ref = db.collection('trips')
 
@@ -182,7 +183,7 @@ def clear_event_store(property_ref):
     app_logger.info('Event store successfully cleared.')
 
 
-def delete_calendar_watch_channel(id, resource_id):
+def delete_calendar_watch_channel(id: int, resource_id: str):
     app_logger.info('Deleting calendar watch channel: %s', id)
     # Call the Google Calendar API to delete the channel
     service = build('calendar', 'v3', credentials=creds)
@@ -194,7 +195,7 @@ def delete_calendar_watch_channel(id, resource_id):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-def initalize_trips_from_cal(property_ref, calendar_id):
+def initalize_trips_from_cal(property_ref: str, calendar_id: str):
     app_logger.info('Initialising trips from calendar: %s , property: %s', calendar_id, property_ref)
 
     # get the property document
@@ -222,11 +223,11 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
         property_doc_ref.update({'channelId': channel['resourceId']})
 
-    sync_calendar_events(property_ref)
+    sync_calendar_events(property_doc_ref)
     create_events_for_future_trips(property_ref)
 
 
-def create_events_for_future_trips(property_ref):
+def create_events_for_future_trips(property_ref: str):
     with logfire.span(f'create_events_for_future_trips for property: {property_ref}'):
         # Get the current time
         now = datetime.utcnow()
