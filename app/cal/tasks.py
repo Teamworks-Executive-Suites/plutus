@@ -111,9 +111,15 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     trip_begin = start_datetime - timedelta(minutes=30)
     trip_end = end_datetime + timedelta(minutes=30)
 
+    # If internal event, set isExternal to False
+    if 'Teamworks' in event.summary:
+        is_external = False
+    else:
+        is_external = True
+
     # Creating the TripData instance
     trip_data = TripData(
-        isExternal=True,
+        isExternal=is_external,
         propertyRef=property_ref,
         tripBeginDateTime=trip_begin,
         tripEndDateTime=trip_end,
