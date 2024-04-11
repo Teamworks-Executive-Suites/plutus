@@ -104,7 +104,8 @@ def sync_calendar_events(property_ref):
 
                     else:
                         # Add the trip to the database
-                        db.collection('trips').add(trip_data_dict)
+                        trip = db.collection('trips').add(trip_data_dict)
+                        app_logger.info('Created trip: %s from event: %s', trip[1].id, event['id'])
 
 
                     # check if any of the events have been deleted

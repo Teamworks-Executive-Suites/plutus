@@ -45,13 +45,13 @@ async def receive_webhook(request: Request, calendar_id: str):
     message_number = headers.get('X-Goog-Message-Number')
 
     # Log the extracted data
-    app_logger.info('Received channel_id: %s', channel_id)
-    app_logger.info('Received channel_token: %s', channel_token)
-    app_logger.info('Received channel_expiration: %s', channel_expiration)
-    app_logger.info('Received resource_id: %s', resource_id)
-    app_logger.info('Received resource_uri: %s', resource_uri)
-    app_logger.info('Received resource_state: %s', resource_state)
-    app_logger.info('Received message_number: %s', message_number)
+    app_logger.debug('Received channel_id: %s', channel_id)
+    app_logger.debug('Received channel_token: %s', channel_token)
+    app_logger.debug('Received channel_expiration: %s', channel_expiration)
+    app_logger.debug('Received resource_id: %s', resource_id)
+    app_logger.debug('Received resource_uri: %s', resource_uri)
+    app_logger.debug('Received resource_state: %s', resource_state)
+    app_logger.debug('Received message_number: %s', message_number)
 
     # Check if the channel expiration is within 1 week
     if channel_expiration:
