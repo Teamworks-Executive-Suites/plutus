@@ -23,16 +23,15 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
 
     headers = request.headers
-    app_logger.info('Received headers: %s', headers)
+    app_logger.debug('Received headers: %s', headers)
 
     # Extract the data from the headers
     message_number = headers.get('X-Goog-Message-Number')
 
     # Check if the message number is in the dictionary
     if message_number in processed_message_numbers:
-        app_logger.info('Duplicate webhook ignored: %s', message_number)
         processed_message_numbers[message_number] += 1
-        app_logger.info('Number of times this webhook received so far: %s', processed_message_numbers[message_number])
+        app_logger.info('Webhook message: %s received %s times', message_number, processed_message_numbers[message_number])
         return
 
     # Extract the data from the headers

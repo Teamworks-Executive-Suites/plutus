@@ -1,7 +1,9 @@
+import json
 import uuid
 from datetime import datetime, timedelta
 
 import logfire
+from devtools import debug
 from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -72,6 +74,9 @@ def sync_calendar_events(property_ref):
 
                 # For each event, create or update a trip document
                 for event in events:
+
+                    debug(event)
+                    
                     # Convert the event data to Firestore trip format
                     if 'start' not in event:
                         app_logger.info('Event does not have start key: %s', event['id'])
