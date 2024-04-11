@@ -118,8 +118,10 @@ def auto_complete_and_notify():
                             app_logger.error('Trip document not found for property %s', prop.id)
                             continue  # Changed from return to continue to process the next trip
 
-                        if (not trip.get('complete') or trip.get('upcoming')) and (
-                            current_time > trip.get('tripEndDateTime')
+                        if (
+                            ('complete' in trip and not trip.get('complete'))
+                            or ('upcoming' in trip and trip.get('upcoming'))
+                            and (current_time > trip.get('tripEndDateTime'))
                         ):
                             try:
                                 trip.reference.update({'complete': True, 'upcoming': False})

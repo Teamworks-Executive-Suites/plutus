@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta
-from typing import Union, Any
+from typing import Any, Union
 
 import logfire
 from fastapi import HTTPException
@@ -253,7 +253,7 @@ def create_events_for_future_trips(property_ref: str):
         # For each future trip, create an event and call create_or_update_event_from_trip
         for trip in future_trips:
             trip_data = trip.to_dict()
-            app_logger.info('Trip data: %s', str(trip_data))
+            app_logger.info('Trip data: %s', trip)
             if 'eventId' not in trip_data:
                 # Call create_or_update_event_from_trip to create the event
                 app_logger.info('Creating event for trip: %s', trip.reference)
