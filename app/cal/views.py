@@ -34,7 +34,6 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
         raise HTTPException(status_code=400, detail=error_message)
 
 
-# Create or Update Event from Trip
 @cal_router.post('/event_from_trip')
 def process_create_or_update_event_from_trip(data: EventFromTrip, token: str = Depends(get_token)):
     app_logger.info(

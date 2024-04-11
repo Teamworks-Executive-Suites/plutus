@@ -37,126 +37,112 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_ref):
-    app_logger.info('Syncing calendar for property: %s', property_ref)
+    app_logger.info(f'Syncing calendar for property: {property_ref}')
 
     # Fetch the specific property document
     collection_id, document_id = property_ref.split('/')
     property_doc_ref = db.collection(collection_id).document(document_id)
-
-    # Fetch the property document
     property_doc = property_doc_ref.get()
+
     if not property_doc.exists:
-        app_logger.error('Property document does not exist for: %s', property_ref)
-        raise HTTPException(status_code=400, detail='Property not found')
+        app_logger.error(f'Property document does not exist for: {property_ref}')
+        raise HTTPException(status_code=404, detail='Property not found')
 
-    # Convert the DocumentSnapshot to a dictionary
     property_doc_dict = property_doc.to_dict()
-
     calendar_id = property_doc_dict.get('externalCalendar')
-    next_sync_token = property_doc_dict.get('nextSyncToken')
-
-    # If nextSyncToken does not exist in the document, assign a default value
-    if next_sync_token is None:
-        app_logger.info('nextSyncToken does not exist')
-        next_sync_token = ''
+    next_sync_token = property_doc_dict.get('nextSyncToken', '')
 
     # Call the Google Calendar API to fetch the events
     service = build('calendar', 'v3', credentials=creds)
+    page_token = None
+
     try:
-        with logfire.span('fetching events from calendar'):
-            page_token = None
-            while True:
-                events_result = (
-                    service.events()
-                    .list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token)
-                    .execute()
-                )
-                events = events_result.get('items', [])
+        while True:
+            events_result = service.events().list(
+                calendarId=calendar_id,
+                syncToken=next_sync_token,
+                pageToken=page_token
+            ).execute()
 
-                # For each event, create or update a trip document
-                for event in events:
+            events = events_result.get('items', [])
+            for event in events:
+                try:
+                    # Validate the event data with GCalEvent model
+                    validated_event = GCalEvent.parse_obj(event)
+                except ValidationError as ve:
+                    app_logger.error('Event validation error: %s, Event: %s', ve, event['id'])
+                    continue
 
-                    event = GCalEvent(**event)
+                if 'start' not in event or 'end' not in event:
+                    app_logger.info('Event missing start/end date: %s', event['id'])
+                    continue
 
-                    # Convert the event data to Firestore trip format
-                    if 'start' not in event:
-                        app_logger.info('Event does not have start key: %s', event['id'])
-                        continue
+                # Process each event, similar to your original logic
+                process_event(validated_event, property_ref)
 
-                    trip_data = TripData(
-                        isExternal=True,
-                        propertyRef=property_ref,
-                        # Add a buffer time of 30 minutes to tripBeginDateTime and tripEndDateTime
-                        tripBeginDateTime=datetime.fromisoformat(event['start'].get('dateTime'))
-                                          - timedelta(minutes=30),
-                        tripEndDateTime=datetime.fromisoformat(event['end'].get('dateTime')) + timedelta(
-                            minutes=30),
-                        eventId=event['id'],
-                        eventSummary=event['summary'],  # Save the event summary on the trip
-                    )
+            next_sync_token = events_result.get('nextSyncToken')
+            property_doc_ref.update({'nextSyncToken': next_sync_token})
 
-                    # Convert the trip_data to a dictionary
-                    trip_data_dict = trip_data.dict()
-
-                    # Check if a trip with the same eventId already exists
-                    existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
-                    if existing_trip_ref:
-                        # If a trip with the same eventId exists, update it
-                        existing_trip_ref[0].reference.update(trip_data_dict)
-                        app_logger.info(
-                            'Updated trip from event: %s, updated trip ref: %s', event['id'],
-                            existing_trip_ref[0].id
-                        )
-
-                    else:
-                        # Add the trip to the database
-                        trip = db.collection('trips').add(trip_data_dict)
-                        app_logger.info('Created trip: %s from event: %s', trip[1].id, event['id'])
-
-
-                    # check if any of the events have been deleted
-                    # Get the current time
-                    now = datetime.utcnow()
-                    # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
-                    # and 'tripBeginDateTime' is in the future
-                    all_external_trips = [
-                        {"eventId": trip.to_dict()['eventId'], "ref": trip.reference}
-                        for trip in db.collection('trips')
-                        .where('propertyRef', '==', property_ref)
-                        .where('isExternal', '==', True)
-                        .where('tripBeginDateTime', '>', now)
-                        .stream()
-                    ]
-
-                    # Check for deleted events
-                    for trip in all_external_trips:
-                        if trip['eventId'] not in [event['id'] for event in events]:
-                            # If a trip exists in the database that does not have a corresponding event in the Google
-                            # Calendar, delete that trip
-                            db.collection('trips').document(trip['ref'].id).delete()
-                            app_logger.info('Deleted trip from event: %s, new trip ref: %s', trip['eventId'],
-                                            trip['ref'].id)
-
-                # Store the nextSyncToken from the response
-                next_sync_token = events_result.get('nextSyncToken')
-
-                # Save the nextSyncToken to use in the next sync request
-                # Update the property document with the new sync token
-                property_doc_ref.update({'nextSyncToken': next_sync_token})
-
-                page_token = events_result.get('nextPageToken')
-                if not page_token:
-                    break
-
+            page_token = events_result.get('nextPageToken')
+            if not page_token:
+                break
     except HttpError as e:
         if e.resp.status == 410:
-            # A 410 status code, "Gone", indicates that the sync token is invalid.
             app_logger.info('Invalid sync token, clearing event store and re-syncing.')
             clear_event_store(property_ref)
             sync_calendar_events(property_ref)
         else:
-            app_logger.error('Error syncing calendar: %s', e)
-            raise HTTPException(status_code=400, detail=str(e))
+            app_logger.error(f'Error syncing calendar: {e}')
+            raise HTTPException(status_code=500, detail=str(e))
+
+
+def convert_event_to_trip_data(event, property_ref):
+    start_datetime_str = event['start'].get('dateTime')
+    end_datetime_str = event['end'].get('dateTime')
+
+    # Parse the start and end datetime strings from the event
+    # This assumes that your events use the 'dateTime' key for specifying their timing
+    # If your data might include 'date' for all-day events, you'll need to adjust this logic
+    start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
+    end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
+
+    if not start_datetime or not end_datetime:
+        raise ValueError("Event start or end datetime is missing")
+
+    # Adding a buffer of 30 minutes before the trip start and after the trip end
+    trip_begin = start_datetime - timedelta(minutes=30)
+    trip_end = end_datetime + timedelta(minutes=30)
+
+    # Creating the TripData instance
+    trip_data = TripData(
+        isExternal=True,
+        propertyRef=property_ref,
+        tripBeginDateTime=trip_begin,
+        tripEndDateTime=trip_end,
+        eventId=event.get('id'),
+        eventSummary=event.get('summary', '')  # Use an empty string if 'summary' is missing
+    )
+
+    return trip_data
+
+
+def process_event(event, property_ref):
+    trip_data_dict = convert_event_to_trip_data(event, property_ref).dict()
+    existing_trip_ref = db.collection('trips').where('eventId', '==', event['id']).get()
+    if existing_trip_ref:
+        update_existing_trip(existing_trip_ref[0], trip_data_dict, event)
+    else:
+        create_new_trip(trip_data_dict, event)
+
+
+def update_existing_trip(trip_ref, trip_data, event):
+    trip_ref.reference.update(trip_data)
+    app_logger.info(f'Updated trip for event: {event["id"]}, trip ref: {trip_ref.id}')
+
+
+def create_new_trip(trip_data, event):
+    trip_ref = db.collection('trips').add(trip_data)
+    app_logger.info(f'Created new trip for event: {event["id"]}, trip ref: {trip_ref[1].id}')
 
 
 def clear_event_store(property_ref):
