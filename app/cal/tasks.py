@@ -1,10 +1,8 @@
-import json
 import uuid
 from datetime import datetime, timedelta
 from typing import Union
 
 import logfire
-from devtools import debug
 from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
@@ -13,7 +11,7 @@ from pydantic import ValidationError
 
 from app.cal._utils import app_logger
 from app.firebase_setup import db
-from app.models import TripData, GCalEvent, CancelledGCalEvent
+from app.models import CancelledGCalEvent, GCalEvent, TripData
 from app.utils import settings
 
 creds = service_account.Credentials.from_service_account_info(
@@ -59,11 +57,9 @@ def sync_calendar_events(property_ref):
 
     try:
         while True:
-            events_result = service.events().list(
-                calendarId=calendar_id,
-                syncToken=next_sync_token,
-                pageToken=page_token
-            ).execute()
+            events_result = (
+                service.events().list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token).execute()
+            )
 
             events = events_result.get('items', [])
             for event in events:
@@ -81,7 +77,7 @@ def sync_calendar_events(property_ref):
                 process_event(validated_event, property_ref)
 
             next_sync_token = events_result.get('nextSyncToken')
-            property_doc_ref.update({f'nextSyncToken': next_sync_token})
+            property_doc_ref.update({'nextSyncToken': next_sync_token})
 
             page_token = events_result.get('nextPageToken')
             if not page_token:
@@ -105,7 +101,7 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
     end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
 
     if not start_datetime or not end_datetime:
-        raise ValueError("Event start or end datetime is missing")
+        raise ValueError('Event start or end datetime is missing')
 
     # Adding a buffer of 30 minutes before the trip start and after the trip end
     trip_begin = start_datetime - timedelta(minutes=30)
@@ -124,7 +120,7 @@ def convert_event_to_trip_data(event: GCalEvent, property_ref: str) -> TripData:
         tripBeginDateTime=trip_begin,
         tripEndDateTime=trip_end,
         eventId=event.id,
-        eventSummary=event.summary or ''  # Use an empty string if 'summary' is missing
+        eventSummary=event.summary or '',  # Use an empty string if 'summary' is missing
     )
 
     return trip_data
@@ -232,7 +228,6 @@ def initalize_trips_from_cal(property_ref, calendar_id):
 
 def create_events_for_future_trips(property_ref):
     with logfire.span(f'create_events_for_future_trips for property: {property_ref}'):
-
         # Get the current time
         now = datetime.utcnow()
 
