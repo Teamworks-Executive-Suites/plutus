@@ -8,10 +8,11 @@ from fastapi import HTTPException
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from pydantic import ValidationError
 
 from app.cal._utils import app_logger
 from app.firebase_setup import db
-from app.models import TripData
+from app.models import TripData, GCalEvent
 from app.utils import settings
 
 creds = service_account.Credentials.from_service_account_info(
@@ -75,8 +76,8 @@ def sync_calendar_events(property_ref):
                 # For each event, create or update a trip document
                 for event in events:
 
-                    debug(event)
-                    
+                    event = GCalEvent(**event)
+
                     # Convert the event data to Firestore trip format
                     if 'start' not in event:
                         app_logger.info('Event does not have start key: %s', event['id'])

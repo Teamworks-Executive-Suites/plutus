@@ -64,3 +64,41 @@ class DeleteWebhookChannel(BaseModel, plugin_settings=PluginSettings(logfire={'r
 
 class UnauthorizedMessage(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     detail: str = 'Bearer token missing or unknown'
+
+
+class Creator(BaseModel):
+    email: str
+
+
+class Organizer(BaseModel):
+    email: str
+    displayName: str
+    self: bool
+
+
+class DateTime(BaseModel):
+    dateTime: str
+    timeZone: str
+
+
+class Reminders(BaseModel):
+    useDefault: bool
+
+
+class GCalEvent(BaseModel):
+    kind: str
+    etag: str
+    id: str
+    status: str
+    htmlLink: str
+    created: str
+    updated: str
+    summary: str
+    creator: Creator
+    organizer: Organizer
+    start: DateTime
+    end: DateTime
+    iCalUID: str
+    sequence: int
+    reminders: Reminders
+    eventType: str
