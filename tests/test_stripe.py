@@ -64,7 +64,7 @@ class FakeFirestore:
                     'isAdmin': False,
                     'isHost': False,
                     'numberProperties': 0,
-                    'phone_number': '',
+                    'phone_numbers': '',
                     'photo_url': '',
                     'termsandconditionsaccepted': False,
                     'uid': '',

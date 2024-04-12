@@ -56,7 +56,7 @@ def get_contact_details(trip_ref: str, property_ref: str):
         app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
         return None, None
 
-    host_numbers = host_doc.get('phone_number')
+    host_numbers = host_doc.get('phone_numbers')
 
     # Get the guest phone numbers
     trip_doc = db.collection('trips').document(trip_ref).get()
@@ -69,7 +69,7 @@ def get_contact_details(trip_ref: str, property_ref: str):
         app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
         return None, None
 
-    guest_number = guest_doc.get('phone_number')[0]
+    guest_number = guest_doc.get('phone_numbers')[0]
     return host_numbers, guest_number
 
 
