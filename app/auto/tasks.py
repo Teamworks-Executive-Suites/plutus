@@ -132,7 +132,8 @@ def auto_complete_and_notify():
                             except Exception as e:
                                 app_logger.error('Failed to update trip %s for property %s: %s', trip.id, prop.id, e)
 
-                        if 'tripBeginDateTime' in trip.to_dict() and trip.get('upcoming'):
+                        trip_dict = trip.to_dict()
+                        if 'tripBeginDateTime' in trip_dict and 'upcoming' in trip_dict and trip_dict['upcoming']:
                             time_difference = trip.get('tripBeginDateTime') - current_time
 
                             with logfire.span(f'Time till trip starts: {time_difference}'):
