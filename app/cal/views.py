@@ -57,7 +57,7 @@ def process_create_or_update_event_from_trip(data: EventFromTrip, token: str = D
 
 
 # Delete Event from Trip
-@cal_router.delete('/event_from_trip')
+@cal_router.post('/delete_event_from_trip')
 def process_delete_event_from_trip(data: EventFromTrip, token: str = Depends(get_token)):
     app_logger.info('Process deleting event for trip: %s, with property_ref: %s', data.trip_ref, data.property_ref)
     # Call the create_or_update_event_from_trip function
