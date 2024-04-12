@@ -56,7 +56,7 @@ def get_contact_details(trip_ref: str, property_ref: str):
         app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
         return None, None
 
-    host_number = host_doc.get('phone_number')
+    host_numbers = host_doc.get('phone_number')
 
     # Get the guest phone numbers
     trip_doc = db.collection('trips').document(trip_ref).get()
@@ -69,28 +69,30 @@ def get_contact_details(trip_ref: str, property_ref: str):
         app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
         return None, None
 
-    guest_number = guest_doc.get('phone_number')
-    return host_number, guest_number
+    guest_number = guest_doc.get('phone_number')[0]
+    return host_numbers, guest_number
 
 
 def complete_trip_sms(trip_ref: str, property_ref: str):
-    host_number, guest_number = get_contact_details(trip_ref, property_ref)
-    if host_number and guest_number:
+    host_numbers, guest_number = get_contact_details(trip_ref, property_ref)
+    if host_numbers and guest_number:
         property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
-        send_sms(host_number, f'Your trip {trip_ref} has been completed. View here: {property_link}')
+        send_sms(host_numbers, f'Your trip {trip_ref} has been completed. View here: {property_link}')
         send_sms(
             guest_number, f'Your trip {trip_ref} has been completed. Please review the host. View here: {property_link}'
         )
 
 
 def send_reminder_sms(trip_ref: str, property_ref: str, time: int):
-    host_number, guest_number = get_contact_details(trip_ref, property_ref)
-    if host_number and guest_number:
+    host_numbers, guest_number = get_contact_details(trip_ref, property_ref)
+    if host_numbers and guest_number:
         property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
 
         # Send SMS to host and guest
-        send_sms(host_number, f'Reminder: Your booking {trip_ref} starts in {time} hours. View here: {property_link}')
         send_sms(guest_number, f'Reminder: Your booking {trip_ref} starts in {time} hours. View here: {property_link}')
+
+        for host_num in host_numbers:
+            send_sms(host_num, f'Reminder: Your booking {trip_ref} starts in {time} hours. View here: {property_link}')
 
 
 def auto_complete_and_notify():
