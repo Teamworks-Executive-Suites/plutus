@@ -187,7 +187,7 @@ def clear_event_store(property_ref: str):
     app_logger.info('Event store successfully cleared.')
 
 
-def delete_calendar_watch_channel(id: int, resource_id: str):
+def delete_calendar_watch_channel(id: str, resource_id: str):
     app_logger.info('Deleting calendar watch channel: %s', id)
     # Call the Google Calendar API to delete the channel
     service = build('calendar', 'v3', credentials=creds)
