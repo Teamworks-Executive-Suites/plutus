@@ -49,6 +49,7 @@ class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all
     isInquiry: bool
     propertyRef: Any
     tripBeginDateTime: datetime
+    tripDate: datetime
     tripEndDateTime: datetime
     eventId: str
     eventSummary: str

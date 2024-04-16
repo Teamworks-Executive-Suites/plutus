@@ -123,6 +123,7 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
         isInquiry=False,
         propertyRef=property_doc_ref,
         tripBeginDateTime=trip_begin,
+        tripDate=trip_begin.replace(hour=0, minute=0, second=0),  # Set tripDate to be at 00:00:00
         tripEndDateTime=trip_end,
         eventId=event.id,
         eventSummary=event.summary or '',  # Use an empty string if 'summary' is missing

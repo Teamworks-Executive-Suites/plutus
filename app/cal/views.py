@@ -29,7 +29,7 @@ def set_google_calendar_id(data: PropertyCal, token: str = Depends(get_token)):
         if 'Channel id not unique' in error_message:
             with logfire.span('Channel id not unique'):
                 app_logger.info('Channel id not unique error encountered. Deleting the channel...')
-                calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
+                calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'  # Hardcoded resource id
                 delete_calendar_watch_channel(data.property_ref, calendar_resource_id)
                 app_logger.info('Channel successfully deleted.')
                 app_logger.info('Retrying to set Google Calendar ID...')
