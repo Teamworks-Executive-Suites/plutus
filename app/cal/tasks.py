@@ -108,8 +108,8 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
         raise ValueError('Event start or end datetime is missing')
 
     # Adding a buffer of 30 minutes before the trip start and after the trip end
-    trip_begin = start_datetime - timedelta(minutes=30)
-    trip_end = end_datetime + timedelta(minutes=30)
+    trip_begin = start_datetime + timedelta(minutes=settings.buffer_time)
+    trip_end = end_datetime - timedelta(minutes=settings.buffer_time)
 
     # If internal event, set isExternal to False
     if 'Teamworks' in event.summary:
