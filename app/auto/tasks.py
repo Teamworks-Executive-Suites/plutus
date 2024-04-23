@@ -10,6 +10,35 @@ from app.firebase_setup import current_time, db
 from app.utils import settings
 
 
+def get_contact_details(trip_ref: str, property_ref: str):
+    # Get the host phone numbers
+    property_doc = db.collection('properties').document(property_ref).get()
+    if not property_doc.exists:
+        app_logger.error('Property document does not exist for: %s', property_ref)
+        return None, None
+
+    host_doc = db.collection('users').document(property_doc.get('userRef')).get()
+    if not host_doc.exists:
+        app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
+        return None, None
+
+    host_numbers = host_doc.get('phone_numbers')
+
+    # Get the guest phone numbers
+    trip_doc = db.collection('trips').document(trip_ref).get()
+    if not trip_doc.exists:
+        app_logger.error('Trip document does not exist for: %s', trip_ref)
+        return None, None
+
+    guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
+    if not guest_doc.exists:
+        app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
+        return None, None
+
+    guest_number = guest_doc.get('phone_numbers')[0]
+    return host_numbers, guest_number
+
+
 def send_sms(to: str, body: str):
     """
     Function to send an SMS to a phone number using Twilio API.
@@ -44,35 +73,6 @@ def send_sms(to: str, body: str):
         app_logger.info('Response: %s', response.text)
 
 
-def get_contact_details(trip_ref: str, property_ref: str):
-    # Get the host phone numbers
-    property_doc = db.collection('properties').document(property_ref).get()
-    if not property_doc.exists:
-        app_logger.error('Property document does not exist for: %s', property_ref)
-        return None, None
-
-    host_doc = db.collection('users').document(property_doc.get('userRef')).get()
-    if not host_doc.exists:
-        app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
-        return None, None
-
-    host_numbers = host_doc.get('phone_numbers')
-
-    # Get the guest phone numbers
-    trip_doc = db.collection('trips').document(trip_ref).get()
-    if not trip_doc.exists:
-        app_logger.error('Trip document does not exist for: %s', trip_ref)
-        return None, None
-
-    guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
-    if not guest_doc.exists:
-        app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
-        return None, None
-
-    guest_number = guest_doc.get('phone_numbers')[0]
-    return host_numbers, guest_number
-
-
 def complete_trip_sms(trip_ref: str, property_ref: str):
     host_numbers, guest_number = get_contact_details(trip_ref, property_ref)
     if host_numbers and guest_number:
@@ -93,6 +93,102 @@ def send_reminder_sms(trip_ref: str, property_ref: str, time: int):
 
         for host_num in host_numbers:
             send_sms(host_num, f'Reminder: Your booking {trip_ref} starts in {time} hours. View here: {property_link}')
+
+
+def sendgrid_email(trip_doc: dict, property_doc: dict, template_id: str, time: int = None, to_host: bool = False):
+    """
+    Function to send an email using SendGrid API.
+    """
+    with logfire.span('sendgrid_email'):
+        # SendGrid API URL
+        url = 'https://api.sendgrid.com/v3/mail/send'
+
+        # SendGrid API Key
+        api_key = settings.sendgrid_api_key
+
+        # Headers for the request
+        headers = {
+            'Content-Type': 'application/json',
+            'Authorization': f'Bearer {api_key}',
+        }
+
+        # Host Doc
+        host_doc = db.collection('users').document(property_doc.get('userRef')).get()
+
+        # Guest Doc
+        guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
+
+        if to_host:
+            to_email = host_doc.get('email')
+        else:
+            to_email = guest_doc.get('email')
+
+        # Data for the request
+        data = {
+            "personalizations": [
+                {
+                    "to": [
+                        {
+                            "email": f'{to_email}'
+                        }
+                    ],
+                    "dynamic_template_data": {
+                        "office_name": f"{property_doc.get('propertyName')}",
+                        "guest_name": f"{guest_doc.get('display_name')}",
+                        "property_image": f"{property_doc.get('mainImage')[0]}",
+                        "start_date_time": f"{trip_doc.get('tripBeginDateTime')}",
+                        "end_date_time": f"{trip_doc.get('tripEndDateTime')}",
+                        "base_price": f"${trip_doc.get('tripBaseTotal')}",
+                        "addons_price": f"${trip_doc.get('tripAddonTotal')}",
+                        "cleaning_fee": f"${property_doc.get('cleaningFee')}",
+                        "total_price": f"${trip_doc.get('tripCost')}",
+                        "trip_ref": f"{trip_doc.reference}",
+                        "image_url": f"{property_doc.get('mainImage')[0]}"
+                    }
+                }
+            ],
+            "from": {
+                "email": "app@bookteamworks.com",
+                "name": "Teamworks Executive Suites"
+            },
+            "reply_to": {
+                "email": "support@bookteamworks.com",
+                "name": "Teamworks Support"
+            },
+            "template_id": f"{template_id}"
+        }
+
+        if time:
+            data['personalizations'][0]['dynamic_template_data']['time'] = time
+
+        # Send the request
+        response = requests.post(url, headers=headers, json=data)
+
+        # Log the response
+        app_logger.info('Email sent to %s', to_email)
+        app_logger.info('Response: %s', response.text)
+
+
+def send_complete_email(trip_ref: str, property_ref: str):
+    trip_doc = db.collection('trips').document(trip_ref).get()
+    property_doc = db.collection('properties').document(property_ref).get()
+
+    host_complete_email_template_id = 'd-f1698bb27e5c44f982478f61e9f5a2eb'
+    guest_complete_email_template_id = 'd-335808be895a413497459fbb3a311a39'
+
+    sendgrid_email(trip_doc, property_doc, host_complete_email_template_id, to_host=True)
+    sendgrid_email(trip_doc, property_doc, guest_complete_email_template_id, to_host=False)
+
+
+def send_reminder_email(trip_ref: str, property_ref: str, time: int):
+    trip_doc = db.collection('trips').document(trip_ref).get()
+    property_doc = db.collection('properties').document(property_ref).get()
+
+    host_reminder_email_template_id = 'd-02adfc13d954429a9e053fba47e9ab60'
+    guest_reminder_email_template_id = 'd-5c55d84eb81543819ff8d6aeba12c1e0'
+
+    sendgrid_email(trip_doc, property_doc, host_reminder_email_template_id, time, to_host=True)
+    sendgrid_email(trip_doc, property_doc, guest_reminder_email_template_id, time, to_host=False)
 
 
 def auto_complete_and_notify():
@@ -121,13 +217,14 @@ def auto_complete_and_notify():
                             continue  # Changed from return to continue to process the next trip
 
                         if (not trip.to_dict().get('complete', False) or trip.get('upcoming')) and (
-                            current_time > trip.get('tripEndDateTime')
+                                current_time > trip.get('tripEndDateTime')
                         ):
                             try:
                                 trip.reference.update({'complete': True, 'upcoming': False})
                                 app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
 
                                 complete_trip_sms(trip.reference, prop.reference)
+                                send_complete_email(trip.reference, prop.reference)
 
                             except Exception as e:
                                 app_logger.error('Failed to update trip %s for property %s: %s', trip.id, prop.id, e)
@@ -149,6 +246,16 @@ def auto_complete_and_notify():
                                             e,
                                         )
 
+                                    try:
+                                        send_reminder_email(trip.reference, prop.reference, 24)
+                                    except Exception as e:
+                                        app_logger.error(
+                                            'Failed to send reminder email for trip %s for property %s: %s',
+                                            trip.id,
+                                            prop.id,
+                                            e,
+                                        )
+
                                 # Check if current time is exactly one hour before the start time of the trip
                                 if timedelta(minutes=59) < time_difference < timedelta(hours=1):
                                     try:
@@ -156,6 +263,16 @@ def auto_complete_and_notify():
                                     except Exception as e:
                                         app_logger.error(
                                             'Failed to send reminder SMS for trip %s for property %s: %s',
+                                            trip.id,
+                                            prop.id,
+                                            e,
+                                        )
+
+                                    try:
+                                        send_reminder_email(trip.reference, prop.reference, 1)
+                                    except Exception as e:
+                                        app_logger.error(
+                                            'Failed to send reminder email for trip %s for property %s: %s',
                                             trip.id,
                                             prop.id,
                                             e,
