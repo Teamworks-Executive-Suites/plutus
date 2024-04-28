@@ -22,7 +22,10 @@ def get_contact_details(trip_ref: str, property_ref: str):
         app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
         return None, None
 
-    host_numbers = host_doc.get('phone_numbers')
+    if host_doc.get('smsOptIn'):
+        host_numbers = host_doc.get('phone_numbers')
+    else:
+        host_numbers = None
 
     # Get the guest phone numbers
     trip_doc = db.collection('trips').document(trip_ref).get()
@@ -35,7 +38,11 @@ def get_contact_details(trip_ref: str, property_ref: str):
         app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
         return None, None
 
-    guest_number = guest_doc.get('phone_numbers')[0]
+    if guest_doc.get('smsOptIn'):
+        guest_number = guest_doc.get('phone_numbers')[0]
+    else:
+        guest_number = None
+
     return host_numbers, guest_number
 
 
@@ -75,9 +82,13 @@ def send_sms(to: str, body: str):
 
 def complete_trip_sms(trip_ref: str, property_ref: str):
     host_numbers, guest_number = get_contact_details(trip_ref, property_ref)
-    if host_numbers and guest_number:
-        property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
-        send_sms(host_numbers, f'Your trip {trip_ref} has been completed. View here: {property_link}')
+    property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
+
+    if host_numbers:
+        for host_num in host_numbers:
+            send_sms(host_num, f'Your trip {trip_ref} has been completed. View here: {property_link}')
+
+    if guest_number:
         send_sms(
             guest_number, f'Your trip {trip_ref} has been completed. Please review the host. View here: {property_link}'
         )
@@ -85,12 +96,13 @@ def complete_trip_sms(trip_ref: str, property_ref: str):
 
 def send_reminder_sms(trip_ref: str, property_ref: str, time: int):
     host_numbers, guest_number = get_contact_details(trip_ref, property_ref)
-    if host_numbers and guest_number:
-        property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
+    property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
 
-        # Send SMS to host and guest
+    # Send SMS to host and guest
+    if guest_number:
         send_sms(guest_number, f'Reminder: Your booking {trip_ref} starts in {time} hours. View here: {property_link}')
 
+    if host_numbers:
         for host_num in host_numbers:
             send_sms(host_num, f'Reminder: Your booking {trip_ref} starts in {time} hours. View here: {property_link}')
 
@@ -125,37 +137,27 @@ def sendgrid_email(trip_doc: dict, property_doc: dict, template_id: str, time: i
 
         # Data for the request
         data = {
-            "personalizations": [
+            'personalizations': [
                 {
-                    "to": [
-                        {
-                            "email": f'{to_email}'
-                        }
-                    ],
-                    "dynamic_template_data": {
-                        "office_name": f"{property_doc.get('propertyName')}",
-                        "guest_name": f"{guest_doc.get('display_name')}",
-                        "property_image": f"{property_doc.get('mainImage')[0]}",
-                        "start_date_time": f"{trip_doc.get('tripBeginDateTime')}",
-                        "end_date_time": f"{trip_doc.get('tripEndDateTime')}",
-                        "base_price": f"${trip_doc.get('tripBaseTotal')}",
-                        "addons_price": f"${trip_doc.get('tripAddonTotal')}",
-                        "cleaning_fee": f"${property_doc.get('cleaningFee')}",
-                        "total_price": f"${trip_doc.get('tripCost')}",
-                        "trip_ref": f"{trip_doc.reference}",
-                        "image_url": f"{property_doc.get('mainImage')[0]}"
-                    }
+                    'to': [{'email': f'{to_email}'}],
+                    'dynamic_template_data': {
+                        'office_name': f"{property_doc.get('propertyName')}",
+                        'guest_name': f"{guest_doc.get('display_name')}",
+                        'property_image': f"{property_doc.get('mainImage')[0]}",
+                        'start_date_time': f"{trip_doc.get('tripBeginDateTime')}",
+                        'end_date_time': f"{trip_doc.get('tripEndDateTime')}",
+                        'base_price': f"${trip_doc.get('tripBaseTotal')}",
+                        'addons_price': f"${trip_doc.get('tripAddonTotal')}",
+                        'cleaning_fee': f"${property_doc.get('cleaningFee')}",
+                        'total_price': f"${trip_doc.get('tripCost')}",
+                        'trip_ref': f'{trip_doc.reference}',
+                        'image_url': f"{property_doc.get('mainImage')[0]}",
+                    },
                 }
             ],
-            "from": {
-                "email": "app@bookteamworks.com",
-                "name": "Teamworks Executive Suites"
-            },
-            "reply_to": {
-                "email": "support@bookteamworks.com",
-                "name": "Teamworks Support"
-            },
-            "template_id": f"{template_id}"
+            'from': {'email': 'app@bookteamworks.com', 'name': 'Teamworks Executive Suites'},
+            'reply_to': {'email': 'support@bookteamworks.com', 'name': 'Teamworks Support'},
+            'template_id': f'{template_id}',
         }
 
         if time:
@@ -217,7 +219,7 @@ def auto_complete_and_notify():
                             continue  # Changed from return to continue to process the next trip
 
                         if (not trip.to_dict().get('complete', False) or trip.get('upcoming')) and (
-                                current_time > trip.get('tripEndDateTime')
+                            current_time > trip.get('tripEndDateTime')
                         ):
                             try:
                                 trip.reference.update({'complete': True, 'upcoming': False})
