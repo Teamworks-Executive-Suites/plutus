@@ -207,6 +207,9 @@ def initalize_trips_from_cal(property_ref: str, calendar_id: str):
     collection_id, document_id = property_ref.split('/')
     property_doc_ref = db.collection(collection_id).document(document_id)
 
+    # Update the externalCalendar field with the provided calendar_id
+    property_doc_ref.update({'externalCalendar': calendar_id})
+
     # Call the Google Calendar API to fetch the future events
     service = build('calendar', 'v3', credentials=creds)
 
