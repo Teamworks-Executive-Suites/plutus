@@ -122,8 +122,8 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
         app_logger.info('Buffer time: %s', settings.buffer_time)
 
         # Adding a buffer of 30 minutes before the trip start and after the trip end
-        trip_begin = start_datetime + timedelta(minutes=settings.buffer_time)
-        trip_end = end_datetime - timedelta(minutes=settings.buffer_time)
+        trip_begin = start_datetime - timedelta(minutes=settings.buffer_time)
+        trip_end = end_datetime + timedelta(minutes=settings.buffer_time)
 
         app_logger.info('Trip begin datetime with buffer: %s', trip_begin)
         app_logger.info('Trip end datetime with buffer: %s', trip_end)
