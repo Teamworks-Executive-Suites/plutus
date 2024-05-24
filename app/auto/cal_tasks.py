@@ -24,7 +24,7 @@ def check_and_renew_channels():
                 continue
 
             # If the channel is about to expire, renew it
-            if channel_expiration and datetime.fromtimestamp(channel_expiration / 1000) - now < timedelta(days=2):
+            if channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(days=2):
                 app_logger.info('Renewing channel for property: %s', prop.id)
                 calendar_id = prop.get('externalCalendar')
                 channel_id = prop.get('channelId')
