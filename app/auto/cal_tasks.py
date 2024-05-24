@@ -8,8 +8,8 @@ from app.firebase_setup import db
 from app.utils import settings
 
 
-def check_and_renew_channels():
-    with logfire.span('Check and renew notification channels'):
+def auto_check_and_renew_channels():
+    with logfire.span('auto_check_and_renew_channels'):
         # Get the current time
         now = datetime.utcnow()
 
