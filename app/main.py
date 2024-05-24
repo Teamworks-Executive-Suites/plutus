@@ -24,6 +24,7 @@ async def lifespan(app: FastAPI):
 
     # Run the tasks immediately on startup
     auto_complete_and_notify()
+    check_and_renew_channels()
 
     # Schedule the tasks to run every hour
     scheduler = BackgroundScheduler()
