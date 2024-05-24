@@ -32,7 +32,8 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
     app_logger.info('Renewed notification channel. Old id: %s, new id: %s', channel_id, new_channel['id'])
 
-    return new_channel
+    # Return the new channel and its expiration time
+    return new_channel, new_channel.get('expiration')
 
 
 def sync_calendar_events(property_doc_ref: Any):
@@ -223,13 +224,10 @@ def initalize_trips_from_cal(property_ref: str, calendar_id: str):
         channel_id = property_ref
         app_logger.info('Setting up webhook and setting the channel_id: %s', property_ref)
         webhook_url = f'{settings.url}/cal_webhook?calendar_id={property_ref}'
-        channel = (
-            service.events()
-            .watch(calendarId=calendar_id, body={'id': channel_id, 'type': 'web_hook', 'address': webhook_url})
-            .execute()
-        )
+        new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook', webhook_url)
 
-        property_doc_ref.update({'channelId': channel['resourceId']})
+        # Update the property document with the new channel id and expiration time
+        property_doc_ref.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
 
     sync_calendar_events(property_doc_ref)
     create_events_for_future_trips(property_ref)
