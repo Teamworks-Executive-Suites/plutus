@@ -60,77 +60,93 @@ def sync_calendar_events(property_doc_ref: Any):
     service = build('calendar', 'v3', credentials=creds)
     page_token = None
 
-    try:
-        while True:
-            events_result = (
-                service.events().list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token).execute()
-            )
+    with logfire.span('syncing calendar events with Google Calendar'):
+        try:
+            while True:
+                events_result = (
+                    service.events().list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token).execute()
+                )
 
-            events = events_result.get('items', [])
-            for event in events:
-                try:
-                    # Validate the event data with the appropriate model
-                    if event['status'] == 'cancelled':
-                        validated_event = CancelledGCalEvent.parse_obj(event)
-                    else:
-                        validated_event = GCalEvent.parse_obj(event)
-                except ValidationError as ve:
-                    app_logger.error('Event validation error: %s, Event: %s', ve, event['id'])
-                    continue
+                events = events_result.get('items', [])
+                app_logger.info('%s events found in calendar: %s', len(events), calendar_id)
+                for event in events:
+                    try:
+                        # Validate the event data with the appropriate model
+                        if event['status'] == 'cancelled':
+                            app_logger.info('Cancelled event: %s', event['id'])
+                            validated_event = CancelledGCalEvent.parse_obj(event)
+                        else:
+                            app_logger.info('Valid event: %s', event['id'])
+                            validated_event = GCalEvent.parse_obj(event)
+                    except ValidationError as ve:
+                        app_logger.error('Event validation error: %s, Event: %s', ve, event['id'])
+                        continue
 
-                # Process each event
-                process_event(validated_event, property_doc_ref)
+                    # Process each event
+                    process_event(validated_event, property_doc_ref)
 
-            next_sync_token = events_result.get('nextSyncToken')
-            property_doc_ref.update({'nextSyncToken': next_sync_token})
+                next_sync_token = events_result.get('nextSyncToken')
+                property_doc_ref.update({'nextSyncToken': next_sync_token})
 
-            page_token = events_result.get('nextPageToken')
-            if not page_token:
-                break
-    except HttpError as e:
-        if e.resp.status == 410:
-            app_logger.info('Invalid sync token, clearing event store and re-syncing.')
-            clear_event_store(property_doc_ref.path)
-            sync_calendar_events(property_doc_ref)
-        else:
-            app_logger.error('Error syncing calendar: %s', e)
-            raise HTTPException(status_code=500, detail=str(e))
+                page_token = events_result.get('nextPageToken')
+                if not page_token:
+                    break
+        except HttpError as e:
+            if e.resp.status == 410:
+                app_logger.info('Invalid sync token, clearing event store and re-syncing.')
+                clear_event_store(property_doc_ref.path)
+                sync_calendar_events(property_doc_ref)
+            else:
+                app_logger.error('Error syncing calendar: %s', e)
+                raise HTTPException(status_code=500, detail=str(e))
 
 
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
-    start_datetime_str = event.start.dateTime
-    end_datetime_str = event.end.dateTime
+    with logfire.span('convert_event_to_trip_data'):
+        start_datetime_str = event.start.dateTime
+        end_datetime_str = event.end.dateTime
 
-    # Parse the start and end datetime strings from the event
-    start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
-    end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
+        app_logger.info('Event start datetime: %s', start_datetime_str)
+        app_logger.info('Event end datetime: %s', end_datetime_str)
 
-    if not start_datetime or not end_datetime:
-        raise ValueError('Event start or end datetime is missing')
+        # Parse the start and end datetime strings from the event
+        start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
+        end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
 
-    # Adding a buffer of 30 minutes before the trip start and after the trip end
-    trip_begin = start_datetime + timedelta(minutes=settings.buffer_time)
-    trip_end = end_datetime - timedelta(minutes=settings.buffer_time)
+        app_logger.info('Parsed start datetime: %s', start_datetime)
+        app_logger.info('Parsed end datetime: %s', end_datetime)
 
-    # If internal event, set isExternal to False
-    if 'Teamworks' in event.summary:
-        is_external = False
-    else:
-        is_external = True
+        if not start_datetime or not end_datetime:
+            raise ValueError('Event start or end datetime is missing')
 
-    # Creating the TripData instance
-    trip_data = TripData(
-        isExternal=is_external,
-        isInquiry=False,
-        propertyRef=property_doc_ref,
-        tripBeginDateTime=trip_begin,
-        tripDate=trip_begin.replace(hour=0, minute=0, second=0),  # Set tripDate to be at 00:00:00
-        tripEndDateTime=trip_end,
-        eventId=event.id,
-        eventSummary=event.summary or '',  # Use an empty string if 'summary' is missing
-    )
+        app_logger.info('Buffer time: %s', settings.buffer_time)
 
-    return trip_data
+        # Adding a buffer of 30 minutes before the trip start and after the trip end
+        trip_begin = start_datetime + timedelta(minutes=settings.buffer_time)
+        trip_end = end_datetime - timedelta(minutes=settings.buffer_time)
+
+        app_logger.info('Trip begin datetime with buffer: %s', trip_begin)
+        app_logger.info('Trip end datetime with buffer: %s', trip_end)
+
+        # If internal event, set isExternal to False
+        if 'Teamworks' in event.summary:
+            is_external = False
+        else:
+            is_external = True
+
+        # Creating the TripData instance
+        trip_data = TripData(
+            isExternal=is_external,
+            isInquiry=False,
+            propertyRef=property_doc_ref,
+            tripBeginDateTime=trip_begin,
+            tripDate=trip_begin.replace(hour=0, minute=0, second=0),  # Set tripDate to be at 00:00:00
+            tripEndDateTime=trip_end,
+            eventId=event.id,
+            eventSummary=event.summary or '',  # Use an empty string if 'summary' is missing
+        )
+
+        return trip_data
 
 
 def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_doc_ref: Any):
