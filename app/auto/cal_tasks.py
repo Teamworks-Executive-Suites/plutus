@@ -20,7 +20,7 @@ def check_and_renew_channels():
             try:
                 channel_expiration = prop.get('channelExpiration')
             except KeyError:
-                app_logger.error('Channel expiration time not found for property: %s', prop.id)
+                app_logger.info('Channel expiration time not found for property: %s', prop.id)
                 continue
 
             # If the channel is about to expire, renew it
