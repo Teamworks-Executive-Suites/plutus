@@ -55,15 +55,6 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received resource_state: %s', resource_state)
     app_logger.info('Received message_number: %s', message_number)
 
-    # Check if the channel expiration is within 1 week
-    if channel_expiration:
-        expiration_time = datetime.strptime(channel_expiration, '%a, %d %b %Y %H:%M:%S %Z')  # Parse the date string
-        now = datetime.utcnow()
-        if expiration_time - now < timedelta(days=2):
-            channel_address = settings.url + calendar_id
-            # Renew the notification channel
-            renew_notification_channel(calendar_id, channel_id, 'web_hook', channel_address)
-
     if resource_id:
         try:
             if '-' in calendar_id:
