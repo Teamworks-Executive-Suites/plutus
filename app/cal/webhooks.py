@@ -22,6 +22,7 @@ processed_message_numbers = {}
 @cal_webhook_router.post('/cal_webhook')
 async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received webhook with calendar_id: %s', calendar_id)
+    app_logger.debug('Received request: %s', request)
 
     headers = request.headers
     app_logger.debug('Received headers: %s', headers)
