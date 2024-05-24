@@ -17,7 +17,11 @@ def check_and_renew_channels():
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
             # Get the channel expiration time
-            channel_expiration = prop.get('channelExpiration')
+            try:
+                channel_expiration = prop.get('channelExpiration')
+            except KeyError:
+                app_logger.error('Channel expiration time not found for property: %s', prop.id)
+                continue
 
             # If the channel is about to expire, renew it
             if channel_expiration and datetime.fromtimestamp(channel_expiration / 1000) - now < timedelta(days=2):
