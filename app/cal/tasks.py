@@ -165,8 +165,14 @@ def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
 
 
 def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
+    """
+    Update an existing trip in the Firestore database from the Google Calendar event, We also remove the buffer from the start and end time
+    """
+    trip_data.tripBeginDateTime = trip_data.tripBeginDateTime + timedelta(minutes=settings.buffer_time)
+    trip_data.tripEndDateTime = trip_data.tripEndDateTime - timedelta(minutes=settings.buffer_time)
     trip_ref.reference.update(trip_data.dict())
-    app_logger.info(f'Updated trip for event: {event.id}, trip ref: {trip_ref.id}')
+    app_logger.info('Updated trip for event: %s, trip ref: %s with data: %s', event.id, trip_ref.id, trip_data.dict())
+
 
 
 def create_new_trip(trip_data: TripData, event: GCalEvent):
@@ -321,14 +327,15 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
                         # Add the event description
                         'start': {
-                            'dateTime': (trip_data['tripBeginDateTime'] - timedelta(minutes=30)).isoformat(),
+                            'dateTime': (trip_data['tripBeginDateTime'] - timedelta(minutes=settings.buffer_time)).isoformat(),
                             'timeZone': 'UTC',
                         },
                         'end': {
-                            'dateTime': (trip_data['tripEndDateTime'] + timedelta(minutes=30)).isoformat(),
+                            'dateTime': (trip_data['tripEndDateTime'] + timedelta(minutes=settings.buffer_time)).isoformat(),
                             'timeZone': 'UTC',
                         },
                     }
+                    app_logger.info('Event data: %s', event_data)
 
                     # Call the Google Calendar API to update or create the event
                     service = build('calendar', 'v3', credentials=creds)
