@@ -322,7 +322,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
 
                     # Set the event summary based on whether the trip is blocked or not
                     if trip_doc.get('isBlocked'):
-                        summary = f'Blocked for {guest_name} | Teamworks'
+                        summary = f'Blocked | Teamworks'
                         app_logger.info('Blocked event summary: %s', summary)
                     else:
                         summary = f'Office Booking for {guest_name} | Teamworks'
