@@ -320,10 +320,18 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                         f'{settings.app_url}/tripDetails?tripPassed={trip_document_id}&property={property_document_id}'
                     )
 
+                    # Set the event summary based on whether the trip is blocked or not
+                    if trip_doc.get('isBlocked'):
+                        summary = f'Blocked for {guest_name} | Teamworks'
+                        app_logger.info('Blocked event summary: %s', summary)
+                    else:
+                        summary = f'Office Booking for {guest_name} | Teamworks'
+
+
                     # Convert the trip data to Google Calendar event format
                     # Add 30-minute buffer time to either side of the event
                     event_data = {
-                        'summary': f'Office Booking for {guest_name} | Teamworks',  # Generate the event name
+                        'summary': summary,  # Generate the event name
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
                         # Add the event description
                         'start': {
