@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.auth.views import auth_router
-from app.auto.cal_tasks import auto_check_and_renew_channels
+from app.auto.cal_tasks import auto_check_and_renew_channels, resync_all_calendar_events
 from app.auto.tasks import auto_complete_and_notify
 from app.cal.views import cal_router
 from app.cal.webhooks import cal_webhook_router
@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     # Run the tasks immediately on startup
     auto_complete_and_notify()
     auto_check_and_renew_channels()
+    resync_all_calendar_events()
 
     # Schedule the tasks to run every hour
     scheduler = BackgroundScheduler()

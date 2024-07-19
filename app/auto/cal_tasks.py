@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import logfire
 
 from app.auto._utils import app_logger
-from app.cal.tasks import renew_notification_channel
+from app.cal.tasks import renew_notification_channel, sync_calendar_events
 from app.firebase_setup import db
 from app.utils import settings
 
@@ -42,3 +42,22 @@ def auto_check_and_renew_channels():
                 app_logger.info('Channel for property: %s successfully renewed', prop.id)
             else:
                 app_logger.info('Channel for property: %s does not need to be renewed', prop.id)
+
+def resync_all_calendar_events():
+    """
+    Resync all calendar events for all
+    """
+    with logfire.span('resync_all_calendar_events'):
+
+        # Iterate over all property documents
+        properties_ref = db.collection('properties').stream()
+        for prop in properties_ref:
+            try:
+                sync_calendar_events(prop)
+            except Exception as e:
+                app_logger.error('Error syncing calendar events for property: %s', prop.id)
+                app_logger.error(e)
+                continue
+            app_logger.info('Calendar events for property: %s successfully synced', prop.id)
+
+        app_logger.info('All calendar events successfully synced')
