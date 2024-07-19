@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional, Union
 
 from logfire.integrations.pydantic_plugin import PluginSettings
 from pydantic import BaseModel, Field
@@ -84,6 +84,10 @@ class DateTime(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all
     timeZone: str
 
 
+class Date(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+    date: str
+
+
 class Reminders(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     useDefault: bool
 
@@ -96,11 +100,11 @@ class GCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'al
     htmlLink: str
     created: str
     updated: str
-    summary: str
+    summary: Optional[str]
     creator: Creator
     organizer: Organizer
-    start: DateTime
-    end: DateTime
+    start: Union[DateTime, Date]
+    end: Union[DateTime, Date]
     iCalUID: str
     sequence: int
     reminders: Reminders

@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from typing import Any, Union
 
 import logfire
@@ -12,7 +12,7 @@ from pydantic import ValidationError
 
 from app.cal._utils import app_logger
 from app.firebase_setup import db
-from app.models import CancelledGCalEvent, GCalEvent, TripData
+from app.models import CancelledGCalEvent, GCalEvent, TripData, Date
 from app.utils import settings
 
 creds = service_account.Credentials.from_service_account_info(
@@ -38,7 +38,6 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
-
     # Fetch the specific property document
     # collection_id, document_id = property_ref.split('/')
     # property_doc_ref = db.collection(collection_id).document(document_id)
@@ -77,7 +76,8 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
         try:
             while True:
                 events_result = (
-                    service.events().list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token).execute()
+                    service.events().list(calendarId=calendar_id, syncToken=next_sync_token,
+                                          pageToken=page_token).execute()
                 )
 
                 events = events_result.get('items', [])
@@ -122,19 +122,22 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
 
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
     with logfire.span('convert_event_to_trip_data'):
-        start_datetime_str = event.start.dateTime
-        end_datetime_str = event.end.dateTime
+        if isinstance(event.start, Date):
+            start_datetime = datetime.combine(datetime.fromisoformat(event.start.date), time())
+            end_datetime = datetime.combine(datetime.fromisoformat(event.end.date), time(23, 59, 59))
+        else:
+            start_datetime_str = event.start.dateTime
+            end_datetime_str = event.end.dateTime
 
-        # Parse the start and end datetime strings from the event
-        start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
-        end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
+            # Parse the start and end datetime strings from the event
+            start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
+            end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
 
         app_logger.info('Parsed start datetime: %s', start_datetime)
         app_logger.info('Parsed end datetime: %s', end_datetime)
 
         if not start_datetime or not end_datetime:
             raise ValueError('Event start or end datetime is missing')
-
 
         # If internal event, set isExternal to False
         if 'Teamworks' in event.summary:
@@ -189,7 +192,6 @@ def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
     trip_data.tripEndDateTime = trip_data.tripEndDateTime - timedelta(minutes=settings.buffer_time)
     trip_ref.reference.update(trip_data.dict())
     app_logger.info('Updated trip for event: %s, trip ref: %s', event.id, trip_ref.id)
-
 
 
 def create_new_trip(trip_data: TripData, event: GCalEvent):
@@ -344,7 +346,6 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     else:
                         summary = f'Office Booking for {guest_name} | Teamworks'
 
-
                     # Convert the trip data to Google Calendar event format
                     # Add 30-minute buffer time to either side of the event
                     event_data = {
@@ -352,11 +353,13 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
                         # Add the event description
                         'start': {
-                            'dateTime': (trip_data['tripBeginDateTime'] - timedelta(minutes=settings.buffer_time)).isoformat(),
+                            'dateTime': (trip_data['tripBeginDateTime'] - timedelta(
+                                minutes=settings.buffer_time)).isoformat(),
                             'timeZone': 'UTC',
                         },
                         'end': {
-                            'dateTime': (trip_data['tripEndDateTime'] + timedelta(minutes=settings.buffer_time)).isoformat(),
+                            'dateTime': (trip_data['tripEndDateTime'] + timedelta(
+                                minutes=settings.buffer_time)).isoformat(),
                             'timeZone': 'UTC',
                         },
                     }
