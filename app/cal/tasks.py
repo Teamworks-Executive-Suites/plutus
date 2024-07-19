@@ -92,7 +92,7 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
                             app_logger.info('Valid event: %s', event['id'])
                             validated_event = GCalEvent.parse_obj(event)
                     except ValidationError as ve:
-                        app_logger.error('Event validation error: %s, Event: %s', ve, event['id'])
+                        app_logger.error('Event validation error: %s, Event: %s', ve, event)
                         continue
 
                     # Process each event
