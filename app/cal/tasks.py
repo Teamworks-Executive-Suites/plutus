@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta, time
+from datetime import datetime, timedelta
 from typing import Any, Union
 
 import logfire
@@ -9,6 +9,7 @@ from google.cloud.firestore_v1 import FieldFilter
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from pydantic import ValidationError
+from pytz import timezone
 
 from app.cal._utils import app_logger
 from app.firebase_setup import db
@@ -38,9 +39,6 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
-    # Fetch the specific property document
-    # collection_id, document_id = property_ref.split('/')
-    # property_doc_ref = db.collection(collection_id).document(document_id)
 
     if isinstance(property_doc_ref, str):
         try:
@@ -123,8 +121,23 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
     with logfire.span('convert_event_to_trip_data'):
         if isinstance(event.start, Date):
-            start_datetime = datetime.combine(datetime.fromisoformat(event.start.date), time())
-            end_datetime = datetime.combine(datetime.fromisoformat(event.end.date), time(23, 59, 59))
+
+            # Fetch the property document
+            property_doc = property_doc_ref.get()
+            if not property_doc.exists:
+                raise ValueError('Property document does not exist')
+
+            # Get the timezone from the property document
+            property_timezone = timezone(property_doc.to_dict().get('timezone', 'UTC'))
+
+            if isinstance(event.start, Date):
+                # Parse the date and set the time to 00:00:00 in the property's timezone
+                start_date = datetime.fromisoformat(event.start.date)
+                start_datetime = property_timezone.localize(start_date.replace(hour=0, minute=0, second=0))
+
+                # Parse the date and set the time to 23:59:59 in the property's timezone
+                end_date = datetime.fromisoformat(event.end.date)
+                end_datetime = property_timezone.localize(end_date.replace(hour=23, minute=59, second=59))
         else:
             start_datetime_str = event.start.dateTime
             end_datetime_str = event.end.dateTime
