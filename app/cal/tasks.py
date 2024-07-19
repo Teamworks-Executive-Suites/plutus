@@ -44,9 +44,17 @@ def sync_calendar_events(property_doc_ref: Any):
     # property_doc_ref = db.collection(collection_id).document(document_id)
 
     if isinstance(property_doc_ref, str):
-        property_doc_ref = db.document(property_doc_ref)
+        try:
+            property_doc_ref = db.document(property_doc_ref)
+        except ValueError:
+            app_logger.error('Invalid property document reference: %s', property_doc_ref)
+            raise HTTPException(status_code=400, detail='Invalid property document reference')
 
-    property_doc = property_doc_ref.get()
+    try:
+        property_doc = property_doc_ref.get()
+    except ValueError:
+        app_logger.error('Invalid property document reference: %s', property_doc_ref)
+        raise HTTPException(status_code=400, detail='Invalid property document reference')
 
     if not property_doc.exists:
         app_logger.error('Property document does not exist for: %s', property_doc_ref)
