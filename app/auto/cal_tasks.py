@@ -53,7 +53,7 @@ def resync_all_calendar_events():
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
             try:
-                sync_calendar_events(prop)
+                sync_calendar_events(prop.reference)
             except Exception as e:
                 app_logger.error('Error syncing calendar events for property: %s', prop.id)
                 app_logger.error(e)
