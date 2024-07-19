@@ -38,7 +38,6 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
-    app_logger.info('Syncing calendar for property:%s', property_doc_ref.id)
 
     # Fetch the specific property document
     # collection_id, document_id = property_ref.split('/')
@@ -60,6 +59,8 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
     if not property_doc.exists:
         app_logger.error('Property document does not exist for: %s', property_doc_ref)
         raise HTTPException(status_code=404, detail='Property not found')
+
+    app_logger.info('Syncing calendar for property:%s', property_doc_ref.id)
 
     property_doc_dict = property_doc.to_dict()
     calendar_id = property_doc_dict.get('externalCalendar')
