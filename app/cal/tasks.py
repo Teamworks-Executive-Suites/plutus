@@ -37,8 +37,8 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     return new_channel, new_channel.get('expiration')
 
 
-def sync_calendar_events(property_doc_ref: Any):
-    app_logger.info(f'Syncing calendar for property: {property_doc_ref}')
+def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
+    app_logger.info('Syncing calendar for property:%s', property_doc_ref.path)
 
     # Fetch the specific property document
     # collection_id, document_id = property_ref.split('/')
@@ -102,9 +102,13 @@ def sync_calendar_events(property_doc_ref: Any):
                     break
         except HttpError as e:
             if e.resp.status == 410:
-                app_logger.info('Invalid sync token, clearing event store and re-syncing.')
-                clear_event_store(property_doc_ref.path)
-                sync_calendar_events(property_doc_ref)
+                if retry_count < 2:
+                    app_logger.info('Invalid sync token, clearing event store and re-syncing.')
+                    clear_event_store(property_doc_ref.path)
+                    sync_calendar_events(property_doc_ref, retry_count + 1)
+                else:
+                    app_logger.error('Error syncing calendar: %s. Maximum retry attempts exceeded.', e)
+                    raise HTTPException(status_code=500, detail=str(e))
             else:
                 app_logger.error('Error syncing calendar: %s', e)
                 raise HTTPException(status_code=500, detail=str(e))
