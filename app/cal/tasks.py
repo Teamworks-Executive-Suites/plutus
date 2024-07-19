@@ -5,6 +5,7 @@ from typing import Any, Union
 import logfire
 from fastapi import HTTPException
 from google.oauth2 import service_account
+from google.cloud.firestore_v1 import FieldFilter
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from pydantic import ValidationError
@@ -157,7 +158,7 @@ def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_doc_ref:
 
 
 def handle_cancelled_event(event: CancelledGCalEvent):
-    existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
+    existing_trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
     if existing_trip_ref:
         existing_trip_ref[0].reference.delete()
         app_logger.info(f'Deleted trip for cancelled event: {event.id}')
@@ -165,7 +166,7 @@ def handle_cancelled_event(event: CancelledGCalEvent):
 
 def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
     trip_data = convert_event_to_trip_data(event, property_doc_ref)
-    existing_trip_ref = db.collection('trips').where('eventId', '==', event.id).get()
+    existing_trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
     if existing_trip_ref:
         update_existing_trip(existing_trip_ref[0], trip_data, event)
     else:
@@ -198,9 +199,9 @@ def clear_event_store(property_ref: str):
     # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is True,
     # and 'tripBeginDateTime' is in the future
     trips = (
-        trips_ref.where('propertyRef', '==', property_ref)
-        .where('isExternal', '==', True)
-        .where('tripBeginDateTime', '>', now)
+        trips_ref.where(filter=FieldFilter('propertyRef', '==', property_ref))
+        .where(filter=FieldFilter('isExternal', '==', True))
+        .where(filter=FieldFilter('tripBeginDateTime', '>', now))
         .stream()
     )
 
@@ -264,9 +265,9 @@ def create_events_for_future_trips(property_ref: str):
         # 'eventId' does not exist, and 'tripBeginDateTime' is in the future
         future_trips = (
             db.collection('trips')
-            .where('propertyRef', '==', property_ref)
-            .where('isExternal', '==', False)
-            .where('tripBeginDateTime', '>', now)
+            .where(filter=FieldFilter('propertyRef', '==', property_ref))
+            .where(filter=FieldFilter('isExternal', '==', False))
+            .where(filter=FieldFilter('tripBeginDateTime', '>', now))
             .stream()
         )
 
@@ -424,7 +425,8 @@ def delete_trip_from_event(property_ref, event_id):
             app_logger.info('Property document exists for event: %s', property_ref)
 
             # Fetch the specific trip document associated with the event id
-            trip_ref = db.collection('trips').where('eventId', '==', event_id).get()
+            trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event_id)).get()
+
             if trip_ref:
                 # Delete the trip document from Firestore
                 trip_ref[0].reference.delete()
