@@ -64,7 +64,10 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
 
     property_doc_dict = property_doc.to_dict()
     calendar_id = property_doc_dict.get('externalCalendar')
-    next_sync_token = property_doc_dict.get('nextSyncToken', '')
+    if retry_count == 0:
+        next_sync_token = property_doc_dict.get('nextSyncToken', '')
+    else:
+        next_sync_token = ''
 
     # Call the Google Calendar API to fetch the events
     service = build('calendar', 'v3', credentials=creds)
@@ -106,6 +109,8 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
                 if retry_count < 2:
                     app_logger.info('Invalid sync token, clearing event store and re-syncing.')
                     clear_event_store(property_doc_ref.path)
+                    # Reset the sync token
+                    next_sync_token = ''
                     sync_calendar_events(property_doc_ref, retry_count + 1)
                 else:
                     app_logger.error('Error syncing calendar: %s. Maximum retry attempts exceeded.', e)
