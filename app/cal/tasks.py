@@ -38,7 +38,7 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
-    app_logger.info('Syncing calendar for property:%s', property_doc_ref.path)
+    app_logger.info('Syncing calendar for property:%s', property_doc_ref.id)
 
     # Fetch the specific property document
     # collection_id, document_id = property_ref.split('/')
@@ -179,7 +179,8 @@ def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
 
 def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
     """
-    Update an existing trip in the Firestore database from the Google Calendar event, We also remove the buffer from the start and end time
+    Update an existing trip in the Firestore database from the Google Calendar event, We also remove the buffer from
+    the start and end time
     """
     trip_data.tripBeginDateTime = trip_data.tripBeginDateTime + timedelta(minutes=settings.buffer_time)
     trip_data.tripEndDateTime = trip_data.tripEndDateTime - timedelta(minutes=settings.buffer_time)
