@@ -229,7 +229,7 @@ def auto_complete_and_notify():
                                 send_complete_email(trip.reference, prop.reference)
 
                             except Exception as e:
-                                app_logger.error('Failed to update trip %s for property %s: %s', trip.id, prop.id, e)
+                                app_logger.error('Failed to update trip %s for property %s: %s', trip.id, prop.id, str(e))
 
                         trip_dict = trip.to_dict()
                         if 'tripBeginDateTime' in trip_dict and 'upcoming' in trip_dict and trip_dict['upcoming']:

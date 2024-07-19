@@ -125,9 +125,6 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
         start_datetime_str = event.start.dateTime
         end_datetime_str = event.end.dateTime
 
-        app_logger.info('Event start datetime: %s', start_datetime_str)
-        app_logger.info('Event end datetime: %s', end_datetime_str)
-
         # Parse the start and end datetime strings from the event
         start_datetime = datetime.fromisoformat(start_datetime_str) if start_datetime_str else None
         end_datetime = datetime.fromisoformat(end_datetime_str) if end_datetime_str else None
@@ -191,7 +188,7 @@ def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
     trip_data.tripBeginDateTime = trip_data.tripBeginDateTime + timedelta(minutes=settings.buffer_time)
     trip_data.tripEndDateTime = trip_data.tripEndDateTime - timedelta(minutes=settings.buffer_time)
     trip_ref.reference.update(trip_data.dict())
-    app_logger.info('Updated trip for event: %s, trip ref: %s with data: %s', event.id, trip_ref.id, trip_data.dict())
+    app_logger.info('Updated trip for event: %s, trip ref: %s', event.id, trip_ref.id)
 
 
 

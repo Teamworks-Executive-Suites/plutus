@@ -25,7 +25,6 @@ async def receive_webhook(request: Request, calendar_id: str):
     app_logger.info('Received request: %s', request)
 
     headers = request.headers
-    app_logger.info('Received headers: %s', headers)
 
     # Extract the data from the headers
     message_number = headers.get('X-Goog-Message-Number')
