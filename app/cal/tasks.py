@@ -135,9 +135,9 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
                 start_date = datetime.fromisoformat(event.start.date)
                 start_datetime = property_timezone.localize(start_date.replace(hour=0, minute=0, second=0))
 
-                # Parse the date and set the time to 23:59:59 in the property's timezone
-                end_date = datetime.fromisoformat(event.end.date)
-                end_datetime = property_timezone.localize(end_date.replace(hour=23, minute=59, second=59))
+                # Parse the date and set the time to 00:00:00 on the next day in the property's timezone
+                end_date = datetime.fromisoformat(event.end.date) + timedelta(days=1)
+                end_datetime = property_timezone.localize(end_date.replace(hour=0, minute=0, second=0))
         else:
             start_datetime_str = event.start.dateTime
             end_datetime_str = event.end.dateTime
