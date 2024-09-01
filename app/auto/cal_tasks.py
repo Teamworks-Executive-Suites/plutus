@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 import logfire
-from devtools import debug
 from fastapi import HTTPException
 from googleapiclient.errors import HttpError
 
@@ -28,8 +27,8 @@ def auto_check_and_renew_channels(force_renew=False):
 
             # If the channel is about to expire or force_renew is True, renew it
             if force_renew or (
-                    channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(
-                    days=2)):
+                channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(days=2)
+            ):
                 app_logger.info('Renewing channel for property: %s', prop.id)
                 try:
                     # Check if externalCalendar exists
@@ -61,13 +60,16 @@ def auto_check_and_renew_channels(force_renew=False):
                 # Assuming `new_channel` and `expiration` are obtained from the response of `initalize_trips_from_cal`
                 new_channel = {
                     'id': 'new_channel_id',  # Replace with actual new channel id
-                    'expiration': int((now + timedelta(days=30)).timestamp() * 1000)  # Example expiration time
+                    'expiration': int((now + timedelta(days=30)).timestamp() * 1000),  # Example expiration time
                 }
-                prop.reference.update({'channelId': new_channel['id'], 'channelExpiration': new_channel['expiration']})
+                prop.reference.update(
+                    {'channelId': new_channel['id'], 'channelExpiration': str(new_channel['expiration'])}
+                )
 
                 app_logger.info('Channel for property: %s successfully renewed', prop.id)
             else:
                 app_logger.info('Channel for property: %s does not need to be renewed', prop.id)
+
 
 def resync_all_calendar_events():
     """

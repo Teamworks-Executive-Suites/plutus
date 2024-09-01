@@ -1,6 +1,6 @@
-from dotenv import load_dotenv
 import logging
 
+from dotenv import load_dotenv
 
 from app.settings import Settings
 

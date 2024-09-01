@@ -13,7 +13,7 @@ from app.cal.views import cal_router
 from app.cal.webhooks import cal_webhook_router
 from app.logging import config
 from app.pay.views import stripe_router
-from app.utils import settings, app_logger
+from app.utils import app_logger, settings
 
 
 @asynccontextmanager
