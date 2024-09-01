@@ -18,27 +18,23 @@ from app.utils import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Retrieve master token from environment variable and add it to known_tokens
-
     logging.info('startup')
 
-    # Run the tasks immediately on startup
     auto_complete_and_notify()
     auto_check_and_renew_channels()
-    # resync_all_calendar_events()
 
-    # Schedule the tasks to run every hour
     scheduler = BackgroundScheduler()
     scheduler.add_job(auto_complete_and_notify, 'interval', hours=1)
     scheduler.add_job(auto_check_and_renew_channels, 'interval', hours=1)
     scheduler.start()
+    logging.info('Scheduler initialized and started')
+    logging.info('Job auto_check_and_renew_channels added to scheduler')
 
-    yield  # anything before this line runs on before startup and anything after runs on shutdown
+    yield
 
 
 app = FastAPI(lifespan=lifespan)
 
-# Logfire
 if bool(settings.logfire_token) and settings.testing is False and settings.dev_mode is False:
     logfire.instrument_fastapi(app)
     logfire.configure(
@@ -47,10 +43,8 @@ if bool(settings.logfire_token) and settings.testing is False and settings.dev_m
 
     FastAPIInstrumentor.instrument_app(app)
 
-# Configure logging
 logging.config.dictConfig(config)
 
-# Routers
 app.include_router(auth_router)
 app.include_router(cal_router)
 app.include_router(cal_webhook_router)

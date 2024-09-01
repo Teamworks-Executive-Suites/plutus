@@ -32,7 +32,7 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
         .execute()
     )
 
-    app_logger.info('Renewed notification channel. Old id: %s, new id: %s', channel_id, new_channel['id'])
+    app_logger.info('Renewed notification channel. Old id: %s, new id: %s, new expiry: %s', channel_id, new_channel['id'], new_channel.get('expiration'))
 
     # Return the new channel and its expiration time
     return new_channel, new_channel.get('expiration')
