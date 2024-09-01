@@ -18,17 +18,27 @@ def auto_check_and_renew_channels():
             app_logger.info('Renewing channel for property: %s', prop.id)
             calendar_id = prop.get('externalCalendar')
 
-            # Create a PropertyCal object
-            data = PropertyCal(property_ref=prop.id, cal_id=calendar_id)
+            # Check if 'channelId' exists in the property document
+            if 'channelId' not in prop.to_dict():
+                app_logger.warning('Property %s does not contain channelId', prop.id)
+                continue
 
+            channel_id = prop.get('channelId')
+            channel_address = settings.url + calendar_id
             try:
-                # Call set_google_calendar_id programmatically
-                set_google_calendar_id(data)
-                app_logger.info('Channel for property: %s successfully renewed', prop.id)
+                new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook', channel_address)
+                if not new_channel or not expiration:
+                    app_logger.error('Failed to renew channel for property: %s. Invalid response from renew_notification_channel.', prop.id)
+                    continue
             except Exception as e:
                 app_logger.error('Error renewing channel for property: %s', prop.id)
                 app_logger.error(e)
                 continue
+
+            # Update the property document with the new channel id and expiration time
+            prop.reference.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
+
+            app_logger.info('Channel for property: %s successfully renewed', prop.id)
 
 def resync_all_calendar_events():
     """
