@@ -10,6 +10,7 @@ from app.models import PropertyCal
 
 def auto_check_and_renew_channels():
     with logfire.span('auto_check_and_renew_channels'):
+        app_logger.info('Starting auto_check_and_renew_channels job')
         # Iterate over all property documents
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
@@ -48,6 +49,7 @@ def auto_check_and_renew_channels():
                 app_logger.error('Error renewing channel for property: %s', prop.id)
                 app_logger.error(e)
                 continue
+        app_logger.info('Completed auto_check_and_renew_channels job')
 
 
 def resync_all_calendar_events():
