@@ -11,7 +11,7 @@ from app.firebase_setup import db
 from app.models import PropertyCal
 
 
-def auto_check_and_renew_channels():
+def auto_check_and_renew_channels(force_renew=False):
     with logfire.span('auto_check_and_renew_channels'):
         # Get the current time
         now = datetime.utcnow()
@@ -26,8 +26,8 @@ def auto_check_and_renew_channels():
                 app_logger.info('Channel expiration time not found for property: %s', prop.id)
                 continue
 
-            # If the channel is about to expire, renew it
-            if channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(days=2):
+            # If the channel is about to expire or force_renew is True, renew it
+            if force_renew or (channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(days=2)):
                 app_logger.info('Renewing channel for property: %s', prop.id)
                 try:
                     # Assuming `data` is a dictionary or object with required properties

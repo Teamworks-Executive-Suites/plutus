@@ -20,7 +20,7 @@ from app.utils import settings, app_logger
 async def lifespan(app: FastAPI):
     app_logger.info('startup')
 
-    auto_check_and_renew_channels()
+    auto_check_and_renew_channels(force_renew=True)
     auto_complete_and_notify()
 
     scheduler = BackgroundScheduler()
