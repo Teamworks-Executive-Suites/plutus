@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta
-
 from fastapi import APIRouter, Depends, HTTPException, Request
 from googleapiclient.errors import HttpError
 
@@ -7,11 +5,9 @@ from app.auth.views import get_token
 from app.cal._utils import app_logger
 from app.cal.tasks import (
     delete_calendar_watch_channel,
-    renew_notification_channel,
     sync_calendar_events,
 )
 from app.models import DeleteWebhookChannel
-from app.utils import settings
 
 cal_webhook_router = APIRouter()
 

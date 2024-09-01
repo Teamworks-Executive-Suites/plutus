@@ -4,8 +4,8 @@ from typing import Any, Union
 
 import logfire
 from fastapi import HTTPException
-from google.oauth2 import service_account
 from google.cloud.firestore_v1 import FieldFilter
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from pydantic import ValidationError
@@ -13,7 +13,7 @@ from pytz import timezone
 
 from app.cal._utils import app_logger
 from app.firebase_setup import db
-from app.models import CancelledGCalEvent, GCalEvent, TripData, Date
+from app.models import CancelledGCalEvent, Date, GCalEvent, TripData
 from app.utils import settings
 
 creds = service_account.Credentials.from_service_account_info(
@@ -25,20 +25,31 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
     service = build('calendar', 'v3', credentials=creds)
 
     # Log the input parameters
-    app_logger.info('Renewing notification channel for calendar_id: %s, channel_id: %s, channel_type: %s, channel_address: %s',
-                    calendar_id, channel_id, channel_type, channel_address)
+    app_logger.info(
+        'Renewing notification channel for calendar_id: %s, channel_id: %s, channel_type: %s, channel_address: %s',
+        calendar_id,
+        channel_id,
+        channel_type,
+        channel_address,
+    )
 
     try:
         # Create a new channel with a unique id
         new_channel_id = str(uuid.uuid4())
         new_channel = (
             service.events()
-            .watch(calendarId=calendar_id, body={'id': new_channel_id, 'type': channel_type, 'address': channel_address})
+            .watch(
+                calendarId=calendar_id, body={'id': new_channel_id, 'type': channel_type, 'address': channel_address}
+            )
             .execute()
         )
 
-        app_logger.info('Renewed notification channel. Old id: %s, new id: %s, new expiry: %s',
-                        channel_id, new_channel['id'], new_channel.get('expiration'))
+        app_logger.info(
+            'Renewed notification channel. Old id: %s, new id: %s, new expiry: %s',
+            channel_id,
+            new_channel['id'],
+            new_channel.get('expiration'),
+        )
 
         # Ensure the function returns a tuple with two values
         return new_channel, new_channel.get('expiration')
@@ -48,7 +59,6 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
-
     if isinstance(property_doc_ref, str):
         try:
             property_doc_ref = db.document(property_doc_ref)
@@ -83,8 +93,9 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
         try:
             while True:
                 events_result = (
-                    service.events().list(calendarId=calendar_id, syncToken=next_sync_token,
-                                          pageToken=page_token).execute()
+                    service.events()
+                    .list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token)
+                    .execute()
                 )
 
                 events = events_result.get('items', [])
@@ -130,7 +141,6 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
     with logfire.span('convert_event_to_trip_data'):
         if isinstance(event.start, Date):
-
             # Fetch the property document
             property_doc = property_doc_ref.get()
             if not property_doc.exists:
@@ -363,7 +373,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
 
                     # Set the event summary based on whether the trip is blocked or not
                     if trip_doc.get('isBlocked'):
-                        summary = f'Blocked | Teamworks'
+                        summary = 'Blocked | Teamworks'
                         app_logger.info('Blocked event summary: %s', summary)
                     else:
                         summary = f'Office Booking for {guest_name} | Teamworks'
@@ -375,13 +385,15 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
                         # Add the event description
                         'start': {
-                            'dateTime': (trip_data['tripBeginDateTime'] - timedelta(
-                                minutes=settings.buffer_time)).isoformat(),
+                            'dateTime': (
+                                trip_data['tripBeginDateTime'] - timedelta(minutes=settings.buffer_time)
+                            ).isoformat(),
                             'timeZone': 'UTC',
                         },
                         'end': {
-                            'dateTime': (trip_data['tripEndDateTime'] + timedelta(
-                                minutes=settings.buffer_time)).isoformat(),
+                            'dateTime': (
+                                trip_data['tripEndDateTime'] + timedelta(minutes=settings.buffer_time)
+                            ).isoformat(),
                             'timeZone': 'UTC',
                         },
                     }

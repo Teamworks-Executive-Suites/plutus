@@ -208,8 +208,6 @@ def auto_complete_and_notify():
 
                 for trip in trips:
                     with logfire.span(f'Processing trip: {trip.id}'):
-                        app_logger.info('Trip data: %s', str(trip.to_dict()))
-
                         if not trip.exists:
                             app_logger.error('Trip document not found for property %s', prop.id)
                             continue
