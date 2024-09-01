@@ -38,8 +38,9 @@ def auto_check_and_renew_channels(force_renew=False):
                         app_logger.info('externalCalendar not found for property: %s', prop.id)
                         continue
 
+                    property_ref = 'properties/' + prop.id
                     # Create PropertyCal instance
-                    property_cal = PropertyCal(property_ref=prop.id, cal_id=external_calendar)
+                    property_cal = PropertyCal(property_ref=property_ref, cal_id=external_calendar)
 
                     initalize_trips_from_cal(property_cal.property_ref, property_cal.cal_id)
                     app_logger.info('Google Calendar ID successfully set.')
