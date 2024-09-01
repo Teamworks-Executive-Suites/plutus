@@ -1,4 +1,5 @@
 import logfire
+from devtools import debug
 from fastapi import HTTPException
 from googleapiclient.errors import HttpError
 
@@ -11,9 +12,11 @@ from app.models import PropertyCal
 def auto_check_and_renew_channels():
     with logfire.span('auto_check_and_renew_channels'):
         app_logger.info('Starting auto_check_and_renew_channels job')
+        debug('Starting auto_check_and_renew_channels job')
         # Iterate over all property documents
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
+            debug(prop)
             app_logger.info('Renewing channel for property: %s', prop.id)
 
             # Check if 'externalCalendar' exists in the property document
@@ -32,6 +35,7 @@ def auto_check_and_renew_channels():
                 try:
                     initalize_trips_from_cal(data.property_ref, data.cal_id)
                     app_logger.info('Channel for property: %s successfully renewed', prop.id)
+                    debug('Channel for property: %s successfully renewed', prop.id)
                 except HttpError as e:
                     error_message = str(e)
                     app_logger.error('Error setting Google Calendar ID: %s', error_message)
