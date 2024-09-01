@@ -27,13 +27,21 @@ def auto_check_and_renew_channels(force_renew=False):
                 continue
 
             # If the channel is about to expire or force_renew is True, renew it
-            if force_renew or (channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(days=2)):
+            if force_renew or (
+                    channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(
+                    days=2)):
                 app_logger.info('Renewing channel for property: %s', prop.id)
                 try:
+                    # Check if externalCalendar exists
+                    external_calendar = prop.get('externalCalendar')
+                    if not external_calendar:
+                        app_logger.info('externalCalendar not found for property: %s', prop.id)
+                        continue
+
                     # Assuming `data` is a dictionary or object with required properties
                     data = {
                         'property_ref': prop.reference,
-                        'cal_id': prop.get('calId')  # Assuming calId is stored in the property document
+                        'cal_id': external_calendar
                     }
                     initalize_trips_from_cal(data['property_ref'], data['cal_id'])
                     app_logger.info('Google Calendar ID successfully set.')
