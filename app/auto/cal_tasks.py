@@ -18,10 +18,17 @@ def auto_check_and_renew_channels():
         for prop in properties_ref:
             app_logger.info('Renewing channel for property: %s', prop.id)
             calendar_id = prop.get('externalCalendar')
+
+            # Check if 'channelId' exists in the property document
+            if 'channelId' not in prop.to_dict():
+                app_logger.warning('Property %s does not contain channelId', prop.id)
+                continue
+
             channel_id = prop.get('channelId')
             channel_address = settings.url + calendar_id
             try:
-                new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook', channel_address)
+                new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook',
+                                                                     channel_address)
             except Exception as e:
                 app_logger.error('Error renewing channel for property: %s', prop.id)
                 app_logger.error(e)
