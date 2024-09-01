@@ -13,21 +13,26 @@ from app.cal.views import cal_router
 from app.cal.webhooks import cal_webhook_router
 from app.logging import config
 from app.pay.views import stripe_router
-from app.utils import settings
-
-app = FastAPI()
+from app.utils import settings, app_logger
 
 
-@app.on_event("startup")
-async def startup_event():
-    logging.info('startup')
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app_logger.info('startup')
+
+    auto_check_and_renew_channels()
+    auto_complete_and_notify()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(auto_check_and_renew_channels, 'interval', hours=1)
     scheduler.add_job(auto_complete_and_notify, 'interval', hours=1)
     scheduler.start()
-    logging.info('Scheduler initialized and started')
+    app_logger.info('Scheduler initialized and started')
 
+    yield
+
+
+app = FastAPI(lifespan=lifespan)
 
 if bool(settings.logfire_token) and settings.testing is False and settings.dev_mode is False:
     logfire.instrument_fastapi(app)
