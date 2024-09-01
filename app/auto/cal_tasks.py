@@ -31,7 +31,6 @@ def auto_check_and_renew_channels():
                 try:
                     initalize_trips_from_cal(data.property_ref, data.cal_id)
                     app_logger.info('Channel for property: %s successfully renewed', prop.id)
-                    return {'propertyRef': data.property_ref, 'message': 'Google Calendar ID successfully set'}
                 except HttpError as e:
                     error_message = str(e)
                     app_logger.error('Error setting Google Calendar ID: %s', error_message)
