@@ -29,7 +29,7 @@ def auto_check_and_renew_channels(force_renew=False):
             # If the channel is about to expire or force_renew is True, renew it
             if force_renew or (
                     channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(
-                    days=2)):
+                days=2)):
                 app_logger.info('Renewing channel for property: %s', prop.id)
                 try:
                     # Check if externalCalendar exists
@@ -38,12 +38,10 @@ def auto_check_and_renew_channels(force_renew=False):
                         app_logger.info('externalCalendar not found for property: %s', prop.id)
                         continue
 
-                    # Assuming `data` is a dictionary or object with required properties
-                    data = {
-                        'property_ref': prop.reference,
-                        'cal_id': external_calendar
-                    }
-                    initalize_trips_from_cal(data['property_ref'], data['cal_id'])
+                    # Create PropertyCal instance
+                    property_cal = PropertyCal(property_ref=prop.reference, cal_id=external_calendar)
+
+                    initalize_trips_from_cal(property_cal.property_ref, property_cal.cal_id)
                     app_logger.info('Google Calendar ID successfully set.')
                 except HttpError as e:
                     error_message = str(e)
@@ -52,10 +50,10 @@ def auto_check_and_renew_channels(force_renew=False):
                         with logfire.span('Channel id not unique'):
                             app_logger.info('Channel id not unique error encountered. Deleting the channel...')
                             calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'  # Hardcoded resource id
-                            delete_calendar_watch_channel(data['property_ref'], calendar_resource_id)
+                            delete_calendar_watch_channel(property_cal.property_ref, calendar_resource_id)
                             app_logger.info('Channel successfully deleted.')
                             app_logger.info('Retrying to set Google Calendar ID...')
-                            initalize_trips_from_cal(data['property_ref'], data['cal_id'])
+                            initalize_trips_from_cal(property_cal.property_ref, property_cal.cal_id)
                             app_logger.info('Google Calendar ID successfully set.')
                     raise HTTPException(status_code=400, detail=error_message)
 
