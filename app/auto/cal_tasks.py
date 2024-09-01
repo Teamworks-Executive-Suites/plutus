@@ -4,40 +4,31 @@ import logfire
 
 from app.auto._utils import app_logger
 from app.cal.tasks import renew_notification_channel, sync_calendar_events
+from app.cal.views import set_google_calendar_id
 from app.firebase_setup import db
+from app.models import PropertyCal
 from app.utils import settings
 
 
 def auto_check_and_renew_channels():
     with logfire.span('auto_check_and_renew_channels'):
-        # Get the current time
-        now = datetime.utcnow()
-
         # Iterate over all property documents
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
             app_logger.info('Renewing channel for property: %s', prop.id)
             calendar_id = prop.get('externalCalendar')
 
-            # Check if 'channelId' exists in the property document
-            if 'channelId' not in prop.to_dict():
-                app_logger.warning('Property %s does not contain channelId', prop.id)
-                continue
+            # Create a PropertyCal object
+            data = PropertyCal(property_ref=prop.id, cal_id=calendar_id)
 
-            channel_id = prop.get('channelId')
-            channel_address = settings.url + calendar_id
             try:
-                new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook',
-                                                                     channel_address)
+                # Call set_google_calendar_id programmatically
+                set_google_calendar_id(data)
+                app_logger.info('Channel for property: %s successfully renewed', prop.id)
             except Exception as e:
                 app_logger.error('Error renewing channel for property: %s', prop.id)
                 app_logger.error(e)
                 continue
-
-            # Update the property document with the new channel id and expiration time
-            prop.reference.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
-
-            app_logger.info('Channel for property: %s successfully renewed', prop.id)
 
 def resync_all_calendar_events():
     """
