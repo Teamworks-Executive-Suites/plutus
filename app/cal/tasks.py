@@ -24,18 +24,29 @@ creds = service_account.Credentials.from_service_account_info(
 def renew_notification_channel(calendar_id, channel_id, channel_type, channel_address):
     service = build('calendar', 'v3', credentials=creds)
 
-    # Create a new channel with a unique id
-    new_channel_id = str(uuid.uuid4())
-    new_channel = (
-        service.events()
-        .watch(calendarId=calendar_id, body={'id': new_channel_id, 'type': channel_type, 'address': channel_address})
-        .execute()
-    )
+    # Log the input parameters
+    app_logger.info(
+        'Renewing notification channel for calendar_id: %s, channel_id: %s, channel_type: %s, channel_address: %s',
+        calendar_id, channel_id, channel_type, channel_address)
 
-    app_logger.info('Renewed notification channel. Old id: %s, new id: %s, new expiry: %s', channel_id, new_channel['id'], new_channel.get('expiration'))
+    try:
+        # Create a new channel with a unique id
+        new_channel_id = str(uuid.uuid4())
+        new_channel = (
+            service.events()
+            .watch(calendarId=calendar_id,
+                   body={'id': new_channel_id, 'type': channel_type, 'address': channel_address})
+            .execute()
+        )
 
-    # Return the new channel and its expiration time
-    return new_channel, new_channel.get('expiration')
+        app_logger.info('Renewed notification channel. Old id: %s, new id: %s, new expiry: %s',
+                        channel_id, new_channel['id'], new_channel.get('expiration'))
+
+        # Return the new channel and its expiration time
+        return new_channel, new_channel.get('expiration')
+    except HttpError as e:
+        app_logger.error('Error renewing notification channel: %s', e)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
