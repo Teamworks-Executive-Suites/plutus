@@ -217,7 +217,7 @@ def auto_complete_and_notify():
                             continue  # Changed from return to continue to process the next trip
 
                         if (not trip.to_dict().get('complete', False) or trip.get('upcoming')) and (
-                                trip.get('tripEndDateTime') and current_time > trip.get('tripEndDateTime')
+                                'tripEndDateTime' in trip.to_dict() and current_time > trip.get('tripEndDateTime')
                         ):
                             try:
                                 trip.reference.update({'complete': True, 'upcoming': False})
