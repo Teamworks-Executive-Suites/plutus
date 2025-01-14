@@ -332,7 +332,9 @@ def create_events_for_future_trips(property_doc_id: str):
             if 'eventId' not in trip_data:
                 # Call create_or_update_event_from_trip to create the event
                 app_logger.info('Creating event for trip: %s', trip.reference)
-                create_or_update_event_from_trip(property_doc.reference, trip.reference)
+                document_ref_str = 'properties/' + property_doc_id
+                trip_ref_str = 'trips/' + trip.id
+                create_or_update_event_from_trip(document_ref_str, trip_ref_str)
             else:
                 app_logger.info('Event already exists for trip: %s', trip.reference)
 
