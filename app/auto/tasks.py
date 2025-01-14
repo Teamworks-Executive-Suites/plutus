@@ -18,7 +18,7 @@ def get_contact_details(trip_ref: str, property_ref: str):
             app_logger.error('Property document does not exist for: %s', property_ref)
             return None, None
 
-        host_doc = db.collection('users').document(property_doc.get('userRef')).get()
+        host_doc = db.collection('users').document(property_doc.get('userRef').id).get()
         if not host_doc.exists:
             app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
             return None, None
@@ -228,7 +228,7 @@ def auto_complete_and_notify():
                                 trip.reference.update({'complete': True, 'upcoming': False})
                                 app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
 
-                                complete_trip_sms(trip.id, prop.id)
+                                complete_trip_sms(trip.reference, prop.reference)
                                 send_complete_email(trip.id, prop.id)
 
                             except Exception as e:
