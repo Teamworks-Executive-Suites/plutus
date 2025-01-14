@@ -267,35 +267,36 @@ def delete_calendar_watch_channel(id: str, resource_id: str):
 
 
 def initalize_trips_from_cal(property_ref: str, calendar_id: str):
-    app_logger.info('Initialising trips from calendar: %s , property: %s', calendar_id, property_ref)
+    with logfire.span('initalize_trips_from_cal'):
+        app_logger.info('Initialising trips from calendar: %s , property: %s', calendar_id, property_ref)
 
-    # get the property document
-    collection_id, document_id = property_ref.split('/')
-    property_doc_ref = db.collection(collection_id).document(document_id)
+        # get the property document
+        collection_id, document_id = property_ref.split('/')
+        property_doc_ref = db.collection(collection_id).document(document_id)
 
-    # Update the externalCalendar field with the provided calendar_id
-    property_doc_ref.update({'externalCalendar': calendar_id})
+        # Update the externalCalendar field with the provided calendar_id
+        property_doc_ref.update({'externalCalendar': calendar_id})
 
-    # Call the Google Calendar API to fetch the future events
-    service = build('calendar', 'v3', credentials=creds)
+        # Call the Google Calendar API to fetch the future events
+        service = build('calendar', 'v3', credentials=creds)
 
-    # test calendar list
-    calendars = service.calendarList().list().execute()
-    for calendar_list_entry in calendars['items']:
-        app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
+        # test calendar list
+        calendars = service.calendarList().list().execute()
+        for calendar_list_entry in calendars['items']:
+            app_logger.info(calendar_list_entry['id'], calendar_list_entry['summary'])
 
-    # Set up the webhook
-    with logfire.span('setting up webhook for calendar'):
-        channel_id = property_ref
-        app_logger.info('Setting up webhook and setting the channel_id: %s', property_ref)
-        webhook_url = f'{settings.url}/cal_webhook?calendar_id={property_ref}'
-        new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook', webhook_url)
+        # Set up the webhook
+        with logfire.span('setting up webhook for calendar'):
+            channel_id = property_ref
+            app_logger.info('Setting up webhook and setting the channel_id: %s', property_ref)
+            webhook_url = f'{settings.url}/cal_webhook?calendar_id={property_ref}'
+            new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook', webhook_url)
 
-        # Update the property document with the new channel id and expiration time
-        property_doc_ref.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
+            # Update the property document with the new channel id and expiration time
+            property_doc_ref.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
 
-    sync_calendar_events(property_doc_ref)
-    create_events_for_future_trips(property_ref)
+        sync_calendar_events(property_doc_ref)
+        create_events_for_future_trips(property_ref)
 
 
 def create_events_for_future_trips(property_ref: str):
