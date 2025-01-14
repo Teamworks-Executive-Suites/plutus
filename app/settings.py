@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     g_auth_provider_x509_cert_url: str = 'https://www.googleapis.com/oauth2/v1/certs'
     g_client_x509_cert_url: str = 'https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-2xapk%40teamworks-3b262.iam.gserviceaccount.com'
 
+    g_calendar_resource_id: str = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
+
     # Twilio
     t_account_sid: str = ''
     t_auth_token: str = ''

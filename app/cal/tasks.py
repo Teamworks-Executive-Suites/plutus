@@ -266,8 +266,8 @@ def delete_calendar_watch_channel(id: str, resource_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-def initalize_trips_from_cal(property_ref: str, calendar_id: str):
-    with logfire.span('initalize_trips_from_cal'):
+def initialize_trips_from_cal(property_ref: str, calendar_id: str):
+    with logfire.span('initialize_trips_from_cal'):
         app_logger.info('Initialising trips from calendar: %s , property: %s', calendar_id, property_ref)
 
         # get the property document

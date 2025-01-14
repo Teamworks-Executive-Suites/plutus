@@ -92,7 +92,8 @@ def complete_trip_sms(trip_doc_id: str, property_doc_id: str):
 
         if guest_number:
             send_sms(
-                guest_number, f'Your trip {trip_doc_id} has been completed. Please review the host. View here: {property_link}'
+                guest_number,
+                f'Your trip {trip_doc_id} has been completed. Please review the host. View here: {property_link}',
             )
 
 
@@ -221,7 +222,7 @@ def auto_complete_and_notify():
                             continue  # Changed from return to continue to process the next trip
 
                         if (not trip.to_dict().get('complete', False) or trip.to_dict().get('upcoming', False)) and (
-                                'tripEndDateTime' in trip.to_dict() and current_time > trip.get('tripEndDateTime')
+                            'tripEndDateTime' in trip.to_dict() and current_time > trip.get('tripEndDateTime')
                         ):
                             try:
                                 trip.reference.update({'complete': True, 'upcoming': False})
