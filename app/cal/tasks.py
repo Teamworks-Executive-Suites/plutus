@@ -273,10 +273,10 @@ def initialize_trips_from_cal(property_ref: str, calendar_id: str):
 
         # get the property document
         collection_id, document_id = property_ref.split('/')
-        property_doc_ref = db.collection(collection_id).document(document_id)
+        property_doc = db.collection(collection_id).document(document_id)
 
         # Update the externalCalendar field with the provided calendar_id
-        property_doc_ref.update({'externalCalendar': calendar_id})
+        property_doc.update({'externalCalendar': calendar_id})
 
         # Call the Google Calendar API to fetch the future events
         service = build('calendar', 'v3', credentials=creds)
@@ -294,10 +294,10 @@ def initialize_trips_from_cal(property_ref: str, calendar_id: str):
             new_channel, expiration = renew_notification_channel(calendar_id, channel_id, 'web_hook', webhook_url)
 
             # Update the property document with the new channel id and expiration time
-            property_doc_ref.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
+            property_doc.update({'channelId': new_channel['id'], 'channelExpiration': expiration})
 
-        sync_calendar_events(property_doc_ref)
-        create_events_for_future_trips(property_ref)
+        sync_calendar_events(property_doc)
+        create_events_for_future_trips(property_doc.id)
 
 
 def create_events_for_future_trips(property_doc_id: str):
