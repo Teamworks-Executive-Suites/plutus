@@ -11,39 +11,40 @@ from app.utils import settings
 
 
 def get_contact_details(trip_ref: str, property_ref: str):
-    # Get the host phone numbers
-    property_doc = db.collection('properties').document(property_ref).get()
-    if not property_doc.exists:
-        app_logger.error('Property document does not exist for: %s', property_ref)
-        return None, None
+    with logfire.span('get_contact_details'):
+        # Get the host phone numbers
+        property_doc = db.collection('properties').document(property_ref).get()
+        if not property_doc.exists:
+            app_logger.error('Property document does not exist for: %s', property_ref)
+            return None, None
 
-    host_doc = db.collection('users').document(property_doc.get('userRef')).get()
-    if not host_doc.exists:
-        app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
-        return None, None
+        host_doc = db.collection('users').document(property_doc.get('userRef')).get()
+        if not host_doc.exists:
+            app_logger.error('Host document does not exist for: %s', property_doc.get('userRef'))
+            return None, None
 
-    if host_doc.get('smsOptIn'):
-        host_numbers = host_doc.get('phone_numbers')
-    else:
-        host_numbers = None
+        if host_doc.get('smsOptIn'):
+            host_numbers = host_doc.get('phone_numbers')
+        else:
+            host_numbers = None
 
-    # Get the guest phone numbers
-    trip_doc = db.collection('trips').document(trip_ref).get()
-    if not trip_doc.exists:
-        app_logger.error('Trip document does not exist for: %s', trip_ref)
-        return None, None
+        # Get the guest phone numbers
+        trip_doc = db.collection('trips').document(trip_ref).get()
+        if not trip_doc.exists:
+            app_logger.error('Trip document does not exist for: %s', trip_ref)
+            return None, None
 
-    guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
-    if not guest_doc.exists:
-        app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
-        return None, None
+        guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
+        if not guest_doc.exists:
+            app_logger.error('Guest document does not exist for: %s', trip_doc.get('userRef'))
+            return None, None
 
-    if guest_doc.get('smsOptIn'):
-        guest_number = guest_doc.get('phone_numbers')[0]
-    else:
-        guest_number = None
+        if guest_doc.get('smsOptIn'):
+            guest_number = guest_doc.get('phone_numbers')[0]
+        else:
+            guest_number = None
 
-    return host_numbers, guest_number
+        return host_numbers, guest_number
 
 
 def send_sms(to: str, body: str):
@@ -80,18 +81,19 @@ def send_sms(to: str, body: str):
         app_logger.info('Response: %s', response.text)
 
 
-def complete_trip_sms(trip_ref: str, property_ref: str):
-    host_numbers, guest_number = get_contact_details(trip_ref, property_ref)
-    property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_ref}&property={property_ref}'
+def complete_trip_sms(trip_doc_id: str, property_doc_id: str):
+    with logfire.span('complete_trip_sms'):
+        host_numbers, guest_number = get_contact_details(trip_doc_id, property_doc_id)
+        property_link = f'{settings.app_url}/tripDetails?tripPassed={trip_doc_id}&property={property_doc_id}'
 
-    if host_numbers:
-        for host_num in host_numbers:
-            send_sms(host_num, f'Your trip {trip_ref} has been completed. View here: {property_link}')
+        if host_numbers:
+            for host_num in host_numbers:
+                send_sms(host_num, f'Your trip {trip_doc_id} has been completed. View here: {property_link}')
 
-    if guest_number:
-        send_sms(
-            guest_number, f'Your trip {trip_ref} has been completed. Please review the host. View here: {property_link}'
-        )
+        if guest_number:
+            send_sms(
+                guest_number, f'Your trip {trip_doc_id} has been completed. Please review the host. View here: {property_link}'
+            )
 
 
 def send_reminder_sms(trip_ref: str, property_ref: str, time: int):
@@ -171,26 +173,28 @@ def sendgrid_email(trip_doc: dict, property_doc: dict, template_id: str, time: i
         app_logger.info('Response: %s', response.text)
 
 
-def send_complete_email(trip_ref: str, property_ref: str):
-    trip_doc = db.collection('trips').document(trip_ref).get()
-    property_doc = db.collection('properties').document(property_ref).get()
+def send_complete_email(trip_doc_id: str, property_doc_id: str):
+    with logfire.span('send_complete_email'):
+        trip_doc = db.collection('trips').document(trip_doc_id).get()
+        property_doc = db.collection('properties').document(property_doc_id).get()
 
-    host_complete_email_template_id = 'd-f1698bb27e5c44f982478f61e9f5a2eb'
-    guest_complete_email_template_id = 'd-335808be895a413497459fbb3a311a39'
+        host_complete_email_template_id = 'd-f1698bb27e5c44f982478f61e9f5a2eb'
+        guest_complete_email_template_id = 'd-335808be895a413497459fbb3a311a39'
 
-    sendgrid_email(trip_doc, property_doc, host_complete_email_template_id, to_host=True)
-    sendgrid_email(trip_doc, property_doc, guest_complete_email_template_id, to_host=False)
+        sendgrid_email(trip_doc, property_doc, host_complete_email_template_id, to_host=True)
+        sendgrid_email(trip_doc, property_doc, guest_complete_email_template_id, to_host=False)
 
 
-def send_reminder_email(trip_ref: str, property_ref: str, time: int):
-    trip_doc = db.collection('trips').document(trip_ref).get()
-    property_doc = db.collection('properties').document(property_ref).get()
+def send_reminder_email(trip_doc_id: str, property_doc_id: str, time: int):
+    with logfire.span('send_reminder_email'):
+        trip_doc = db.collection('trips').document(trip_doc_id).get()
+        property_doc = db.collection('properties').document(property_doc_id).get()
 
-    host_reminder_email_template_id = 'd-02adfc13d954429a9e053fba47e9ab60'
-    guest_reminder_email_template_id = 'd-5c55d84eb81543819ff8d6aeba12c1e0'
+        host_reminder_email_template_id = 'd-02adfc13d954429a9e053fba47e9ab60'
+        guest_reminder_email_template_id = 'd-5c55d84eb81543819ff8d6aeba12c1e0'
 
-    sendgrid_email(trip_doc, property_doc, host_reminder_email_template_id, time, to_host=True)
-    sendgrid_email(trip_doc, property_doc, guest_reminder_email_template_id, time, to_host=False)
+        sendgrid_email(trip_doc, property_doc, host_reminder_email_template_id, time, to_host=True)
+        sendgrid_email(trip_doc, property_doc, guest_reminder_email_template_id, time, to_host=False)
 
 
 def auto_complete_and_notify():
@@ -223,8 +227,8 @@ def auto_complete_and_notify():
                                 trip.reference.update({'complete': True, 'upcoming': False})
                                 app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
 
-                                complete_trip_sms(trip.reference, prop.reference)
-                                send_complete_email(trip.reference, prop.reference)
+                                complete_trip_sms(trip.id, prop.id)
+                                send_complete_email(trip.id, prop.id)
 
                             except Exception as e:
                                 app_logger.error('Failed to update trip %s for property %s: %s', trip.id, prop.id, e)
@@ -247,7 +251,7 @@ def auto_complete_and_notify():
                                         )
 
                                     try:
-                                        send_reminder_email(trip.reference, prop.reference, 24)
+                                        send_reminder_email(trip.id, prop.id, 24)
                                     except Exception as e:
                                         app_logger.error(
                                             'Failed to send reminder email for trip %s for property %s: %s',
@@ -259,7 +263,7 @@ def auto_complete_and_notify():
                                 # Check if current time is exactly one hour before the start time of the trip
                                 if timedelta(minutes=59) < time_difference < timedelta(hours=1):
                                     try:
-                                        send_reminder_sms(trip.reference, prop.reference, 1)
+                                        send_reminder_sms(trip.id, prop.id, 1)
                                     except Exception as e:
                                         app_logger.error(
                                             'Failed to send reminder SMS for trip %s for property %s: %s',
@@ -269,7 +273,7 @@ def auto_complete_and_notify():
                                         )
 
                                     try:
-                                        send_reminder_email(trip.reference, prop.reference, 1)
+                                        send_reminder_email(trip.id, prop.id, 1)
                                     except Exception as e:
                                         app_logger.error(
                                             'Failed to send reminder email for trip %s for property %s: %s',
