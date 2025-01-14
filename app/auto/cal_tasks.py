@@ -11,34 +11,29 @@ from app.models import PropertyCal
 
 
 def auto_check_and_renew_channels(force_renew=False):
+    app_logger.info('Starting auto_check_and_renew_channels with force_renew=%s', force_renew)
     with logfire.span('auto_check_and_renew_channels'):
-        # Get the current time
         now = datetime.utcnow()
-
-        # Iterate over all property documents
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
-            # Get the channel expiration time
+            app_logger.info('Checking property: %s', prop.id)
             try:
                 channel_expiration = prop.get('channelExpiration')
             except KeyError:
                 app_logger.info('Channel expiration time not found for property: %s', prop.id)
                 continue
 
-            # If the channel is about to expire or force_renew is True, renew it
             if force_renew or (
                 channel_expiration and datetime.fromtimestamp(int(channel_expiration) / 1000) - now < timedelta(days=2)
             ):
                 app_logger.info('Renewing channel for property: %s', prop.id)
                 try:
-                    # Check if externalCalendar exists
                     external_calendar = prop.get('externalCalendar')
                     if not external_calendar:
                         app_logger.info('externalCalendar not found for property: %s', prop.id)
                         continue
 
                     property_ref = 'properties/' + prop.id
-                    # Create PropertyCal instance
                     property_cal = PropertyCal(property_ref=property_ref, cal_id=external_calendar)
 
                     initalize_trips_from_cal(property_cal.property_ref, property_cal.cal_id)
@@ -49,7 +44,7 @@ def auto_check_and_renew_channels(force_renew=False):
                     if 'not unique' in error_message:
                         with logfire.span('Channel id not unique'):
                             app_logger.info('Channel id not unique error encountered. Deleting the channel...')
-                            calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'  # Hardcoded resource id
+                            calendar_resource_id = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
                             delete_calendar_watch_channel(property_cal.property_ref, calendar_resource_id)
                             app_logger.info('Channel successfully deleted.')
                             app_logger.info('Retrying to set Google Calendar ID...')
@@ -57,10 +52,9 @@ def auto_check_and_renew_channels(force_renew=False):
                             app_logger.info('Google Calendar ID successfully set.')
                     raise HTTPException(status_code=400, detail=error_message)
 
-                # Assuming `new_channel` and `expiration` are obtained from the response of `initalize_trips_from_cal`
                 new_channel = {
-                    'id': 'new_channel_id',  # Replace with actual new channel id
-                    'expiration': int((now + timedelta(days=30)).timestamp() * 1000),  # Example expiration time
+                    'id': 'new_channel_id',
+                    'expiration': int((now + timedelta(days=30)).timestamp() * 1000),
                 }
                 prop.reference.update(
                     {'channelId': new_channel['id'], 'channelExpiration': str(new_channel['expiration'])}
@@ -69,6 +63,7 @@ def auto_check_and_renew_channels(force_renew=False):
                 app_logger.info('Channel for property: %s successfully renewed', prop.id)
             else:
                 app_logger.info('Channel for property: %s does not need to be renewed', prop.id)
+    app_logger.info('Finished auto_check_and_renew_channels')
 
 
 def resync_all_calendar_events():
