@@ -12,7 +12,7 @@ from app.utils import settings
 
 
 def auto_check_and_renew_channels(force_renew=False):
-    with logfire.span('auto_check_and_renew_channels; force renew: %s', force_renew):
+    with logfire.span(f'auto_check_and_renew_channels; force renew: {force_renew}'):
         now = datetime.utcnow()
         properties_ref = db.collection('properties').stream()
         for prop in properties_ref:
