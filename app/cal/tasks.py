@@ -59,83 +59,84 @@ def renew_notification_channel(calendar_id, channel_id, channel_type, channel_ad
 
 
 def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
-    if isinstance(property_doc_ref, str):
+    with logfire.span('sync_calendar_events'):
+        if isinstance(property_doc_ref, str):
+            try:
+                property_doc_ref = db.document(property_doc_ref)
+            except ValueError:
+                app_logger.error('Invalid property document reference: %s', property_doc_ref)
+                raise HTTPException(status_code=400, detail='Invalid property document reference')
+
         try:
-            property_doc_ref = db.document(property_doc_ref)
+            property_doc = property_doc_ref.get()
         except ValueError:
             app_logger.error('Invalid property document reference: %s', property_doc_ref)
             raise HTTPException(status_code=400, detail='Invalid property document reference')
 
-    try:
-        property_doc = property_doc_ref.get()
-    except ValueError:
-        app_logger.error('Invalid property document reference: %s', property_doc_ref)
-        raise HTTPException(status_code=400, detail='Invalid property document reference')
+        if not property_doc.exists:
+            app_logger.error('Property document does not exist for: %s', property_doc_ref)
+            raise HTTPException(status_code=404, detail='Property not found')
 
-    if not property_doc.exists:
-        app_logger.error('Property document does not exist for: %s', property_doc_ref)
-        raise HTTPException(status_code=404, detail='Property not found')
+        app_logger.info('Syncing calendar for property:%s', property_doc_ref.id)
 
-    app_logger.info('Syncing calendar for property:%s', property_doc_ref.id)
+        property_doc_dict = property_doc.to_dict()
+        calendar_id = property_doc_dict.get('externalCalendar')
+        if retry_count == 0:
+            next_sync_token = property_doc_dict.get('nextSyncToken', '')
+        else:
+            next_sync_token = ''
 
-    property_doc_dict = property_doc.to_dict()
-    calendar_id = property_doc_dict.get('externalCalendar')
-    if retry_count == 0:
-        next_sync_token = property_doc_dict.get('nextSyncToken', '')
-    else:
-        next_sync_token = ''
+        # Call the Google Calendar API to fetch the events
+        service = build('calendar', 'v3', credentials=creds)
+        page_token = None
 
-    # Call the Google Calendar API to fetch the events
-    service = build('calendar', 'v3', credentials=creds)
-    page_token = None
+        with logfire.span('syncing calendar events with Google Calendar'):
+            try:
+                while True:
+                    events_result = (
+                        service.events()
+                        .list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token)
+                        .execute()
+                    )
 
-    with logfire.span('syncing calendar events with Google Calendar'):
-        try:
-            while True:
-                events_result = (
-                    service.events()
-                    .list(calendarId=calendar_id, syncToken=next_sync_token, pageToken=page_token)
-                    .execute()
-                )
+                    events = events_result.get('items', [])
+                    app_logger.info('%s events found in calendar: %s', len(events), calendar_id)
+                    for event in events:
+                        try:
+                            # Validate the event data with the appropriate model
+                            if event['status'] == 'cancelled':
+                                app_logger.info('Cancelled event: %s', event['id'])
+                                validated_event = CancelledGCalEvent.parse_obj(event)
+                            else:
+                                app_logger.info('Valid event: %s', event['id'])
+                                validated_event = GCalEvent.parse_obj(event)
+                        except ValidationError as ve:
+                            app_logger.error('Event validation error: %s, Event: %s', ve, event)
+                            continue
 
-                events = events_result.get('items', [])
-                app_logger.info('%s events found in calendar: %s', len(events), calendar_id)
-                for event in events:
-                    try:
-                        # Validate the event data with the appropriate model
-                        if event['status'] == 'cancelled':
-                            app_logger.info('Cancelled event: %s', event['id'])
-                            validated_event = CancelledGCalEvent.parse_obj(event)
-                        else:
-                            app_logger.info('Valid event: %s', event['id'])
-                            validated_event = GCalEvent.parse_obj(event)
-                    except ValidationError as ve:
-                        app_logger.error('Event validation error: %s, Event: %s', ve, event)
-                        continue
+                        # Process each event
+                        process_event(validated_event, property_doc_ref)
 
-                    # Process each event
-                    process_event(validated_event, property_doc_ref)
+                    next_sync_token = events_result.get('nextSyncToken')
+                    property_doc_ref.update({'nextSyncToken': next_sync_token})
 
-                next_sync_token = events_result.get('nextSyncToken')
-                property_doc_ref.update({'nextSyncToken': next_sync_token})
-
-                page_token = events_result.get('nextPageToken')
-                if not page_token:
-                    break
-        except HttpError as e:
-            if e.resp.status == 410:
-                if retry_count < 2:
-                    app_logger.info('Invalid sync token, clearing event store and re-syncing.')
-                    clear_event_store(property_doc_ref.path)
-                    # Reset the sync token
-                    next_sync_token = ''
-                    sync_calendar_events(property_doc_ref, retry_count + 1)
+                    page_token = events_result.get('nextPageToken')
+                    if not page_token:
+                        break
+            except HttpError as e:
+                if e.resp.status == 410:
+                    if retry_count < 2:
+                        app_logger.info('Invalid sync token, clearing event store and re-syncing.')
+                        clear_event_store(property_doc_ref.path)
+                        # Reset the sync token
+                        next_sync_token = ''
+                        sync_calendar_events(property_doc_ref, retry_count + 1)
+                    else:
+                        app_logger.error('Error syncing calendar: %s. Maximum retry attempts exceeded.', e)
+                        raise HTTPException(status_code=500, detail=str(e))
                 else:
-                    app_logger.error('Error syncing calendar: %s. Maximum retry attempts exceeded.', e)
+                    app_logger.error('Error syncing calendar: %s', e)
                     raise HTTPException(status_code=500, detail=str(e))
-            else:
-                app_logger.error('Error syncing calendar: %s', e)
-                raise HTTPException(status_code=500, detail=str(e))
 
 
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
