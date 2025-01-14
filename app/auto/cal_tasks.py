@@ -18,7 +18,7 @@ def auto_check_and_renew_channels(force_renew=False):
         for prop in properties_ref:
             app_logger.info('Checking property: %s', prop.id)
 
-            channel_expiration = prop.get('channelExpiration', None)
+            channel_expiration = prop.to_dict().get('channelExpiration', None)
             if channel_expiration is None:
                 app_logger.info('Channel expiration time not found for property: %s', prop.id)
                 continue
