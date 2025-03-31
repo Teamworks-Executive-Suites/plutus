@@ -1,5 +1,6 @@
 from datetime import datetime
-from typing import Any, Optional, Union
+from enum import Enum
+from typing import Any, List, Optional, Union
 
 from logfire.integrations.pydantic_plugin import PluginSettings
 from pydantic import BaseModel, Field
@@ -12,16 +13,19 @@ class Name(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'}))
 class CancelRefund(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     trip_ref: str
     full_refund: bool
+    actor_ref: str
 
 
 class ExtraCharge(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     trip_ref: str
     dispute_ref: str
+    actor_ref: str
 
 
 class Refund(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
     trip_ref: str
     amount: int
+    actor_ref: str
 
 
 class PropertyCal(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
@@ -120,3 +124,41 @@ class CancelledGCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'rec
     etag: str
     id: str
     status: str
+
+
+class ActorRole(str, Enum):
+    platform = 'platform'
+    client = 'client'
+    host = 'host'
+
+
+class Status(str, Enum):
+    completed = 'completed'
+    in_escrow = 'in_escrow'
+    failed = 'failed'
+
+
+class TransactionType(str, Enum):
+    payment = 'payment'
+    transfer = 'transfer'
+    refund = 'refund'
+
+
+class Transaction(BaseModel):
+    actorRef: str
+    actorRole: ActorRole
+    recipientRef: str
+    recipientRole: ActorRole
+    transferId: Optional[str]
+    status: Status
+    type: TransactionType
+    createdAt: datetime
+    processedAt: datetime
+    notes: Optional[str]
+    guestFeeCents: int
+    hostFeeCents: int
+    netFeeCents: int
+    grossFeeCents: int
+    tripRef: str
+    refundedAmountCents: int
+    paymentIntentIds: List[str]
