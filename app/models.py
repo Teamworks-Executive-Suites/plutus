@@ -136,6 +136,7 @@ class Status(str, Enum):
     completed = 'completed'
     in_escrow = 'in_escrow'
     failed = 'failed'
+    merged = 'merged'
 
 
 class TransactionType(str, Enum):
@@ -162,3 +163,4 @@ class Transaction(BaseModel):
     tripRef: str
     refundedAmountCents: int
     paymentIntentIds: List[str]
+    mergedTransactions: List[str]
