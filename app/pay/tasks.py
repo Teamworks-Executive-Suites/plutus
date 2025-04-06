@@ -139,9 +139,9 @@ def handle_refund(trip_ref, amount, actor_ref):
     # transaction from platform to client
 
     client_transaction = Transaction(
-        actorRef='platform',
+        actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.platform,
-        recipientRef=f'users/{actor_ref}',
+        recipientRef=f'users/{trip.get("userRef")}',
         recipientRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
@@ -156,6 +156,7 @@ def handle_refund(trip_ref, amount, actor_ref):
         tripRef=trip_ref,
         refundedAmountCents=total_refunded,
         paymentIntentIds=payment_intent_ids,
+        mergedTransactions=[],
     ).dict()
 
     db.collection('transactions').add(client_transaction)
@@ -163,7 +164,7 @@ def handle_refund(trip_ref, amount, actor_ref):
     # transaction from host to platform
 
     host_transaction = Transaction(
-        actorRef=trip.get('propertyRef'),
+        actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.host,
         recipientRef='platform',
         recipientRole=ActorRole.platform,
@@ -180,6 +181,7 @@ def handle_refund(trip_ref, amount, actor_ref):
         tripRef=trip_ref,
         refundedAmountCents=total_refunded,
         paymentIntentIds=payment_intent_ids,
+        mergedTransactions=[],
     ).dict()
 
     db.collection('transactions').add(host_transaction)
@@ -283,6 +285,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 tripRef=trip_ref,
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
+                mergedTransactions=[],
             ).dict()
 
             db.collection('transactions').add(client_transaction)
@@ -306,6 +309,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 tripRef=trip_ref,
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
+                mergedTransactions=[],
             ).dict()
 
             db.collection('transactions').add(host_transaction)
@@ -470,6 +474,7 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
         tripRef=trip_ref,
         refundedAmountCents=total_refunded,
         paymentIntentIds=payment_intent_ids,
+        mergedTransactions=[],
     ).dict()
 
     db.collection('transactions').add(transaction)

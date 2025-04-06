@@ -39,9 +39,8 @@ app = FastAPI(lifespan=lifespan)
 
 if bool(settings.logfire_token) and settings.testing is False and settings.dev_mode is False:
     logfire.instrument_fastapi(app)
-    logfire.configure(
-        send_to_logfire=True, token=settings.logfire_token, pydantic_plugin=logfire.PydanticPlugin(record='all')
-    )
+    logfire.configure(send_to_logfire=True, token=settings.logfire_token)
+    logfire.instrument_pydantic()
 
     FastAPIInstrumentor.instrument_app(app)
 

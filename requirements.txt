@@ -1,6 +1,6 @@
 fastapi==0.109.1
 APScheduler==3.10.4
-logfire[fastapi]==3.11.0
+logfire[fastapi]==3.12.0
 uvicorn==0.26.0
 devtools==0.12.0
 
@@ -31,6 +31,7 @@ opentelemetry-instrumentation-urllib3
 opentelemetry-instrumentation-requests
 opentelemetry-instrumentation-urllib
 opentelemetry-instrumentation-grpc
+opentelemetry-instrumentation-fastapi
 python-dotenv~=1.0.1
 pydantic-settings==2.8.1
 pydantic==2.11.1

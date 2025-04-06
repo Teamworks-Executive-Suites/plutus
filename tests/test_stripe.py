@@ -26,31 +26,37 @@ class FakeFirestore:
             'trips': {
                 'fake_trip_ref': {
                     'id': 'fake_trip_ref',
-                    'cancelTrip': False,
-                    'complete': False,
-                    'editedTripRef': '',
-                    'guests': [],
-                    'host': '',
-                    'inquiryDescription': '',
-                    'isBlocked': False,
-                    'isExternal': False,
-                    'isInquiry': False,
-                    'isOffer': False,
-                    'isRefunded': False,
-                    'isTempEditTrip': False,
                     'propertyRef': '',
+                    'userRef': '',
+                    'tripCost': 0,
+                    'guests': 0,
+                    'tripCreated': '',
+                    'host': '',
+                    'cancelTrip': False,
+                    'upcoming': False,
+                    'complete': False,
                     'rated': False,
-                    'stripePaymentIntents': [],
+                    'tripBeginDateTime': None,
+                    'tripEndDateTime': None,
+                    'isInquiry': False,
+                    'tripTax': '',
                     'tripAddonTotal': 0,
                     'tripBaseTotal': 0,
-                    'tripBeginDateTime': None,
-                    'tripCost': 0,
-                    'tripCreated': '',
+                    'isExternal': False,
+                    'isRefunded': False,
                     'tripDate': '',
-                    'tripEndDateTime': None,
+                    'inquiryDescription': '',
+                    'isOffer': False,
                     'tripReason': '',
-                    'upcoming': False,
-                    'userRef': '',
+                    'isBlocked': False,
+                    'editedTripRef': '',
+                    'isTempEditTrip': False,
+                    'disputeRef': '',
+                    'stripePaymentIntents': [],
+                    'eventId': '',
+                    'eventSummary': '',
+                    'appliedDiscountRef': '',
+                    'appliedDiscountAmount': '',
                 }
             },
             'users': {
@@ -206,7 +212,7 @@ class StripeRefund(TestCase):
             {'stripePaymentIntents': current_intents}
         )
 
-        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099}
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099, 'actor_ref': 'users/fake_user_ref'}
         r = self.client.post('/refund', headers=self.headers, json=data)
         # Check the result
 
@@ -245,7 +251,7 @@ class StripeRefund(TestCase):
             {'stripePaymentIntents': current_intents}
         )
 
-        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1299}
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1299, 'actor_ref': 'users/fake_user_ref'}
         r = self.client.post('/refund', headers=self.headers, json=data)
         # Check the result
 
@@ -324,6 +330,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -388,6 +395,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -454,6 +462,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -523,6 +532,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -592,6 +602,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -661,6 +672,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -730,6 +742,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -799,6 +812,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -868,6 +882,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -937,6 +952,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1006,6 +1022,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1075,6 +1092,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1143,6 +1161,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1217,6 +1236,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': True,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
