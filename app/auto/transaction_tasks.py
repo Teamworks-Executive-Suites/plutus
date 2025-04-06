@@ -1,9 +1,11 @@
 import os
+
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
+
 from app.auto._utils import app_logger
 from app.firebase_setup import db
-from app.models import ActorRole, TransactionType, Status
+from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -12,8 +14,9 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 def process_transactions():
     app_logger.info('Starting cron job to process transactions in escrow')
 
-    transactions_ref = db.collection('transactions').where(
-        filter=FieldFilter('status', '==', Status.in_escrow)).stream()
+    transactions_ref = (
+        db.collection('transactions').where(filter=FieldFilter('status', '==', Status.in_escrow)).stream()
+    )
 
     processed_trip_refs = set()
 
@@ -26,17 +29,19 @@ def process_transactions():
         trip = db.collection('trips').document(trip_ref).get()
 
         if trip.exists and trip.get('complete', False):
-            host_transactions_ref = db.collection('transactions').where(
-                filter=FieldFilter('tripRef', '==', trip_ref)
-            ).where(
-                filter=FieldFilter('receiverRole', '==', ActorRole.host)
-            ).stream()
+            host_transactions_ref = (
+                db.collection('transactions')
+                .where(filter=FieldFilter('tripRef', '==', trip_ref))
+                .where(filter=FieldFilter('receiverRole', '==', ActorRole.host))
+                .stream()
+            )
 
-            refund_transactions_ref = db.collection('transactions').where(
-                filter=FieldFilter('tripRef', '==', trip_ref)
-            ).where(
-                filter=FieldFilter('type', '==', TransactionType.refund)
-            ).stream()
+            refund_transactions_ref = (
+                db.collection('transactions')
+                .where(filter=FieldFilter('tripRef', '==', trip_ref))
+                .where(filter=FieldFilter('type', '==', TransactionType.refund))
+                .stream()
+            )
 
             host_transactions = list(host_transactions_ref)
             refund_transactions = list(refund_transactions_ref)
@@ -56,15 +61,13 @@ def process_transactions():
                                 transfer_group=trip_ref,
                             )
                             app_logger.info('Transfer created: %s', transfer)
-                            host_transaction.reference.update({
-                                'status': Status.completed,
-                                'transferId': transfer.id
-                            })
+                            host_transaction.reference.update({'status': Status.completed, 'transferId': transfer.id})
                         except Exception as e:
                             app_logger.error('Failed to create transfer: %s', str(e))
             else:
                 total_owed = sum(t.get('grossFeeCents') for t in host_transactions) - sum(
-                    t.get('grossFeeCents') for t in refund_transactions)
+                    t.get('grossFeeCents') for t in refund_transactions
+                )
 
                 host_fee, guest_fee, net_fee = calculate_fees(total_owed)
 
@@ -82,7 +85,7 @@ def process_transactions():
                     'tripRef': trip_ref,
                     'refundedAmountCents': 0,
                     'paymentIntentIds': [],
-                    'mergedTransactions': [t.id for t in host_transactions]
+                    'mergedTransactions': [t.id for t in host_transactions],
                 }
                 new_transaction_ref = db.collection('transactions').add(new_transaction_data)[1]
 
@@ -102,10 +105,7 @@ def process_transactions():
                             transfer_group=trip_ref,
                         )
                         app_logger.info('Transfer created: %s', transfer)
-                        new_transaction_ref.update({
-                            'status': Status.completed,
-                            'transferId': transfer.id
-                        })
+                        new_transaction_ref.update({'status': Status.completed, 'transferId': transfer.id})
                     except Exception as e:
                         app_logger.error('Failed to create transfer: %s', str(e))
 

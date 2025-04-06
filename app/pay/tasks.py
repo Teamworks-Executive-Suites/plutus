@@ -4,7 +4,7 @@ from datetime import timedelta
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.firebase_setup import current_time, db, HOST_FEE, GUEST_FEE
+from app.firebase_setup import GUEST_FEE, HOST_FEE, current_time, db
 from app.models import ActorRole, Status, Transaction, TransactionType
 from app.pay._utils import app_logger
 
@@ -455,7 +455,7 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
     transaction = Transaction(
         actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.host,
-        recipientRef=trip.get("userRef"),
+        recipientRef=trip.get('userRef'),
         recipientRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
