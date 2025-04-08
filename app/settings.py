@@ -35,8 +35,8 @@ class Settings(BaseSettings):
     t_from_number: str = ''
     t_messaging_service_sid: str = ''
 
-
     platform_user_id: str = 'ovd8KQBXVpdw1n0H3AXlKN7AHDr2'
+
     # Firebase Creds
     @property
     def firebase_credentials(self):

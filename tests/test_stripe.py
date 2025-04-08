@@ -8,7 +8,6 @@ from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
 from app.firebase_setup import MOCK_DB, current_time
 from app.main import app
-from app.models import Transaction, ActorRole, TransactionType, Status
 from app.utils import settings
 
 # Set settings.testing to True before importing app/firebase_setup.py
@@ -1547,6 +1546,3 @@ class StripeTransactions(TestCase):
     #
     #
     #     # check
-
-
-
