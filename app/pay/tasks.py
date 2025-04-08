@@ -7,6 +7,7 @@ from google.cloud.firestore_v1 import FieldFilter
 from app.firebase_setup import GUEST_FEE, HOST_FEE, current_time, db
 from app.models import ActorRole, Status, Transaction, TransactionType
 from app.pay._utils import app_logger
+from app.utils import settings
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
@@ -141,8 +142,8 @@ def handle_refund(trip_ref, amount, actor_ref):
     client_transaction = Transaction(
         actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.platform,
-        recipientRef=f'users/{trip.get("userRef")}',
-        recipientRole=ActorRole.client,
+        receiverRef=f'users/{trip.get("userRef")}',
+        receiverRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
         type=TransactionType.refund,
@@ -166,8 +167,8 @@ def handle_refund(trip_ref, amount, actor_ref):
     host_transaction = Transaction(
         actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.host,
-        recipientRef='platform',
-        recipientRole=ActorRole.platform,
+        receiverRef='platform',
+        receiverRole=ActorRole.platform,
         transferId=None,
         status=Status.in_escrow,
         type=TransactionType.refund,
@@ -270,8 +271,8 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             client_transaction = Transaction(
                 actorRef=f'users/{actor_ref}',
                 actorRole=ActorRole.client,
-                recipientRef='platform',
-                recipientRole=ActorRole.platform,
+                receiverRef=f'users/{settings.platform_user_id}',
+                receiverRole=ActorRole.platform,
                 transferId=None,
                 status=Status.completed,
                 type=TransactionType.payment,
@@ -292,10 +293,10 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
 
             # transaction from platform to host
             host_transaction = Transaction(
-                actorRef='platform',
+                actorRef=f'users/{settings.platform_user_id}',
                 actorRole=ActorRole.platform,
-                recipientRef=trip.get('propertyRef'),
-                recipientRole=ActorRole.host,
+                receiverRef=trip.get('propertyRef'),
+                receiverRole=ActorRole.host,
                 transferId=None,
                 status=Status.in_escrow,
                 type=TransactionType.payment,
@@ -459,8 +460,8 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
     transaction = Transaction(
         actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.host,
-        recipientRef=trip.get('userRef'),
-        recipientRole=ActorRole.client,
+        receiverRef=trip.get('userRef'),
+        receiverRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
         type=TransactionType.refund,

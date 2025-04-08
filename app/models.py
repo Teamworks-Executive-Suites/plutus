@@ -147,19 +147,22 @@ class TransactionType(str, Enum):
 class Transaction(BaseModel):
     actorRef: str
     actorRole: ActorRole
-    recipientRef: str
-    recipientRole: ActorRole
+    receiverRef: str
+    receiverRole: ActorRole
     transferId: Optional[str]
     status: Status
     type: TransactionType
     createdAt: datetime
     processedAt: datetime
     notes: Optional[str]
-    guestFeeCents: int
-    hostFeeCents: int
-    netFeeCents: int
-    grossFeeCents: int
+    guestFeeCents: Optional[int]
+    hostFeeCents: Optional[int]
+    netFeeCents: Optional[int]
+    grossFeeCents: Optional[int]
     tripRef: str
-    refundedAmountCents: int
-    paymentIntentIds: List[str]
-    mergedTransactions: List[str]
+    refundedAmountCents: Optional[int]
+    paymentIntentIds: Optional[List[str]]
+    mergedTransactions: Optional[List[str]]
+
+    def to_dict(self):
+        return self.model_dump()
