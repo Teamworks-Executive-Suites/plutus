@@ -377,9 +377,7 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     app_logger.info('Guest name: %s', guest_name)
 
                     # Construct the booking link
-                    booking_link = (
-                        f'{settings.app_url}/tripDetails?tripPassed={trip_document_id}&property={property_document_id}'
-                    )
+                    booking_link = f'{settings.app_url}/bookingDetails?tripPassed={trip_document_id}&property={property_document_id}'
 
                     # Set the event summary based on whether the trip is blocked or not
                     if trip_doc.get('isBlocked'):

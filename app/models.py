@@ -1,40 +1,43 @@
 from datetime import datetime
-from typing import Any, Optional, Union
+from enum import Enum
+from typing import Any, List, Optional, Union
 
-from logfire.integrations.pydantic_plugin import PluginSettings
 from pydantic import BaseModel, Field
 
 
-class Name(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Name(BaseModel):
     name: str
 
 
-class CancelRefund(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class CancelRefund(BaseModel):
     trip_ref: str
     full_refund: bool
+    actor_ref: str
 
 
-class ExtraCharge(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class ExtraCharge(BaseModel):
     trip_ref: str
     dispute_ref: str
+    actor_ref: str
 
 
-class Refund(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Refund(BaseModel):
     trip_ref: str
     amount: int
+    actor_ref: str
 
 
-class PropertyCal(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class PropertyCal(BaseModel):
     property_ref: str
     cal_id: str
 
 
-class TripCal(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class TripCal(BaseModel):
     cal_id: str
     trip_ref: str
 
 
-class Event(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Event(BaseModel):
     kind: str = Field(..., pattern='^calendar#event$')
     id: str
     status: str
@@ -44,7 +47,7 @@ class Event(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})
     end: dict
 
 
-class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class TripData(BaseModel):
     isExternal: bool
     isInquiry: bool
     propertyRef: Any
@@ -55,48 +58,48 @@ class TripData(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all
     eventSummary: str
 
 
-class EventFromTrip(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class EventFromTrip(BaseModel):
     trip_ref: str
     property_ref: str
 
 
-class PropertyRef(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class PropertyRef(BaseModel):
     property_ref: str
 
 
-class DeleteWebhookChannel(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class DeleteWebhookChannel(BaseModel):
     id: str
     resourceId: str
 
 
-class UnauthorizedMessage(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class UnauthorizedMessage(BaseModel):
     detail: str = 'Bearer token missing or unknown'
 
 
-class Creator(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Creator(BaseModel):
     email: str
 
 
-class Organizer(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Organizer(BaseModel):
     email: str
     displayName: str
     self: bool
 
 
-class DateTime(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class DateTime(BaseModel):
     dateTime: str
     timeZone: str
 
 
-class Date(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Date(BaseModel):
     date: str
 
 
-class Reminders(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class Reminders(BaseModel):
     useDefault: bool
 
 
-class GCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class GCalEvent(BaseModel):
     kind: str
     etag: str
     id: str
@@ -115,8 +118,51 @@ class GCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'al
     eventType: str
 
 
-class CancelledGCalEvent(BaseModel, plugin_settings=PluginSettings(logfire={'record': 'all'})):
+class CancelledGCalEvent(BaseModel):
     kind: str
     etag: str
     id: str
     status: str
+
+
+class ActorRole(str, Enum):
+    platform = 'platform'
+    client = 'client'
+    host = 'host'
+
+
+class Status(str, Enum):
+    completed = 'completed'
+    in_escrow = 'in_escrow'
+    failed = 'failed'
+    merged = 'merged'
+
+
+class TransactionType(str, Enum):
+    payment = 'payment'
+    transfer = 'transfer'
+    refund = 'refund'
+
+
+class Transaction(BaseModel):
+    actorRef: str
+    actorRole: ActorRole
+    receiverRef: str
+    receiverRole: ActorRole
+    transferId: Optional[str]
+    status: Status
+    type: TransactionType
+    createdAt: datetime
+    processedAt: datetime
+    notes: Optional[str]
+    guestFeeCents: Optional[int]
+    hostFeeCents: Optional[int]
+    netFeeCents: Optional[int]
+    grossFeeCents: Optional[int]
+    tripRef: str
+    refundedAmountCents: Optional[int]
+    paymentIntentIds: Optional[List[str]]
+    mergedTransactions: Optional[List[str]]
+
+    def to_dict(self):
+        return self.model_dump()

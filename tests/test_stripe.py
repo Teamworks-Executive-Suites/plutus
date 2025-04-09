@@ -13,7 +13,6 @@ from app.utils import settings
 # Set settings.testing to True before importing app/firebase_setup.py
 settings.testing = True
 
-
 client = TestClient(app)
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -26,31 +25,37 @@ class FakeFirestore:
             'trips': {
                 'fake_trip_ref': {
                     'id': 'fake_trip_ref',
-                    'cancelTrip': False,
-                    'complete': False,
-                    'editedTripRef': '',
-                    'guests': [],
-                    'host': '',
-                    'inquiryDescription': '',
-                    'isBlocked': False,
-                    'isExternal': False,
-                    'isInquiry': False,
-                    'isOffer': False,
-                    'isRefunded': False,
-                    'isTempEditTrip': False,
                     'propertyRef': '',
+                    'userRef': '',
+                    'tripCost': 0,
+                    'guests': 0,
+                    'tripCreated': '',
+                    'host': '',
+                    'cancelTrip': False,
+                    'upcoming': False,
+                    'complete': False,
                     'rated': False,
-                    'stripePaymentIntents': [],
+                    'tripBeginDateTime': None,
+                    'tripEndDateTime': None,
+                    'isInquiry': False,
+                    'tripTax': '',
                     'tripAddonTotal': 0,
                     'tripBaseTotal': 0,
-                    'tripBeginDateTime': None,
-                    'tripCost': 0,
-                    'tripCreated': '',
+                    'isExternal': False,
+                    'isRefunded': False,
                     'tripDate': '',
-                    'tripEndDateTime': None,
+                    'inquiryDescription': '',
+                    'isOffer': False,
                     'tripReason': '',
-                    'upcoming': False,
-                    'userRef': '',
+                    'isBlocked': False,
+                    'editedTripRef': '',
+                    'isTempEditTrip': False,
+                    'disputeRef': '',
+                    'stripePaymentIntents': [],
+                    'eventId': '',
+                    'eventSummary': '',
+                    'appliedDiscountRef': '',
+                    'appliedDiscountAmount': '',
                 }
             },
             'users': {
@@ -70,7 +75,41 @@ class FakeFirestore:
                     'uid': '',
                     'userCity': '',
                     'fcm_tokens': [],
-                }
+                },
+                'fake_host_ref': {
+                    'id': 'fake_host_ref',
+                    'bio': '',
+                    'company': '',
+                    'created_time': '',
+                    'display_name': '',
+                    'email': '',
+                    'isAdmin': False,
+                    'isHost': True,
+                    'numberProperties': 0,
+                    'phone_numbers': '',
+                    'photo_url': '',
+                    'termsandconditionsaccepted': False,
+                    'uid': '',
+                    'userCity': '',
+                    'fcm_tokens': [],
+                },
+                'fake_platform_ref': {
+                    'id': 'fake_platform_ref',
+                    'bio': '',
+                    'company': '',
+                    'created_time': '',
+                    'display_name': '',
+                    'email': '',
+                    'isAdmin': True,
+                    'isHost': True,
+                    'numberProperties': 0,
+                    'phone_numbers': '',
+                    'photo_url': '',
+                    'termsandconditionsaccepted': False,
+                    'uid': '',
+                    'userCity': '',
+                    'fcm_tokens': [],
+                },
             },
             'properties': {
                 'fake_property_ref': {
@@ -97,7 +136,57 @@ class FakeFirestore:
                     'sqft': 450,
                     'taxRate': 0,
                     'userRef': 'users/fake_user_ref',
-                }
+                },
+                'fake_host_property_ref': {
+                    'cancellationPolicy': '',
+                    'checkInInstructions': '',
+                    'cleaningFee': 0,
+                    'externalCalendar': '',
+                    'hostRules': '',
+                    'id': 'fake_host_property_ref',
+                    'isDraft': False,
+                    'isLive': True,
+                    'lastUpdated': '',
+                    'mainImage': [],
+                    'maxGuests': 0,
+                    'minHours': 4,
+                    'notes': '',
+                    'parkingInstructions': '',
+                    'price': [0, 0, 0, 0, 0, 0],
+                    'propertyAddress': '',
+                    'propertyArea': '',
+                    'propertyDescription': '',
+                    'propertyName': 'Test Property',
+                    'ratingSummary': 5,
+                    'sqft': 450,
+                    'taxRate': 0,
+                    'userRef': 'users/fake_host_ref',
+                },
+                'fake_platform_property_ref': {
+                    'cancellationPolicy': '',
+                    'checkInInstructions': '',
+                    'cleaningFee': 0,
+                    'externalCalendar': '',
+                    'hostRules': '',
+                    'id': 'fake_platform_property_ref',
+                    'isDraft': False,
+                    'isLive': True,
+                    'lastUpdated': '',
+                    'mainImage': [],
+                    'maxGuests': 0,
+                    'minHours': 4,
+                    'notes': '',
+                    'parkingInstructions': '',
+                    'price': [0, 0, 0, 0, 0, 0],
+                    'propertyAddress': '',
+                    'propertyArea': '',
+                    'propertyDescription': '',
+                    'propertyName': 'Test Property',
+                    'ratingSummary': 5,
+                    'sqft': 450,
+                    'taxRate': 0,
+                    'userRef': 'users/fake_platform_ref',
+                },
             },
             'disputes': {
                 'fake_dispute_ref': {
@@ -206,7 +295,7 @@ class StripeRefund(TestCase):
             {'stripePaymentIntents': current_intents}
         )
 
-        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099}
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099, 'actor_ref': 'users/fake_user_ref'}
         r = self.client.post('/refund', headers=self.headers, json=data)
         # Check the result
 
@@ -245,7 +334,7 @@ class StripeRefund(TestCase):
             {'stripePaymentIntents': current_intents}
         )
 
-        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1299}
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1299, 'actor_ref': 'users/fake_user_ref'}
         r = self.client.post('/refund', headers=self.headers, json=data)
         # Check the result
 
@@ -324,6 +413,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -388,6 +478,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -454,6 +545,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -523,6 +615,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -592,6 +685,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -661,6 +755,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -730,6 +825,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -799,6 +895,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -868,6 +965,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -937,6 +1035,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1006,6 +1105,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1075,6 +1175,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1143,6 +1244,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1217,6 +1319,7 @@ class StripeCancelRefund(TestCase):
         data = {
             'trip_ref': 'trips/fake_trip_ref',
             'full_refund': True,
+            'actor_ref': 'users/fake_user_ref',
         }
         r = self.client.post('/cancel_refund', headers=self.headers, json=data)
 
@@ -1324,3 +1427,122 @@ class StripeCancelRefund(TestCase):
 #         assert r.json()['details']['payment_intent']
 #
 #         self.assertEqual(r.status_code, 200)
+
+
+class StripeTransactions(TestCase):
+    def setUp(self) -> None:
+        self.client = TestClient(app)
+        self.fake_firestore = FakeFirestore()
+
+        self.customer = get_or_create_customer('test_ricky_bobby@example.com', 'Ricky Bobby')
+        self.host = get_or_create_customer('amazing.offices@gmail.com', 'Amazing Offices')
+
+        self.platform = get_or_create_customer('support@teamworksexecutivesuites.com', 'Teamworks Executive Suites')
+
+        settings.testing = True
+        self.headers = {'Authorization': f'Bearer {settings.test_token}'}
+
+        # Create a MockFirestore instance
+        self.mock_firestore = MOCK_DB
+
+        # Set up your mock data
+        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
+            self.fake_firestore.db['trips']['fake_trip_ref']
+        )
+        self.mock_firestore.collection('properties').document('fake_property_ref').set(
+            self.fake_firestore.db['properties']['fake_property_ref']
+        )
+        # Add property_ref to the trip document
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'propertyRef': 'fake_property_ref'})
+
+    # def test_simple_payment_2_transactions_extra_charge(self):
+    #     """
+    #     This test has 2 payment intents
+    #     :return:
+    #     """
+    #
+    #     # Create a Stripe PaymentIntent
+    #     pi = stripe.PaymentIntent.create(
+    #         amount=1099,
+    #         currency='usd',
+    #         customer=self.customer.id,
+    #         payment_method='pm_card_visa',
+    #         off_session=True,
+    #         confirm=True,
+    #     )
+    #
+    #
+    #     # Add payment to trip
+    #     self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+    #         {'stripePaymentIntents': [pi.id]}
+    #     )
+    #
+    #     # create the transactions
+    #
+    #     client_transaction = Transaction(
+    #         actorRef='users/fake_user_ref',
+    #         actorRole=ActorRole.client,
+    #         receiverRef='users/fake_platform_ref',
+    #         receiverRole=ActorRole.platform,
+    #         transferId='',
+    #         status=Status.completed,
+    #         type=TransactionType.payment,
+    #         createdAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
+    #         processedAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
+    #         notes='Test transaction from guest to platform',
+    #         grossAmountCents=1099,
+    #         guestFeeCents=0,
+    #         hostFeeCents=0,
+    #         netFeeCents=0,
+    #         grossFeeCents=0,
+    #         tripRef='trips/fake_trip_ref',
+    #         refundedAmountCents=0,
+    #         paymentIntentIds=[pi.id],
+    #         mergedTransactions=[],
+    #     )
+    #
+    #     host_transaction = Transaction(
+    #         actorRef='users/fake_host_ref',
+    #         actorRole=ActorRole.host,
+    #         receiverRef='users/fake_platform_ref',
+    #         receiverRole=ActorRole.platform,
+    #         transferId='',
+    #         status=Status.in_escrow,
+    #         type=TransactionType.transfer,
+    #         createdAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
+    #         processedAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
+    #         notes='Test transaction from host to platform',
+    #         grossAmountCents=1099,
+    #         guestFeeCents=0,
+    #         hostFeeCents=0,
+    #         netFeeCents=0,
+    #         grossFeeCents=0,
+    #         tripRef='trips/fake_trip_ref',
+    #         refundedAmountCents=0,
+    #         paymentIntentIds=[],
+    #         mergedTransactions=[],
+    #     )
+    #
+    #     # Add the transactions to the mock firestore
+    #     self.mock_firestore.collection('transactions').document('fake_transaction_ref').set(
+    #         client_transaction.to_dict()
+    #     )
+    #     self.mock_firestore.collection('transactions').document('fake_transaction_ref_host').set(
+    #         host_transaction.to_dict()
+    #     )
+    #
+    #     # a refund is triggered
+    #
+    #     data = {
+    #         'trip_ref': 'trips/fake_trip_ref',
+    #         'full_refund': True,
+    #         'actor_ref': 'users/fake_user_ref',
+    #     }
+    #     r = self.client.post('/cancel_refund', headers=self.headers, json=data)
+    #
+    #     # Check the result
+    #     assert r.json()['status'] == 200
+    #     assert r.json()['message'] == 'Refund processed.'
+    #
+    #
+    #     # check

@@ -4,10 +4,39 @@ from datetime import timedelta
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.firebase_setup import current_time, db
+from app.firebase_setup import GUEST_FEE, HOST_FEE, current_time, db
+from app.models import ActorRole, Status, Transaction, TransactionType
 from app.pay._utils import app_logger
+from app.utils import settings
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
+
+def calculate_fee(amount_cents, fee_rate):
+    """
+    Calculate the fee for a given amount.
+    :param amount_cents:
+    :param fee_rate:
+    :return:
+    """
+    app_logger.info('Calculating fee for amount: %s', amount_cents)
+    fee = int(amount_cents * fee_rate)
+    app_logger.info('Fee calculated: %s', fee)
+    return fee
+
+
+def calculate_fees(amount_cents):
+    """
+    Calculate the fees for a given amount.
+    :param amount_cents:
+    :return host_fee, guest_fee:
+    """
+    app_logger.info('Calculating fees for amount: %s', amount_cents)
+    host_fee = calculate_fee(amount_cents, HOST_FEE)
+    guest_fee = calculate_fee(amount_cents, GUEST_FEE)
+    net_fee = amount_cents - host_fee - guest_fee
+    app_logger.info('Fees calculated: %s', {'host_fee': host_fee, 'guest_fee': guest_fee, 'net_fee': net_fee})
+    return host_fee, guest_fee, net_fee
 
 
 # Stripe stuff
@@ -56,11 +85,12 @@ def process_refund(charge_id, amount):
         return f'An error occurred: {str(e)}'
 
 
-def handle_refund(trip_ref, amount):
+def handle_refund(trip_ref, amount, actor_ref):
     """
     Handle a refund for a given trip.
     :param trip_ref:
     :param amount:
+    :param actor_ref:
     :return:
     """
     app_logger.info('handle_refund called with trip_ref: %s', trip_ref)
@@ -107,6 +137,56 @@ def handle_refund(trip_ref, amount):
             total_refunded += refund_amount
             remaining_refund -= refund_amount
 
+    # transaction from platform to client
+
+    client_transaction = Transaction(
+        actorRef=f'users/{actor_ref}',
+        actorRole=ActorRole.platform,
+        receiverRef=f'users/{trip.get("userRef")}',
+        receiverRole=ActorRole.client,
+        transferId=None,
+        status=Status.completed,
+        type=TransactionType.refund,
+        createdAt=current_time,
+        processedAt=current_time,
+        notes='Refund processed on plutus',
+        guestFeeCents=0,
+        hostFeeCents=0,
+        netFeeCents=0,
+        grossFeeCents=0,
+        tripRef=trip_ref,
+        refundedAmountCents=total_refunded,
+        paymentIntentIds=payment_intent_ids,
+        mergedTransactions=[],
+    ).dict()
+
+    db.collection('transactions').add(client_transaction)
+
+    # transaction from host to platform
+
+    host_transaction = Transaction(
+        actorRef=f'users/{actor_ref}',
+        actorRole=ActorRole.host,
+        receiverRef='platform',
+        receiverRole=ActorRole.platform,
+        transferId=None,
+        status=Status.in_escrow,
+        type=TransactionType.refund,
+        createdAt=current_time,
+        processedAt=current_time,
+        notes='Refund processed on plutus',
+        guestFeeCents=0,
+        hostFeeCents=0,
+        netFeeCents=0,
+        grossFeeCents=0,
+        tripRef=trip_ref,
+        refundedAmountCents=total_refunded,
+        paymentIntentIds=payment_intent_ids,
+        mergedTransactions=[],
+    ).dict()
+
+    db.collection('transactions').add(host_transaction)
+
     response = {
         'status': 200 if remaining_refund == 0 else 206,
         'message': 'Refund processed successfully.'
@@ -118,7 +198,7 @@ def handle_refund(trip_ref, amount):
     return response
 
 
-def process_extra_charge(trip_ref, dispute_ref):
+def process_extra_charge(trip_ref, dispute_ref, actor_ref):
     """
     Process an extra charge for a given trip in the case of a dispute.
 
@@ -183,7 +263,68 @@ def process_extra_charge(trip_ref, dispute_ref):
 
         app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
 
+        host_fee, guest_fee, net_fee = calculate_fees(dispute.get('disputeAmount'))
+
+        try:
+            # create the transactions for the extra charge
+            # transaction from client to platform
+            client_transaction = Transaction(
+                actorRef=f'users/{actor_ref}',
+                actorRole=ActorRole.client,
+                receiverRef=f'users/{settings.platform_user_id}',
+                receiverRole=ActorRole.platform,
+                transferId=None,
+                status=Status.completed,
+                type=TransactionType.payment,
+                createdAt=current_time,
+                processedAt=current_time,
+                notes='Extra charge processed on plutus',
+                guestFeeCents=0,
+                hostFeeCents=0,
+                netFeeCents=0,
+                grossFeeCents=dispute.get('disputeAmount'),
+                tripRef=trip_ref,
+                refundedAmountCents=0,
+                paymentIntentIds=[extra_charge_pi.id],
+                mergedTransactions=[],
+            ).dict()
+
+            db.collection('transactions').add(client_transaction)
+
+            # transaction from platform to host
+            host_transaction = Transaction(
+                actorRef=f'users/{settings.platform_user_id}',
+                actorRole=ActorRole.platform,
+                receiverRef=trip.get('propertyRef'),
+                receiverRole=ActorRole.host,
+                transferId=None,
+                status=Status.in_escrow,
+                type=TransactionType.payment,
+                createdAt=current_time,
+                processedAt=current_time,
+                notes='Extra charge processed on plutus',
+                guestFeeCents=guest_fee,
+                hostFeeCents=host_fee,
+                netFeeCents=net_fee,
+                grossFeeCents=dispute.get('disputeAmount'),
+                tripRef=trip_ref,
+                refundedAmountCents=0,
+                paymentIntentIds=[extra_charge_pi.id],
+                mergedTransactions=[],
+            ).dict()
+
+            db.collection('transactions').add(host_transaction)
+
+        except Exception as e:
+            response['status'] = 500
+            response['message'] = 'An unexpected error occurred while processing the extra charge.'
+            response['details']['error_message'] = str(e)
+
+            app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
+            return response
+
         return response
+
     except stripe.error.CardError as e:
         err = e.error
         response['status'] = 400
@@ -203,7 +344,7 @@ def process_extra_charge(trip_ref, dispute_ref):
         return response
 
 
-def process_cancel_refund(trip_ref, full_refund=False):
+def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
     """
     Process a refund for a given trip based on the cancellation policy of the property.
 
@@ -314,6 +455,30 @@ def process_cancel_refund(trip_ref, full_refund=False):
                         'payment_intent_id': payment_intent_id,
                     }
                 )
+
+    # create a refund transaction document
+    transaction = Transaction(
+        actorRef=f'users/{actor_ref}',
+        actorRole=ActorRole.host,
+        receiverRef=trip.get('userRef'),
+        receiverRole=ActorRole.client,
+        transferId=None,
+        status=Status.completed,
+        type=TransactionType.refund,
+        createdAt=current_time,
+        processedAt=current_time,
+        notes='Refund processed on plutus',
+        guestFeeCents=0,
+        hostFeeCents=0,
+        netFeeCents=0,
+        grossFeeCents=0,
+        tripRef=trip_ref,
+        refundedAmountCents=total_refunded,
+        paymentIntentIds=payment_intent_ids,
+        mergedTransactions=[],
+    ).dict()
+
+    db.collection('transactions').add(transaction)
 
     response = {
         'status': 200,
