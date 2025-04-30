@@ -29,6 +29,10 @@ class Settings(BaseSettings):
 
     g_calendar_resource_id: str = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
 
+    # Firebase Remote Config
+    host_fee: float = 0.15
+    guest_fee: float = 0.05
+
     # Twilio
     t_account_sid: str = ''
     t_auth_token: str = ''

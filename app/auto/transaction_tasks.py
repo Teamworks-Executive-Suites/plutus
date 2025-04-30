@@ -5,7 +5,7 @@ import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.auto._utils import app_logger
-from app.firebase_setup import db, current_time
+from app.firebase_setup import current_time, db
 from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
 from app.utils import settings
@@ -66,14 +66,17 @@ def process_transactions():
                                         transfer_group=trip_ref,
                                     )
                                     app_logger.info('Transfer created: %s', transfer)
-                                    host_transaction.reference.update({'status': Status.completed, 'transferId': transfer.id})
+                                    host_transaction.reference.update(
+                                        {'status': Status.completed, 'transferId': transfer.id}
+                                    )
                                 except Exception as e:
                                     app_logger.error('Failed to create transfer: %s', str(e))
                             elif host_transaction.get('receiverRef') == f'users/{settings.platform_user_id}':
                                 host_transaction.reference.update({'status': Status.completed})
                             else:
                                 app_logger.error(
-                                    'No Stripe account ID for user %s, unable to process transfer,', host_transaction.get('receiverRef')
+                                    'No Stripe account ID for user %s, unable to process transfer,',
+                                    host_transaction.get('receiverRef'),
                                 )
 
                     else:

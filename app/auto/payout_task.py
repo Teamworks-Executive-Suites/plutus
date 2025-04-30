@@ -2,8 +2,9 @@ import os
 
 import logfire
 import stripe
+
 from app.auto._utils import app_logger
-from app.firebase_setup import db, current_time
+from app.firebase_setup import current_time, db
 from app.models import Status
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
@@ -14,11 +15,7 @@ def process_platform_payout():
         app_logger.info('Starting task to process platform payout')
 
         # Query all transactions excluding those in escrow
-        transactions_ref = (
-            db.collection('transactions')
-            .where('status', '!=', Status.in_escrow)
-            .stream()
-        )
+        transactions_ref = db.collection('transactions').where('status', '!=', Status.in_escrow).stream()
 
         total_balance = 0
         transaction_ids = []

@@ -48,6 +48,7 @@ class Event(BaseModel):
 
 
 class TripData(BaseModel):
+    tripCreated: datetime
     isExternal: bool
     isInquiry: bool
     propertyRef: Any

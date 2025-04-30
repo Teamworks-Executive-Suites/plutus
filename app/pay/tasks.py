@@ -4,7 +4,7 @@ from datetime import timedelta
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.firebase_setup import GUEST_FEE, HOST_FEE, current_time, db
+from app.firebase_setup import current_time, db
 from app.models import ActorRole, Status, Transaction, TransactionType
 from app.pay._utils import app_logger
 from app.utils import settings
@@ -32,8 +32,8 @@ def calculate_fees(amount_cents):
     :return host_fee, guest_fee:
     """
     app_logger.info('Calculating fees for amount: %s', amount_cents)
-    host_fee = calculate_fee(amount_cents, HOST_FEE)
-    guest_fee = calculate_fee(amount_cents, GUEST_FEE)
+    host_fee = calculate_fee(amount_cents, settings.host_fee)
+    guest_fee = calculate_fee(amount_cents, settings.guest_fee)
     net_fee = amount_cents - host_fee - guest_fee
     app_logger.info('Fees calculated: %s', {'host_fee': host_fee, 'guest_fee': guest_fee, 'net_fee': net_fee})
     return host_fee, guest_fee, net_fee

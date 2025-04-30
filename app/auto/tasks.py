@@ -222,11 +222,12 @@ def auto_complete_and_notify():
                             continue  # Changed from return to continue to process the next trip
 
                         if (not trip.to_dict().get('complete', False) or trip.to_dict().get('upcoming', False)) and (
-                                'tripEndDateTime' in trip.to_dict() and current_time > trip.get('tripEndDateTime')
+                            'tripEndDateTime' in trip.to_dict() and current_time > trip.get('tripEndDateTime')
                         ):
                             try:
                                 trip.reference.update(
-                                    {'complete': True, 'competeDate': current_time, 'upcoming': False})
+                                    {'complete': True, 'competeDate': current_time, 'upcoming': False}
+                                )
                                 app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
 
                                 complete_trip_sms(trip.reference, prop.reference)
