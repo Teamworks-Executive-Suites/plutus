@@ -8,6 +8,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.auth.views import auth_router
 from app.auto.cal_tasks import auto_check_and_renew_channels
+from app.auto.payout_task import process_platform_payout
 from app.auto.tasks import auto_complete_and_notify
 from app.auto.transaction_tasks import process_transactions
 from app.cal.views import cal_router
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     scheduler = BackgroundScheduler()
     scheduler.add_job(auto_complete_and_notify, 'interval', hours=1)
     scheduler.add_job(process_transactions, 'interval', hours=1)
+    scheduler.add_job(process_platform_payout, 'interval', hours=1)
 
     scheduler.start()
     app_logger.info('Scheduler initialized and started')
