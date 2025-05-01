@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     auto_complete_and_notify()
     auto_check_and_renew_channels(force_renew=False)
     process_transactions()
+    process_platform_payout()
 
     scheduler = BackgroundScheduler()
     scheduler.add_job(auto_complete_and_notify, 'interval', hours=1)
