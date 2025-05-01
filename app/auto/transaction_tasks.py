@@ -24,15 +24,17 @@ def process_transactions():
         processed_trip_refs = set()
 
         for transaction in transactions_ref:
-            trip_ref = transaction.get('tripRef')
+            transaction_doc = db.collection('transactions').document(transaction.id).get()
+            trip_ref = (transaction_doc.get('tripRef')).id
 
             if trip_ref in processed_trip_refs:
                 continue
 
             trip = db.collection('trips').document(trip_ref).get()
 
-            if trip.exists and trip.get('complete', False):
-                complete_date = trip.get('completeDate')
+            if trip.exists and trip.get('complete'):
+                trip_data = trip.to_dict()
+                complete_date = trip_data.get('completeDate')
                 if complete_date and (current_time - complete_date).days >= 10:
                     host_transactions_ref = (
                         db.collection('transactions')

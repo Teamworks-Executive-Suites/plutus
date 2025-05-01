@@ -1,4 +1,3 @@
-import asyncio
 import logging.config
 from contextlib import asynccontextmanager
 
@@ -19,19 +18,6 @@ from app.pay.views import stripe_router
 from app.utils import app_logger, settings
 
 
-# Synchronous wrapper functions for async tasks
-def run_auto_complete_and_notify():
-    asyncio.run(auto_complete_and_notify())
-
-
-def run_process_transactions():
-    asyncio.run(process_transactions())
-
-
-def run_process_platform_payout():
-    asyncio.run(process_platform_payout())
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     app_logger.info('startup')
@@ -40,24 +26,15 @@ async def lifespan(app: FastAPI):
     auto_check_and_renew_channels(force_renew=False)
     process_transactions()
 
-    # Ensure async functions are awaited
-    await auto_complete_and_notify()
-    await auto_check_and_renew_channels(force_renew=False)
-    await process_transactions()
-
-    # Initialize and start the scheduler
     scheduler = BackgroundScheduler()
-    scheduler.add_job(run_auto_complete_and_notify, 'interval', hours=1)
-    scheduler.add_job(run_process_transactions, 'interval', hours=1)
-    scheduler.add_job(run_process_platform_payout, 'interval', hours=1)
+    scheduler.add_job(auto_complete_and_notify, 'interval', hours=1)
+    scheduler.add_job(process_transactions, 'interval', hours=1)
+    scheduler.add_job(process_platform_payout, 'interval', hours=1)
 
     scheduler.start()
     app_logger.info('Scheduler initialized and started')
 
     yield
-
-    # Shutdown the scheduler on app shutdown
-    scheduler.shutdown()
 
 
 app = FastAPI(lifespan=lifespan)
