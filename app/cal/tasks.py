@@ -102,6 +102,10 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
                     events = events_result.get('items', [])
                     app_logger.info('%s events found in calendar: %s', len(events), calendar_id)
                     for event in events:
+                        if 'Buffer Time' in event['summary']:
+                            # Skip the event if it contains 'Buffer Time' in the summary
+                            app_logger.info('Skipping event with Buffer Time in summary: %s', event.summary)
+                            continue
                         try:
                             # Validate the event data with the appropriate model
                             if event['status'] == 'cancelled':
@@ -222,8 +226,8 @@ def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
     Update an existing trip in the Firestore database from the Google Calendar event, We also remove the buffer from
     the start and end time
     """
-    trip_data.tripBeginDateTime = trip_data.tripBeginDateTime + timedelta(minutes=settings.buffer_time)
-    trip_data.tripEndDateTime = trip_data.tripEndDateTime - timedelta(minutes=settings.buffer_time)
+    trip_data.tripBeginDateTime = trip_data.tripBeginDateTime - timedelta(minutes=settings.buffer_time)
+    trip_data.tripEndDateTime = trip_data.tripEndDateTime + timedelta(minutes=settings.buffer_time)
     trip_ref.reference.update(trip_data.dict())
     app_logger.info('Updated trip for event: %s, trip ref: %s', event.id, trip_ref.id)
 
