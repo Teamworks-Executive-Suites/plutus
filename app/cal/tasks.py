@@ -102,10 +102,6 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
                     events = events_result.get('items', [])
                     app_logger.info('%s events found in calendar: %s', len(events), calendar_id)
                     for event in events:
-                        if 'Buffer Time' in event['summary']:
-                            # Skip the event if it contains 'Buffer Time' in the summary
-                            app_logger.info('Skipping event with Buffer Time in summary: %s', event.summary)
-                            continue
                         try:
                             # Validate the event data with the appropriate model
                             if event['status'] == 'cancelled':
@@ -143,8 +139,12 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
                     raise HTTPException(status_code=500, detail=str(e))
 
 
-def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData:
+def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData | None:
     with logfire.span('convert_event_to_trip_data'):
+        if 'Buffer Time' in event['summary']:
+            # Skip the event if it contains 'Buffer Time' in the summary
+            app_logger.info('Skipping event with Buffer Time in summary: %s', event.summary)
+            return None
         if isinstance(event.start, Date):
             # Fetch the property document
             property_doc = property_doc_ref.get()
@@ -214,6 +214,9 @@ def handle_cancelled_event(event: CancelledGCalEvent):
 
 def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
     trip_data = convert_event_to_trip_data(event, property_doc_ref)
+    if not trip_data:
+        app_logger.info('Trip data is None, skipping event: %s', event.id)
+        return
     existing_trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
     if existing_trip_ref:
         update_existing_trip(existing_trip_ref[0], trip_data, event)
