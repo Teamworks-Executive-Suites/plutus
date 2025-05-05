@@ -141,7 +141,7 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
 
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData | None:
     with logfire.span('convert_event_to_trip_data'):
-        if 'Buffer Time' in event['summary']:
+        if 'Buffer Time' in event.summary:
             # Skip the event if it contains 'Buffer Time' in the summary
             app_logger.info('Skipping event with Buffer Time in summary: %s', event.summary)
             return None
