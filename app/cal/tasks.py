@@ -226,11 +226,8 @@ def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
 
 def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
     """
-    Update an existing trip in the Firestore database from the Google Calendar event, We also remove the buffer from
-    the start and end time
+    Update an existing trip in the Firestore database from the Google Calendar event,
     """
-    trip_data.tripBeginDateTime = trip_data.tripBeginDateTime - timedelta(minutes=settings.buffer_time)
-    trip_data.tripEndDateTime = trip_data.tripEndDateTime + timedelta(minutes=settings.buffer_time)
     trip_ref.reference.update(trip_data.dict())
     app_logger.info('Updated trip for event: %s, trip ref: %s', event.id, trip_ref.id)
 
@@ -349,7 +346,8 @@ def create_events_for_future_trips(property_doc_id: str):
 
 def create_or_update_event_from_trip(property_ref, trip_ref):
     """
-    Create or update an event on the Google Calendar associated with the property
+    Create or update an event on the Google Calendar associated with the property,
+    including buffer time events before and after the main event.
     """
     with logfire.span('create_or_update_event_from_trip'):
         # Fetch the specific property document
@@ -394,40 +392,58 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     else:
                         summary = f'Office Booking for {guest_name} | Teamworks'
 
-                    # Convert the trip data to Google Calendar event format
-                    # Add 30-minute buffer time to either side of the event
-                    event_data = {
-                        'summary': summary,  # Generate the event name
-                        'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
-                        # Add the event description
-                        'start': {
-                            'dateTime': (
-                                trip_data['tripBeginDateTime'] - timedelta(minutes=settings.buffer_time)
-                            ).isoformat(),
-                            'timeZone': 'UTC',
-                        },
-                        'end': {
-                            'dateTime': (
-                                trip_data['tripEndDateTime'] + timedelta(minutes=settings.buffer_time)
-                            ).isoformat(),
-                            'timeZone': 'UTC',
-                        },
-                    }
-                    app_logger.info('Event data: %s', event_data)
+                    # Calculate the buffer times
+                    buffer_duration = timedelta(minutes=settings.buffer_time)
+                    main_start = trip_data['tripBeginDateTime']
+                    main_end = trip_data['tripEndDateTime']
+                    buffer_start = main_start - buffer_duration
+                    buffer_end = main_end + buffer_duration
 
-                    # Call the Google Calendar API to update or create the event
+                    # Adjust the main event times
+                    adjusted_start = main_start
+                    adjusted_end = main_end
+
+                    # Create the main event data
+                    main_event_data = {
+                        'summary': summary,
+                        'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
+                        'start': {'dateTime': adjusted_start.isoformat(), 'timeZone': 'UTC'},
+                        'end': {'dateTime': adjusted_end.isoformat(), 'timeZone': 'UTC'},
+                    }
+
+                    # Create the buffer events data
+                    buffer_before_data = {
+                        'summary': f'Buffer Time for {summary}',
+                        'start': {'dateTime': buffer_start.isoformat(), 'timeZone': 'UTC'},
+                        'end': {'dateTime': main_start.isoformat(), 'timeZone': 'UTC'},
+                    }
+                    buffer_after_data = {
+                        'summary': f'Buffer Time for {summary}',
+                        'start': {'dateTime': main_end.isoformat(), 'timeZone': 'UTC'},
+                        'end': {'dateTime': buffer_end.isoformat(), 'timeZone': 'UTC'},
+                    }
+
+                    # Call the Google Calendar API to update or create the events
                     service = build('calendar', 'v3', credentials=creds)
+
+                    # Handle the main event
                     if 'eventId' in trip_data:
-                        app_logger.info('Updating event: %s', trip_data['eventId'])
-                        event_data['id'] = trip_data['eventId']
+                        app_logger.info('Updating main event: %s', trip_data['eventId'])
+                        main_event_data['id'] = trip_data['eventId']
                         service.events().update(
-                            calendarId=calendar_id, eventId=trip_data['eventId'], body=event_data
+                            calendarId=calendar_id, eventId=trip_data['eventId'], body=main_event_data
                         ).execute()
                     else:
-                        # get the event id and add it to the trip document
-                        event = service.events().insert(calendarId=calendar_id, body=event_data).execute()
-                        app_logger.info('Created event: %s', event['id'])
+                        event = service.events().insert(calendarId=calendar_id, body=main_event_data).execute()
+                        app_logger.info('Created main event: %s', event['id'])
                         trip_doc.reference.update({'eventId': event['id']})
+
+                    # Create the buffer events
+                    app_logger.info('Creating buffer before event')
+                    service.events().insert(calendarId=calendar_id, body=buffer_before_data).execute()
+
+                    app_logger.info('Creating buffer after event')
+                    service.events().insert(calendarId=calendar_id, body=buffer_after_data).execute()
 
                 else:
                     app_logger.error('User document does not exist for: %s', trip_data['userRef'])
