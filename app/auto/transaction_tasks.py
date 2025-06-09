@@ -20,6 +20,7 @@ def process_transactions():
         transactions_ref = (
             db.collection('transactions').where(filter=FieldFilter('status', '==', Status.in_escrow)).stream()
         )
+        app_logger.info('Found %d transactions in escrow', len(list(transactions_ref)))
 
         processed_trip_refs = set()
 

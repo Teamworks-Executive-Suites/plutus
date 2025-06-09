@@ -226,7 +226,7 @@ def auto_complete_and_notify():
                         ):
                             try:
                                 trip.reference.update(
-                                    {'complete': True, 'competeDate': current_time, 'upcoming': False}
+                                    {'complete': True, 'completeDate': current_time, 'upcoming': False}
                                 )
                                 app_logger.info('Trip %s for property %s marked as complete', trip.id, prop.id)
 
