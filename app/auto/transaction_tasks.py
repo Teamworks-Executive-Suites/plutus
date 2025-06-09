@@ -26,9 +26,10 @@ def process_transactions():
 
         for transaction in transactions_ref:
             transaction_doc = db.collection('transactions').document(transaction.id).get()
-            trip_ref = (transaction_doc.get('tripRef')).id
+            trip_ref = transaction_doc.get('tripRef')
 
             if trip_ref in processed_trip_refs:
+                app_logger.info('Skipping already processed trip: %s', trip_ref)
                 continue
 
             trip = db.collection('trips').document(trip_ref).get()
@@ -36,7 +37,10 @@ def process_transactions():
             if trip.exists and trip.get('complete'):
                 trip_data = trip.to_dict()
                 complete_date = trip_data.get('completeDate')
+                app_logger.info('Checking trip %s, complete_date: %s', trip_ref, complete_date)
                 if complete_date and (current_time - complete_date).days >= 10:
+                    app_logger.info('Trip %s is complete and eligible for processing', trip_ref)
+
                     host_transactions_ref = (
                         db.collection('transactions')
                         .where(filter=FieldFilter('tripRef', '==', trip_ref))
@@ -54,6 +58,12 @@ def process_transactions():
                     host_transactions = list(host_transactions_ref)
                     refund_transactions = list(refund_transactions_ref)
 
+                    app_logger.info(
+                        'Host transactions: %d, Refund transactions: %d',
+                        len(host_transactions),
+                        len(refund_transactions),
+                    )
+
                     if not refund_transactions:
                         for host_transaction in host_transactions:
                             receiver_ref = host_transaction.get('receiverRef')
@@ -66,7 +76,7 @@ def process_transactions():
                                         amount=host_transaction.get('hostFeeCents'),
                                         currency='usd',
                                         destination=stripe_account_id,
-                                        transfer_group=trip_ref,
+                                        transfer_group=trip_ref.id,
                                     )
                                     app_logger.info('Transfer created: %s', transfer)
                                     host_transaction.reference.update(
