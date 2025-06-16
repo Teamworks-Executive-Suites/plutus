@@ -287,7 +287,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
                 mergedTransactions=[],
-            ).dict()
+            ).model_dump()
 
             db.collection('transactions').add(client_transaction)
 
@@ -295,7 +295,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             host_transaction = Transaction(
                 actorRef=f'users/{settings.platform_user_id}',
                 actorRole=ActorRole.platform,
-                receiverRef=trip.get('propertyRef'),
+                receiverRef=trip.get('propertyRef').id if hasattr(trip.get('propertyRef'), 'id') else str(trip.get('propertyRef')),
                 receiverRole=ActorRole.host,
                 transferId=None,
                 status=Status.in_escrow,
@@ -311,7 +311,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
                 mergedTransactions=[],
-            ).dict()
+            ).model_dump()
 
             db.collection('transactions').add(host_transaction)
 
