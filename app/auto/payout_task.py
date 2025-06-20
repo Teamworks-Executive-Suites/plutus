@@ -24,7 +24,11 @@ def process_platform_payout():
             for transaction in transactions_ref:
                 transaction_doc = db.collection('transactions').document(transaction.id).get()
                 transaction_data = transaction_doc.to_dict()
-                trip_ref = (transaction_doc.get('tripRef')).id
+                trip_ref_obj = transaction_doc.get('tripRef')
+                if hasattr(trip_ref_obj, 'id'):
+                    trip_ref = trip_ref_obj.id
+                else:
+                    trip_ref = trip_ref_obj
 
                 if not trip_ref or trip_ref in processed_trip_refs:
                     continue
