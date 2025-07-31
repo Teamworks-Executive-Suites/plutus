@@ -215,21 +215,26 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
     trip = get_document_from_ref(trip_ref)
 
     if not trip.exists:
+        # Update dispute status to denied if trip not found
+        dispute = get_document_from_ref(dispute_ref)
+        if dispute and dispute.exists:
+            dispute.reference.update({'status': 'denied'})
         response['status'] = 404
         response['message'] = 'Trip document not found.'
         app_logger.error('Trip document not found')
         return response
 
     # Retrieve the dispute associated with the trip
-    # dispute = get_dispute_by_trip_ref(trip_ref)
-
     dispute = get_document_from_ref(dispute_ref)
 
-    if not dispute:
+    if not dispute or not dispute.exists:
         response['status'] = 404
         response['message'] = 'No dispute found for this trip.'
         app_logger.error('No dispute found for this trip')
         return response
+
+    # Set dispute status to pending before processing
+    dispute.reference.update({'status': 'pending'})
 
     # Avoid code duplication by retrieving PaymentIntent once
     first_payment_intent = stripe.PaymentIntent.retrieve(trip.get('stripePaymentIntents')[0])
@@ -248,8 +253,8 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             confirm=True,
         )
 
-        # Update dispute with the new PaymentIntent ID
-        dispute.reference.update({'paymentIntent': extra_charge_pi.id})
+        # Update dispute with the new PaymentIntent ID and set status to completed
+        dispute.reference.update({'paymentIntent': extra_charge_pi.id, 'status': 'completed'})
 
         # Update the trip with the new PaymentIntent ID
         current_payment_intents = trip.get('stripePaymentIntents')
@@ -314,28 +319,30 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             ).model_dump()
 
             db.collection('transactions').add(host_transaction)
-
         except Exception as e:
+            # Update dispute status to failed if transaction creation fails
+            dispute.reference.update({'status': 'failed'})
             response['status'] = 500
             response['message'] = 'An unexpected error occurred while processing the extra charge.'
             response['details']['error_message'] = str(e)
-
             app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
             return response
 
         return response
 
     except stripe.error.CardError as e:
+        # Update dispute status to failed on card error
+        dispute.reference.update({'status': 'failed'})
         err = e.error
         response['status'] = 400
         response['message'] = 'Failed to process extra charge due to a card error.'
         response['details']['error_code'] = err.code
         response['details']['error_message'] = str(e)
-
         app_logger.error('Failed to process extra charge due to a card error: %s', err.code)
-
         return response
     except Exception as e:
+        # Update dispute status to failed on general error
+        dispute.reference.update({'status': 'failed'})
         response['status'] = 500
         response['message'] = 'An unexpected error occurred while processing the extra charge.'
         response['details']['error_message'] = str(e)
