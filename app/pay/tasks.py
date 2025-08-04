@@ -300,7 +300,9 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             host_transaction = Transaction(
                 actorRef=f'users/{settings.platform_user_id}',
                 actorRole=ActorRole.platform,
-                receiverRef=trip.get('propertyRef').id if hasattr(trip.get('propertyRef'), 'id') else str(trip.get('propertyRef')),
+                receiverRef=trip.get('propertyRef').id
+                if hasattr(trip.get('propertyRef'), 'id')
+                else str(trip.get('propertyRef')),
                 receiverRole=ActorRole.host,
                 transferId=None,
                 status=Status.in_escrow,
@@ -467,7 +469,7 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
     transaction = Transaction(
         actorRef=f'users/{actor_ref}',
         actorRole=ActorRole.host,
-        receiverRef=trip.get('userRef'),
+        receiverRef=trip.get('userRef').id if hasattr(trip.get('userRef'), 'id') else str(trip.get('userRef')),
         receiverRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
