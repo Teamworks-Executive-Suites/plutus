@@ -27,6 +27,14 @@ class Refund(BaseModel):
     actor_ref: str
 
 
+class OffSessionPayment(BaseModel):
+    customer_id: str  # Guest email (will lookup Stripe customer)
+    amount: int  # Amount in cents
+    currency: str = 'usd'
+    trip_ref: str
+    guest_email: str
+
+
 class PropertyCal(BaseModel):
     property_ref: str
     cal_id: str

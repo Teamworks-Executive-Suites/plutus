@@ -497,3 +497,85 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
         'cancellation_policy': cancellation_policy,
     }
     return response
+
+
+def process_off_session_payment(customer_id, amount, currency, trip_ref, guest_email):
+    """
+    Process an off-session payment for booking directly on behalf of a guest.
+    Uses the guest's saved payment method to charge them without interaction.
+
+    :param customer_id: Guest email (will lookup Stripe customer)
+    :param amount: Amount in cents
+    :param currency: Currency code (default: 'usd')
+    :param trip_ref: Reference to the trip document
+    :param guest_email: Guest email for error messages
+    :return: Response dict with payment status
+    """
+    app_logger.info('process_off_session_payment called for trip %s, amount %s', trip_ref, amount)
+
+    try:
+        # Lookup Stripe customer by email
+        customers = stripe.Customer.list(email=guest_email, limit=1)
+
+        if not customers.data:
+            app_logger.error('No Stripe customer found for email: %s', guest_email)
+            return {
+                'status': 'failed',
+                'error': 'No payment method on file',
+            }
+
+        stripe_customer = customers.data[0]
+        app_logger.info('Found Stripe customer: %s', stripe_customer.id)
+
+        # Get customer's default payment method
+        default_pm = stripe_customer.invoice_settings.default_payment_method
+
+        if not default_pm:
+            app_logger.error('No default payment method for customer: %s', stripe_customer.id)
+            return {
+                'status': 'failed',
+                'error': 'No payment method on file',
+            }
+
+        # Create and confirm payment intent off-session
+        payment_intent = stripe.PaymentIntent.create(
+            amount=amount,
+            currency=currency,
+            customer=stripe_customer.id,
+            payment_method=default_pm,
+            off_session=True,
+            confirm=True,
+            metadata={
+                'trip_ref': trip_ref,
+                'guest_email': guest_email,
+                'booked_by_platform': 'true',
+            },
+        )
+
+        app_logger.info('Off-session payment created successfully: %s', payment_intent.id)
+
+        return {
+            'paymentIntentId': payment_intent.id,
+            'status': payment_intent.status,
+        }
+
+    except stripe.error.CardError as e:
+        app_logger.error('Card error in off-session payment: %s', str(e))
+        return {
+            'status': 'failed',
+            'error': e.user_message,
+        }
+
+    except stripe.error.AuthenticationRequired as e:
+        app_logger.error('Authentication required for off-session payment: %s', str(e))
+        return {
+            'status': 'failed',
+            'error': 'Payment requires authentication',
+        }
+
+    except Exception as e:
+        app_logger.error('Error in process_off_session_payment: %s', str(e))
+        return {
+            'status': 'failed',
+            'error': str(e),
+        }
