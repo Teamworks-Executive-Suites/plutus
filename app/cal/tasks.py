@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Union
 
 import logfire
@@ -346,8 +346,7 @@ def create_events_for_future_trips(property_doc_id: str):
 
 def create_or_update_event_from_trip(property_ref, trip_ref):
     """
-    Create or update an event on the Google Calendar associated with the property,
-    including buffer time events before and after the main event.
+    Create or update an event on the Google Calendar associated with the property.
     """
     with logfire.span('create_or_update_event_from_trip'):
         # Fetch the specific property document
@@ -392,38 +391,19 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                     else:
                         summary = f'Office Booking for {guest_name} | Teamworks'
 
-                    # Calculate the buffer times
-                    buffer_duration = timedelta(minutes=settings.buffer_time)
+                    # Get the booking start and end times
                     main_start = trip_data['tripBeginDateTime']
                     main_end = trip_data['tripEndDateTime']
-                    buffer_start = main_start - buffer_duration
-                    buffer_end = main_end + buffer_duration
-
-                    # Adjust the main event times
-                    adjusted_start = main_start
-                    adjusted_end = main_end
 
                     # Create the main event data
                     main_event_data = {
                         'summary': summary,
                         'description': f'Property: {property_name}\nTrip Ref: {trip_ref}\nBooking Link: {booking_link}',
-                        'start': {'dateTime': adjusted_start.isoformat(), 'timeZone': 'UTC'},
-                        'end': {'dateTime': adjusted_end.isoformat(), 'timeZone': 'UTC'},
+                        'start': {'dateTime': main_start.isoformat(), 'timeZone': 'UTC'},
+                        'end': {'dateTime': main_end.isoformat(), 'timeZone': 'UTC'},
                     }
 
-                    # Create the buffer events data
-                    buffer_before_data = {
-                        'summary': f'Buffer Time for {summary}',
-                        'start': {'dateTime': buffer_start.isoformat(), 'timeZone': 'UTC'},
-                        'end': {'dateTime': main_start.isoformat(), 'timeZone': 'UTC'},
-                    }
-                    buffer_after_data = {
-                        'summary': f'Buffer Time for {summary}',
-                        'start': {'dateTime': main_end.isoformat(), 'timeZone': 'UTC'},
-                        'end': {'dateTime': buffer_end.isoformat(), 'timeZone': 'UTC'},
-                    }
-
-                    # Call the Google Calendar API to update or create the events
+                    # Call the Google Calendar API to update or create the main event
                     service = build('calendar', 'v3', credentials=creds)
 
                     # Handle the main event
@@ -437,13 +417,6 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                         event = service.events().insert(calendarId=calendar_id, body=main_event_data).execute()
                         app_logger.info('Created main event: %s', event['id'])
                         trip_doc.reference.update({'eventId': event['id']})
-
-                    # Create the buffer events
-                    app_logger.info('Creating buffer before event')
-                    service.events().insert(calendarId=calendar_id, body=buffer_before_data).execute()
-
-                    app_logger.info('Creating buffer after event')
-                    service.events().insert(calendarId=calendar_id, body=buffer_after_data).execute()
 
                 else:
                     app_logger.error('User document does not exist for: %s', trip_data['userRef'])
