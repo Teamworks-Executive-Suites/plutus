@@ -244,7 +244,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
     try:
         # Create a new PaymentIntent for the extra charge
         extra_charge_pi = stripe.PaymentIntent.create(
-            amount=int(dispute.get('disputeAmount') * 100),  # Ensure the amount is an integer
+            amount=round(dispute.get('disputeAmount')),  # Round to nearest cent (disputeAmount is in cents)
             currency='usd',
             automatic_payment_methods={'enabled': True},
             customer=stripe_customer,
@@ -268,7 +268,9 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
 
         app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
 
-        host_fee, guest_fee, net_fee = calculate_fees(dispute.get('disputeAmount'))
+        # Round dispute amount to nearest cent (disputeAmount is in cents but may have fractional part)
+        dispute_amount_cents = round(dispute.get('disputeAmount'))
+        host_fee, guest_fee, net_fee = calculate_fees(dispute_amount_cents)
 
         try:
             # create the transactions for the extra charge
@@ -287,7 +289,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 guestFeeCents=0,
                 hostFeeCents=0,
                 netFeeCents=0,
-                grossFeeCents=dispute.get('disputeAmount'),
+                grossFeeCents=dispute_amount_cents,
                 tripRef=trip_ref,
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
@@ -313,7 +315,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 guestFeeCents=guest_fee,
                 hostFeeCents=host_fee,
                 netFeeCents=net_fee,
-                grossFeeCents=dispute.get('disputeAmount'),
+                grossFeeCents=dispute_amount_cents,
                 tripRef=trip_ref,
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
