@@ -268,7 +268,9 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
 
         app_logger.info('Extra charge processed successfully: %s', extra_charge_pi)
 
-        host_fee, guest_fee, net_fee = calculate_fees(dispute.get('disputeAmount'))
+        # Convert dispute amount from dollars to cents
+        dispute_amount_cents = int(dispute.get('disputeAmount') * 100)
+        host_fee, guest_fee, net_fee = calculate_fees(dispute_amount_cents)
 
         try:
             # create the transactions for the extra charge
@@ -287,7 +289,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 guestFeeCents=0,
                 hostFeeCents=0,
                 netFeeCents=0,
-                grossFeeCents=dispute.get('disputeAmount'),
+                grossFeeCents=dispute_amount_cents,
                 tripRef=trip_ref,
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
@@ -313,7 +315,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 guestFeeCents=guest_fee,
                 hostFeeCents=host_fee,
                 netFeeCents=net_fee,
-                grossFeeCents=dispute.get('disputeAmount'),
+                grossFeeCents=dispute_amount_cents,
                 tripRef=trip_ref,
                 refundedAmountCents=0,
                 paymentIntentIds=[extra_charge_pi.id],
