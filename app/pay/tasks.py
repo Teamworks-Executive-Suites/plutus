@@ -13,6 +13,22 @@ from app.utils import settings
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 
+def generate_refund_idempotency_key(trip_ref, charge_id, amount, refund_type='manual'):
+    """
+    Generate a unique idempotency key for a refund operation.
+    
+    :param trip_ref: Trip reference
+    :param charge_id: Stripe charge ID
+    :param amount: Refund amount in cents
+    :param refund_type: Type of refund ('manual' or 'cancel')
+    :return: Idempotency key (40 characters)
+    """
+    key_data = f"{trip_ref}:{charge_id}:{amount}:{refund_type}"
+    # Hash and truncate to 40 chars for brevity while maintaining uniqueness
+    # SHA256 provides sufficient uniqueness even when truncated
+    return hashlib.sha256(key_data.encode()).hexdigest()[:40]
+
+
 def calculate_fee(amount_cents, fee_rate):
     """
     Calculate the fee for a given amount.
@@ -150,11 +166,8 @@ def handle_refund(trip_ref, amount, actor_ref):
 
             refund_amount = min(remaining_refund, refundable_amount)
             
-            # Generate idempotency key based on trip_ref, charge_id, and amount
-            # This ensures the same refund won't be processed twice even if the API is called multiple times
-            idempotency_key = hashlib.sha256(
-                f"{trip_ref}:{charge.id}:{refund_amount}".encode()
-            ).hexdigest()[:40]  # Stripe idempotency keys have a max length of 255 chars
+            # Generate idempotency key to prevent duplicate refunds
+            idempotency_key = generate_refund_idempotency_key(trip_ref, charge.id, refund_amount, 'manual')
             
             process_refund(charge.id, refund_amount, idempotency_key)
 
@@ -496,10 +509,8 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
                     refund_reason = f'Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support'
 
             if refund_amount > 0:
-                # Generate idempotency key based on trip_ref, charge_id, and amount
-                idempotency_key = hashlib.sha256(
-                    f"{trip_ref}:{charge.id}:{refund_amount}:cancel".encode()
-                ).hexdigest()[:40]
+                # Generate idempotency key to prevent duplicate refunds
+                idempotency_key = generate_refund_idempotency_key(trip_ref, charge.id, refund_amount, 'cancel')
                 
                 process_refund(charge.id, refund_amount, idempotency_key)
                 refund_details.append(
