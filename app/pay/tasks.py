@@ -1,3 +1,4 @@
+import hashlib
 import os
 from datetime import timedelta
 
@@ -66,18 +67,23 @@ def get_dispute_by_trip_ref(trip_ref):
     return dispute_documents[0] if dispute_documents else None
 
 
-def process_refund(charge_id, amount):
+def process_refund(charge_id, amount, idempotency_key=None):
     """
     Process a refund for a given charge.
     :param charge_id:
     :param amount:
+    :param idempotency_key: Optional idempotency key to prevent duplicate refunds
     :return:
     """
     try:
-        refund = stripe.Refund.create(
-            charge=charge_id,
-            amount=amount,
-        )
+        refund_params = {
+            'charge': charge_id,
+            'amount': amount,
+        }
+        if idempotency_key:
+            refund_params['idempotency_key'] = idempotency_key
+        
+        refund = stripe.Refund.create(**refund_params)
         app_logger.info('Refund processed: %s', refund)
         return refund.status == 'succeeded'
     except Exception as e:
@@ -100,6 +106,24 @@ def handle_refund(trip_ref, amount, actor_ref):
     if not trip.exists:
         app_logger.error('Trip document not found.')
         return {'status': 404, 'message': 'Trip document not found.'}
+
+    # Check for existing refund transactions to prevent duplicates
+    existing_refunds = (
+        db.collection('transactions')
+        .where(filter=FieldFilter('tripRef', '==', trip_ref))
+        .where(filter=FieldFilter('type', '==', TransactionType.refund))
+        .where(filter=FieldFilter('refundedAmountCents', '==', amount))
+        .limit(1)
+        .stream()
+    )
+    
+    existing_refund_list = list(existing_refunds)
+    if existing_refund_list:
+        app_logger.warning('Duplicate refund request detected for trip %s with amount %s', trip_ref, amount)
+        return {
+            'status': 409,
+            'message': 'A refund transaction with this amount already exists for this trip.',
+        }
 
     payment_intent_ids = trip.get('stripePaymentIntents')
     if not payment_intent_ids:
@@ -125,7 +149,14 @@ def handle_refund(trip_ref, amount, actor_ref):
                 continue
 
             refund_amount = min(remaining_refund, refundable_amount)
-            process_refund(charge.id, refund_amount)
+            
+            # Generate idempotency key based on trip_ref, charge_id, and amount
+            # This ensures the same refund won't be processed twice even if the API is called multiple times
+            idempotency_key = hashlib.sha256(
+                f"{trip_ref}:{charge.id}:{refund_amount}".encode()
+            ).hexdigest()[:40]  # Stripe idempotency keys have a max length of 255 chars
+            
+            process_refund(charge.id, refund_amount, idempotency_key)
 
             refund_details.append(
                 {
@@ -369,6 +400,24 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
     if not trip.exists:
         app_logger.error('Trip document not found.')
         return {'status': 404, 'message': 'Trip document not found.'}
+    
+    # Check for existing cancel_refund transactions to prevent duplicates
+    existing_cancel_refunds = (
+        db.collection('transactions')
+        .where(filter=FieldFilter('tripRef', '==', trip_ref))
+        .where(filter=FieldFilter('type', '==', TransactionType.refund))
+        .where(filter=FieldFilter('actorRole', '==', ActorRole.host))
+        .limit(1)
+        .stream()
+    )
+    
+    existing_cancel_refund_list = list(existing_cancel_refunds)
+    if existing_cancel_refund_list:
+        app_logger.warning('Duplicate cancel_refund request detected for trip %s', trip_ref)
+        return {
+            'status': 409,
+            'message': 'A cancellation refund transaction already exists for this trip.',
+        }
 
     property_ref = trip.get('propertyRef')
     property = get_document_from_ref(f'properties/{property_ref.id}')
@@ -447,7 +496,12 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
                     refund_reason = f'Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support'
 
             if refund_amount > 0:
-                process_refund(charge.id, refund_amount)
+                # Generate idempotency key based on trip_ref, charge_id, and amount
+                idempotency_key = hashlib.sha256(
+                    f"{trip_ref}:{charge.id}:{refund_amount}:cancel".encode()
+                ).hexdigest()[:40]
+                
+                process_refund(charge.id, refund_amount, idempotency_key)
                 refund_details.append(
                     {
                         'refunded_amount': refund_amount,
