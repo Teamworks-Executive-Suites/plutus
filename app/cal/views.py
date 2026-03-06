@@ -102,12 +102,7 @@ def process_resync_property_calendar_events(data: PropertyRef, token: str = Depe
                 with logfire.span('Channel id not unique'):
                     delete_calendar_watch_channel(property_cal.property_ref, settings.g_calendar_resource_id)
                     initialize_trips_from_cal(property_cal.property_ref, property_cal.cal_id)
-            raise HTTPException(status_code=400, detail=error_message)
+            else:
+                raise HTTPException(status_code=400, detail=error_message)
 
-        new_channel = {
-            'id': 'new_channel_id',
-            'expiration': int((datetime.utcnow() + timedelta(days=30)).timestamp() * 1000),
-        }
-        property_doc.reference.update(
-            {'channelId': new_channel['id'], 'channelExpiration': str(new_channel['expiration'])}
-        )
+        return {'propertyRef': data.property_ref, 'message': 'Calendar events resynced successfully'}
