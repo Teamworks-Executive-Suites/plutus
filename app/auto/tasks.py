@@ -195,7 +195,6 @@ def auto_complete_and_notify():
             completion_trips = (
                 db.collection('trips')
                 .where(filter=FieldFilter('upcoming', '==', True))
-                .where(filter=FieldFilter('isExternal', '==', False))
                 .where(filter=FieldFilter('tripEndDateTime', '<=', now))
                 .stream()
             )
@@ -203,7 +202,7 @@ def auto_complete_and_notify():
             for trip in completion_trips:
                 trip_dict = trip.to_dict()
 
-                if trip_dict.get('isBlocked', False):
+                if trip_dict.get('isExternal', False) or trip_dict.get('isBlocked', False):
                     continue
 
                 if trip_dict.get('complete', False):
@@ -237,7 +236,6 @@ def auto_complete_and_notify():
             reminder_trips = (
                 db.collection('trips')
                 .where(filter=FieldFilter('upcoming', '==', True))
-                .where(filter=FieldFilter('isExternal', '==', False))
                 .where(filter=FieldFilter('tripBeginDateTime', '>', now))
                 .where(filter=FieldFilter('tripBeginDateTime', '<=', reminder_cutoff))
                 .stream()
@@ -246,7 +244,7 @@ def auto_complete_and_notify():
             for trip in reminder_trips:
                 trip_dict = trip.to_dict()
 
-                if trip_dict.get('isBlocked', False):
+                if trip_dict.get('isExternal', False) or trip_dict.get('isBlocked', False):
                     continue
 
                 property_ref = trip_dict.get('propertyRef')
