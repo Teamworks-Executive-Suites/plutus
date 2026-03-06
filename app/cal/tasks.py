@@ -211,10 +211,10 @@ def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_doc_ref:
 
 
 def handle_cancelled_event(event: CancelledGCalEvent):
-    existing_trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
-    if existing_trip_ref:
-        existing_trip_ref[0].reference.delete()
-        app_logger.info(f'Deleted trip for cancelled event: {event.id}')
+    existing_trips = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
+    for trip in existing_trips:
+        trip.reference.delete()
+        app_logger.info('Deleted trip %s for cancelled event: %s', trip.id, event.id)
 
 
 def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
@@ -222,9 +222,13 @@ def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
     if not trip_data:
         app_logger.info('Trip data is None, skipping event: %s', event.id)
         return
-    existing_trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
-    if existing_trip_ref:
-        update_existing_trip(existing_trip_ref[0], trip_data, event)
+    existing_trips = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
+    if existing_trips:
+        update_existing_trip(existing_trips[0], trip_data, event)
+        # Clean up duplicates
+        for dup in existing_trips[1:]:
+            dup.reference.delete()
+            app_logger.info('Deleted duplicate trip %s for event: %s', dup.id, event.id)
     else:
         create_new_trip(trip_data, event)
 
@@ -238,8 +242,10 @@ def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
 
 
 def create_new_trip(trip_data: TripData, event: GCalEvent):
-    trip_ref = db.collection('trips').add(trip_data.dict())
-    app_logger.info(f'Created new trip for event: {event.id}, trip ref: {trip_ref[1].id}')
+    # Use eventId as document ID so concurrent creates are idempotent
+    doc_ref = db.collection('trips').document(event.id)
+    doc_ref.set(trip_data.dict())
+    app_logger.info('Created new trip for event: %s, trip ref: %s', event.id, doc_ref.id)
 
 
 def clear_event_store(property_ref: str):
