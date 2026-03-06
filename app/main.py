@@ -31,6 +31,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(auto_complete_and_notify, 'interval', hours=1)
     scheduler.add_job(process_transactions, 'interval', hours=1)
     scheduler.add_job(process_platform_payout, 'interval', hours=1)
+    scheduler.add_job(auto_check_and_renew_channels, 'interval', hours=12)
 
     scheduler.start()
     app_logger.info('Scheduler initialized and started')

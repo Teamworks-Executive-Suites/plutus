@@ -46,15 +46,9 @@ def auto_check_and_renew_channels(force_renew=False):
                         with logfire.span('Channel id not unique'):
                             delete_calendar_watch_channel(property_cal.property_ref, settings.g_calendar_resource_id)
                             initialize_trips_from_cal(property_cal.property_ref, property_cal.cal_id)
-                    raise HTTPException(status_code=400, detail=error_message)
-
-                new_channel = {
-                    'id': 'new_channel_id',
-                    'expiration': int((now + timedelta(days=30)).timestamp() * 1000),
-                }
-                prop.reference.update(
-                    {'channelId': new_channel['id'], 'channelExpiration': str(new_channel['expiration'])}
-                )
+                    else:
+                        app_logger.error('Unrecoverable error renewing channel for property: %s', prop.id)
+                    continue
 
             else:
                 app_logger.info('Channel for property: %s does not need to be renewed', prop.id)

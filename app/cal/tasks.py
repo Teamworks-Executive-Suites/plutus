@@ -115,7 +115,11 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
                             continue
 
                         # Process each event
-                        process_event(validated_event, property_doc_ref)
+                        try:
+                            process_event(validated_event, property_doc_ref)
+                        except Exception as e:
+                            app_logger.error('Error processing event %s: %s', event.get('id', 'unknown'), e)
+                            continue
 
                     next_sync_token = events_result.get('nextSyncToken')
                     property_doc_ref.update({'nextSyncToken': next_sync_token})
@@ -141,9 +145,10 @@ def sync_calendar_events(property_doc_ref: Any, retry_count: int = 0):
 
 def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripData | None:
     with logfire.span('convert_event_to_trip_data'):
-        if 'Buffer Time' in event.summary:
+        summary = event.summary or ''
+        if 'Buffer Time' in summary:
             # Skip the event if it contains 'Buffer Time' in the summary
-            app_logger.info('Skipping event with Buffer Time in summary: %s', event.summary)
+            app_logger.info('Skipping event with Buffer Time in summary: %s', summary)
             return None
         if isinstance(event.start, Date):
             # Fetch the property document
@@ -177,7 +182,7 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
             raise ValueError('Event start or end datetime is missing')
 
         # If internal event, set isExternal to False
-        if 'Teamworks' in event.summary:
+        if 'Teamworks' in summary:
             is_external = False
         else:
             is_external = True
@@ -192,7 +197,7 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
             tripDate=start_datetime.replace(hour=0, minute=0, second=0),  # Set tripDate to be at 00:00:00
             tripEndDateTime=end_datetime,
             eventId=event.id,
-            eventSummary=event.summary or '',  # Use an empty string if 'summary' is missing
+            eventSummary=summary,
         )
 
         return trip_data
