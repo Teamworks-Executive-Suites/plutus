@@ -13,7 +13,7 @@ from app.utils import settings
 def get_contact_details(trip_doc, property_doc):
     """Get host and guest contact details from already-fetched trip/property docs."""
     with logfire.span('get_contact_details'):
-        host_doc = db.collection('users').document(property_doc.get('userRef')).get()
+        host_doc = db.collection('users').document(property_doc.get('userRef').id).get()
         if not host_doc.exists:
             app_logger.error('Host document does not exist for property: %s', property_doc.id)
             return None, None
@@ -117,7 +117,7 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
         }
 
         # Host Doc
-        host_doc = db.collection('users').document(property_doc.get('userRef')).get()
+        host_doc = db.collection('users').document(property_doc.get('userRef').id).get()
 
         # Guest Doc
         guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
