@@ -65,6 +65,12 @@ def backfill_all_properties():
                 total_skipped += 1
                 continue
 
+            # Skip unpaid/zombie trips (upcoming is set to true only after payment)
+            if not trip_data.get('upcoming', False) and not trip_data.get('isBlocked', False):
+                print(f'  SKIP {trip.id} — upcoming=false (unpaid)')
+                total_skipped += 1
+                continue
+
             # Get user name
             user_ref = trip_data.get('userRef')
             guest_name = 'Guest'
