@@ -1,5 +1,7 @@
 import asyncio
 import json
+from concurrent.futures import Future
+from threading import Thread
 
 import httpx
 from firebase_admin import remote_config
@@ -11,14 +13,30 @@ BUNDLE_ID = "com.onlineolive.teamworks"
 ITUNES_LOOKUP_URL = f"https://itunes.apple.com/lookup?bundleId={BUNDLE_ID}"
 
 
+def _run_async_in_new_loop(coro) -> Future:
+    """Run an async coroutine in a fresh event loop on a new thread."""
+    result_future: Future = Future()
+
+    def target():
+        try:
+            res = asyncio.run(coro)
+            result_future.set_result(res)
+        except Exception as e:
+            result_future.set_exception(e)
+
+    t = Thread(target=target, daemon=True)
+    t.start()
+    t.join(timeout=30)
+    return result_future
+
+
 def auto_update_cloud_version():
     """Check App Store for latest published version and update Remote Config."""
+    future = _run_async_in_new_loop(_auto_update_cloud_version())
     try:
-        asyncio.run(_auto_update_cloud_version())
-    except RuntimeError:
-        # Already in an event loop (e.g. during testing)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(_auto_update_cloud_version())
+        future.result(timeout=30)
+    except Exception as e:
+        app_logger.error(f"Version check wrapper failed: {e}")
 
 
 async def _auto_update_cloud_version():
