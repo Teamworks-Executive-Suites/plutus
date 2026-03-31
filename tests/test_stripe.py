@@ -1546,3 +1546,81 @@ class StripeTransactions(TestCase):
     #
     #
     #     # check
+
+    def test_duplicate_refund_prevention(self):
+        """Test that duplicate refund requests are prevented"""
+        # Create a payment intent
+        pi = stripe.PaymentIntent.create(
+            amount=62350,  # $623.50 like in the issue
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+
+        # Add payment to trip
+        trip = self.mock_firestore.collection('trips').document('fake_trip_ref').get()
+        current_intents = trip.get('stripePaymentIntents')
+        current_intents.append(pi.id)
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': current_intents}
+        )
+
+        # First refund request - should succeed
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 62350, 'actor_ref': 'fake_user_ref'}
+        r1 = self.client.post('/refund', headers=self.headers, json=data)
+        
+        # Check the first refund succeeded
+        assert r1.json()['status'] == 200
+        assert r1.json()['message'] == 'Refund processed successfully.'
+        assert r1.json()['total_refunded'] == 62350
+
+        # Second refund request with same amount - should be rejected
+        r2 = self.client.post('/refund', headers=self.headers, json=data)
+        
+        # Check the second refund was rejected with 409 Conflict
+        assert r2.json()['status'] == 409
+        assert 'already exists' in r2.json()['message']
+
+        # Verify only one refund was actually processed in Stripe
+        charges = stripe.Charge.list(payment_intent=pi.id)
+        total_refunded = sum(charge.amount_refunded for charge in charges.auto_paging_iter())
+        assert total_refunded == 62350  # Only one refund should have been processed
+
+    def test_duplicate_cancel_refund_prevention(self):
+        """Test that duplicate cancel_refund requests are prevented"""
+        # Create a payment intent
+        pi = stripe.PaymentIntent.create(
+            amount=62350,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+
+        # Add payment to trip with proper dates
+        trip_begin = current_time + timedelta(days=30)
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({
+            'stripePaymentIntents': [pi.id],
+            'tripBeginDateTime': DatetimeWithNanoseconds.from_timestamp_pb(
+                {'seconds': int(trip_begin.timestamp())}
+            ),
+            'propertyRef': self.mock_firestore.collection('properties').document('fake_property_ref'),
+        })
+
+        # First cancel_refund request - should succeed
+        data = {'trip_ref': 'trips/fake_trip_ref', 'full_refund': True, 'actor_ref': 'fake_user_ref'}
+        r1 = self.client.post('/cancel_refund', headers=self.headers, json=data)
+        
+        # Check the first cancel_refund succeeded
+        assert r1.json()['status'] == 200
+
+        # Second cancel_refund request - should be rejected
+        r2 = self.client.post('/cancel_refund', headers=self.headers, json=data)
+        
+        # Check the second cancel_refund was rejected with 409 Conflict
+        assert r2.json()['status'] == 409
+        assert 'already exists' in r2.json()['message']
+
