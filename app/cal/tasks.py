@@ -213,8 +213,8 @@ def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_doc_ref:
 def handle_cancelled_event(event: CancelledGCalEvent):
     existing_trips = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
     for trip in existing_trips:
-        trip.reference.delete()
-        app_logger.info('Deleted trip %s for cancelled event: %s', trip.id, event.id)
+        trip.reference.update({'cancelTrip': True, 'eventId': ''})
+        app_logger.info('Marked trip %s as cancelled for cancelled event: %s', trip.id, event.id)
 
 
 def handle_validated_event(event: GCalEvent, property_doc_ref: Any):

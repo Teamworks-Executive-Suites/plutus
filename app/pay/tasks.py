@@ -382,7 +382,7 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
 
     trip_begin_time = trip.get('tripBeginDateTime')
     trip_begin_time = trip_begin_time.astimezone(current_time.tzinfo)
-    time_difference = current_time - trip_begin_time  # from start to now
+    time_difference = trip_begin_time - current_time  # time from now until trip starts
 
     payment_intent_ids = trip.get('stripePaymentIntents')
     if not payment_intent_ids:
@@ -406,7 +406,7 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
 
             else:
                 if cancellation_policy == 'Very Flexible':
-                    if time_difference <= timedelta(hours=24):
+                    if time_difference >= timedelta(hours=24):
                         refund_amount = refundable_amount
                         refund_reason = '24 or more before booking - 100% refund'
                     else:

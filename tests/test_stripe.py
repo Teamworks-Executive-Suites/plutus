@@ -375,10 +375,9 @@ class StripeCancelRefund(TestCase):
 
     def test_simple_cancel_refund(self):
         """
-        This test has 1 payment intent
-        less than 24hrs
+        Very Flexible
+        Trip starts in 1 day (24 or more hours before booking)
         full refund
-        :return:
         """
 
         # Add Cancellation Policy to the property document
@@ -400,7 +399,7 @@ class StripeCancelRefund(TestCase):
         self.mock_firestore.collection('trips').document('fake_trip_ref').update({'stripePaymentIntents': [pi.id]})
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=1)
+        trip_begin_datetime = current_time + timedelta(days=1)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -429,10 +428,10 @@ class StripeCancelRefund(TestCase):
 
     def test_simple_cancel_refund_2(self):
         """
-        This test has 2 payment intent
-        less than 24hrs
+        Very Flexible
+        2 payment intents
+        Trip starts in 1 day (24 or more hours before booking)
         full refund
-        :return:
         """
 
         # Add Cancellation Policy to the property document
@@ -465,7 +464,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=1)
+        trip_begin_datetime = current_time + timedelta(days=1)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -496,10 +495,10 @@ class StripeCancelRefund(TestCase):
 
     def test_simple_cancel_refund_3(self):
         """
-        This test has 2 payment intent
-        greater than 24hrs
+        Very Flexible
+        2 payment intents
+        Trip starts in 5 hours (less than 24 hours before booking)
         no refund
-        :return:
         """
 
         # Add Cancellation Policy to the property document
@@ -532,7 +531,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=2)
+        trip_begin_datetime = current_time + timedelta(hours=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -602,7 +601,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=8)
+        trip_begin_datetime = current_time + timedelta(days=8)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -672,7 +671,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=5)
+        trip_begin_datetime = current_time + timedelta(days=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -742,7 +741,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(hours=5)
+        trip_begin_datetime = current_time + timedelta(hours=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -812,7 +811,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=31)
+        trip_begin_datetime = current_time + timedelta(days=31)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -882,7 +881,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=8)
+        trip_begin_datetime = current_time + timedelta(days=8)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -952,7 +951,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=2)
+        trip_begin_datetime = current_time + timedelta(days=2)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1022,7 +1021,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=92)
+        trip_begin_datetime = current_time + timedelta(days=92)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1092,7 +1091,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=40)
+        trip_begin_datetime = current_time + timedelta(days=40)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1162,7 +1161,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=20)
+        trip_begin_datetime = current_time + timedelta(days=20)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1232,7 +1231,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=20)
+        trip_begin_datetime = current_time + timedelta(days=20)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1265,6 +1264,89 @@ class StripeCancelRefund(TestCase):
         assert r.json()['cancellation_policy'] == 'Unknown Cancellation Policy'
 
         self.assertEqual(r.status_code, 200)
+
+    def test_cancel_refund_future_trip_very_flexible_full_refund(self):
+        """
+        Very Flexible: cancelling 2 days before the trip (more than 24h out)
+        should return a 100% refund.
+        """
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Very Flexible'}
+        )
+
+        pi = stripe.PaymentIntent.create(
+            amount=1000,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id]}
+        )
+
+        trip_begin_datetime = current_time + timedelta(days=2)
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_datetime}
+        )
+
+        data = {
+            'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
+        }
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
+
+        assert r.json()['status'] == 200
+        assert r.json()['total_refunded'] == 1000
+        assert r.json()['refund_details'][0]['refunded_amount'] == 1000
+        assert r.json()['refund_details'][0]['reason'] == '24 or more before booking - 100% refund'
+
+    def test_cancel_refund_future_trip_standard_30_day_50_percent(self):
+        """
+        Regression test for inverted time_difference bug.
+
+        Trip is 10 days in the FUTURE (a real guest cancelling a real booking).
+        Standard 30 Day policy, so this falls in the "between 7 and 30 days
+        before booking" bucket and should refund 50%.
+        """
+        self.mock_firestore.collection('properties').document('fake_property_ref').update(
+            {'cancellationPolicy': 'Standard 30 Day'}
+        )
+
+        pi = stripe.PaymentIntent.create(
+            amount=1000,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': [pi.id]}
+        )
+
+        trip_begin_datetime = current_time + timedelta(days=10)
+        trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'tripBeginDateTime': trip_begin_datetime}
+        )
+
+        data = {
+            'trip_ref': 'trips/fake_trip_ref',
+            'full_refund': False,
+            'actor_ref': 'users/fake_user_ref',
+        }
+        r = self.client.post('/cancel_refund', headers=self.headers, json=data)
+
+        assert r.json()['status'] == 200
+        assert r.json()['total_refunded'] == 500
+        assert r.json()['refund_details'][0]['refunded_amount'] == 500
+        assert r.json()['refund_details'][0]['reason'] == 'Between 7 and 30 days before booking - 50% refund'
 
     def test_simple_cancel_full_refund_13(self):
         """
@@ -1306,7 +1388,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time - timedelta(days=20)
+        trip_begin_datetime = current_time + timedelta(days=20)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
