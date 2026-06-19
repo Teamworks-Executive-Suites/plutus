@@ -6,6 +6,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
+from app.admin.views import admin_router
 from app.auth.views import auth_router
 from app.auto.cal_tasks import auto_check_and_renew_channels
 from app.auto.payout_task import process_platform_payout
@@ -54,6 +55,7 @@ if bool(settings.logfire_token) and settings.testing is False and settings.dev_m
 logging.config.dictConfig(config)
 
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(cal_router)
 app.include_router(cal_webhook_router)
 app.include_router(stripe_router)
