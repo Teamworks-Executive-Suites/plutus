@@ -35,6 +35,17 @@ class OffSessionPayment(BaseModel):
     guest_email: str
 
 
+class ImpersonationTokenRequest(BaseModel):
+    target_uid: str  # Firebase uid of the user the admin wants to view as
+
+
+class ImpersonationTokenResponse(BaseModel):
+    custom_token: str  # Firebase custom token for signInWithCustomToken
+    target_uid: str
+    view_only: bool
+    expires_in: int  # seconds the Firebase custom token is valid for
+
+
 class PropertyCal(BaseModel):
     property_ref: str
     cal_id: str
