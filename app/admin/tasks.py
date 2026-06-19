@@ -20,36 +20,44 @@ def _is_admin(user_data: dict) -> bool:
     return bool(user_data and user_data.get('isAdmin'))
 
 
-def mint_impersonation_token(admin_uid: str, target_uid: str) -> dict:
-    """Mint a Firebase custom token for `target_uid` on behalf of an admin.
+def _mint(uid: str, claims: dict | None = None) -> str:
+    token = firebase_auth.create_custom_token(uid, claims) if claims else firebase_auth.create_custom_token(uid)
+    if isinstance(token, bytes):
+        token = token.decode('utf-8')
+    return token
 
-    The caller has already been verified as an admin by the route dependency.
+
+def mint_impersonation_token(admin_uid: str, target_uid: str) -> dict:
+    """Mint a view-only Firebase custom token for `target_uid`, plus a restore
+    token so the admin can return to their own session on exit.
+
+    `admin_uid` is asserted by the trusted Cloud Function; we still re-verify it
+    is genuinely an admin here as defense-in-depth.
     """
+    if not admin_uid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='admin_uid is required')
     if not target_uid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='target_uid is required')
-
     if target_uid == admin_uid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Cannot impersonate yourself')
+
+    admin_doc = db.collection('users').document(admin_uid).get()
+    if not admin_doc.exists or not _is_admin(admin_doc.to_dict() or {}):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Caller is not an admin')
 
     target_doc = db.collection('users').document(target_uid).get()
     if not target_doc.exists:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Target user not found')
 
-    target_data = target_doc.to_dict() or {}
-
     # Never let an admin impersonate another admin (privilege containment).
-    if _is_admin(target_data):
+    if _is_admin(target_doc.to_dict() or {}):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='Cannot impersonate another admin')
 
-    developer_claims = {
-        'impersonated': True,
-        'imp_admin_uid': admin_uid,
-        'imp_view_only': VIEW_ONLY,
-    }
-
-    custom_token = firebase_auth.create_custom_token(target_uid, developer_claims)
-    if isinstance(custom_token, bytes):
-        custom_token = custom_token.decode('utf-8')
+    # View-only session for the target; claims propagate into its ID token so
+    # rules / payment endpoints can enforce view-only authoritatively.
+    custom_token = _mint(target_uid, {'impersonated': True, 'imp_admin_uid': admin_uid, 'imp_view_only': VIEW_ONLY})
+    # Clean admin session (no impersonation claims) used to exit without re-login.
+    admin_restore_token = _mint(admin_uid)
 
     _write_audit(admin_uid, target_uid)
 
@@ -57,7 +65,9 @@ def mint_impersonation_token(admin_uid: str, target_uid: str) -> dict:
 
     return {
         'custom_token': custom_token,
+        'admin_restore_token': admin_restore_token,
         'target_uid': target_uid,
+        'admin_uid': admin_uid,
         'view_only': VIEW_ONLY,
         'expires_in': TOKEN_TTL_SECONDS,
     }

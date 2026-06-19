@@ -37,13 +37,16 @@ class OffSessionPayment(BaseModel):
 
 class ImpersonationTokenRequest(BaseModel):
     target_uid: str  # Firebase uid of the user the admin wants to view as
+    admin_uid: str  # caller's uid, asserted by the trusted Cloud Function (master_token holder)
 
 
 class ImpersonationTokenResponse(BaseModel):
-    custom_token: str  # Firebase custom token for signInWithCustomToken
+    custom_token: str  # Firebase custom token to sign in AS the target (view-only)
+    admin_restore_token: str  # Firebase custom token to sign back in as the admin on exit
     target_uid: str
+    admin_uid: str
     view_only: bool
-    expires_in: int  # seconds the Firebase custom token is valid for
+    expires_in: int  # seconds the Firebase custom tokens are valid for
 
 
 class PropertyCal(BaseModel):
