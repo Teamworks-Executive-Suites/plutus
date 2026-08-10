@@ -5,7 +5,7 @@ import logfire
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.auto._utils import app_logger
+from app.auto._utils import app_logger, trip_document_id
 from app.firebase_setup import db
 from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
@@ -34,20 +34,27 @@ def process_transactions():
 
         for transaction in transactions:
             transaction_doc = db.collection('transactions').document(transaction.id).get()
+            # Keep the stored value for querying and re-writing, and a normalised id for
+            # document lookups and de-duplication. See trip_document_id for why.
             trip_ref = transaction_doc.get('tripRef')
+            trip_id = trip_document_id(trip_ref)
 
-            if trip_ref in processed_trip_refs:
-                app_logger.info('Skipping already processed trip: %s', trip_ref)
+            if trip_id is None:
+                app_logger.error('Transaction %s has an unusable tripRef, skipping', transaction.id)
                 continue
 
-            trip = db.collection('trips').document(trip_ref).get()
+            if trip_id in processed_trip_refs:
+                app_logger.info('Skipping already processed trip: %s', trip_id)
+                continue
+
+            trip = db.collection('trips').document(trip_id).get()
 
             if trip.exists and trip.get('complete'):
                 trip_data = trip.to_dict()
                 complete_date = trip_data.get('completeDate')
-                app_logger.info('Checking trip %s, complete_date: %s', trip_ref, complete_date)
+                app_logger.info('Checking trip %s, complete_date: %s', trip_id, complete_date)
                 if complete_date and (now - complete_date).days >= 10:
-                    app_logger.info('Trip %s is complete and eligible for processing', trip_ref)
+                    app_logger.info('Trip %s is complete and eligible for processing', trip_id)
 
                     # Escrowed only: a trip can carry host transactions that already
                     # transferred, and those must not be paid or merged a second time.
@@ -87,7 +94,7 @@ def process_transactions():
                                         amount=host_transaction.get('hostFeeCents'),
                                         currency='usd',
                                         destination=stripe_account_id,
-                                        transfer_group=trip_ref,
+                                        transfer_group=trip_id,
                                     )
                                     app_logger.info('Transfer created: %s', transfer)
                                     host_transaction.reference.update(
@@ -141,11 +148,11 @@ def process_transactions():
                                     amount=new_transaction_data['hostFeeCents'],
                                     currency='usd',
                                     destination=stripe_account_id,
-                                    transfer_group=trip_ref,
+                                    transfer_group=trip_id,
                                 )
                                 app_logger.info('Transfer created: %s', transfer)
                                 new_transaction_ref.update({'status': Status.completed, 'transferId': transfer.id})
                             except Exception as e:
                                 app_logger.error('Failed to create transfer: %s', str(e))
 
-            processed_trip_refs.add(trip_ref)
+            processed_trip_refs.add(trip_id)

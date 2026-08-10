@@ -4,7 +4,7 @@ import logfire
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.auto._utils import app_logger
+from app.auto._utils import app_logger, trip_document_id
 from app.firebase_setup import db
 from app.models import Status
 
@@ -33,16 +33,14 @@ def process_platform_payout():
                 if transaction_data.get('paidOut'):
                     continue
 
-                trip_ref_obj = transaction_doc.get('tripRef')
-                if hasattr(trip_ref_obj, 'id'):
-                    trip_ref = trip_ref_obj.id
-                else:
-                    trip_ref = trip_ref_obj
+                # Handles both stored shapes. A raw 'trips/<id>' path string used to raise
+                # ValueError out of .document() and abort the entire payout run.
+                trip_id = trip_document_id(transaction_doc.get('tripRef'))
 
-                if not trip_ref or trip_ref in processed_trip_refs:
+                if not trip_id or trip_id in processed_trip_refs:
                     continue
 
-                trip = db.collection('trips').document(trip_ref).get()
+                trip = db.collection('trips').document(trip_id).get()
 
                 if trip.exists:
                     try:
@@ -50,7 +48,7 @@ def process_platform_payout():
                         total_balance += net_fee_cents
                         transaction_ids.append(transaction_doc.id)
                         included_transactions.append(transaction_doc.reference)
-                        processed_trip_refs.add(trip_ref)
+                        processed_trip_refs.add(trip_id)
                     except Exception as e:
                         app_logger.error('Error processing transaction %s: %s', transaction.id, str(e))
 

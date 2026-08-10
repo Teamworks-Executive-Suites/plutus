@@ -2,6 +2,7 @@ import logging
 
 from google.cloud.firestore_v1 import FieldFilter
 from mockfirestore.collection import CollectionReference
+from mockfirestore.document import DocumentReference
 from mockfirestore.query import Query
 
 logger = logging.getLogger(__name__)
@@ -30,4 +31,32 @@ def enable_field_filter_support():
         cls.where = where
 
 
-__all__ = ['FieldFilter', 'enable_field_filter_support', 'logger']
+def enable_document_reference_equality():
+    """Give MockFirestore's DocumentReference the value equality the real one has.
+
+    ``google.cloud.firestore_v1``'s DocumentReference compares by client and path, so a
+    query filtering on a DocumentReference field matches a reference read back out of the
+    store. mock-firestore 0.11.0 defines no ``__eq__`` at all and falls back to identity,
+    so the same document read twice compares unequal and such a query silently returns
+    nothing — which does not reflect production behaviour.
+
+    Idempotent, so test modules can call it at import time without coordinating.
+    """
+    if '__eq__' in DocumentReference.__dict__:
+        return
+
+    def __eq__(self, other):
+        if isinstance(other, DocumentReference):
+            return self._path == other._path
+        return NotImplemented
+
+    DocumentReference.__eq__ = __eq__
+    DocumentReference.__hash__ = lambda self: hash(tuple(self._path))
+
+
+__all__ = [
+    'FieldFilter',
+    'enable_document_reference_equality',
+    'enable_field_filter_support',
+    'logger',
+]

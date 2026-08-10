@@ -16,9 +16,10 @@ from app.auto.payout_task import process_platform_payout  # noqa: E402
 from app.auto.transaction_tasks import process_transactions  # noqa: E402
 from app.firebase_setup import MOCK_DB  # noqa: E402
 from app.models import ActorRole, Status, TransactionType  # noqa: E402
-from tests._common import enable_field_filter_support  # noqa: E402
+from tests._common import enable_document_reference_equality, enable_field_filter_support  # noqa: E402
 
 enable_field_filter_support()
+enable_document_reference_equality()
 
 HOST_UID = 'host_uid'
 HOST_REF = f'users/{HOST_UID}'
@@ -149,6 +150,52 @@ class TestEscrowRelease(MoneyTaskTestCase):
             process_transactions()
 
         create.assert_called_once()
+
+
+class TestTripRefShapes(MoneyTaskTestCase):
+    """`tripRef` is not the `str` that models.py declares.
+
+    In production it is a DocumentReference on 297 of 319 transactions and a
+    'trips/<id>' path string on the remaining 22. Neither can be handed to
+    .document(): the first raises TypeError, the second ValueError.
+    """
+
+    def _run_escrow_with_trip_ref(self, trip_ref):
+        self._add_host_user()
+        self._add_completed_trip('trip_1', days_ago=20)
+        self._add_transaction('txn_1', trip_ref)
+
+        transfer = MagicMock(id='tr_abc123')
+        with patch(TRANSFER_CREATE, return_value=transfer) as create:
+            process_transactions()
+        return create
+
+    def test_escrow_release_handles_a_document_reference_trip_ref(self):
+        create = self._run_escrow_with_trip_ref(MOCK_DB.collection('trips').document('trip_1'))
+        create.assert_called_once()
+
+    def test_escrow_release_handles_a_path_string_trip_ref(self):
+        create = self._run_escrow_with_trip_ref('trips/trip_1')
+        create.assert_called_once()
+
+    def _run_payout_with_trip_ref(self, trip_ref):
+        self._add_completed_trip('trip_1', days_ago=20)
+        self._add_transaction('txn_1', trip_ref, status=Status.completed, netFeeCents=1200)
+
+        payout = MagicMock(id='po_abc123')
+        with patch(PAYOUT_CREATE, return_value=payout) as create:
+            process_platform_payout()
+        return create
+
+    def test_payout_handles_a_document_reference_trip_ref(self):
+        create = self._run_payout_with_trip_ref(MOCK_DB.collection('trips').document('trip_1'))
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs['amount'], 1200)
+
+    def test_payout_handles_a_path_string_trip_ref(self):
+        create = self._run_payout_with_trip_ref('trips/trip_1')
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs['amount'], 1200)
 
 
 class TestPlatformPayout(MoneyTaskTestCase):
