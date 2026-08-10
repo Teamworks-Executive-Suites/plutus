@@ -7,7 +7,37 @@ from google.cloud.firestore_v1 import FieldFilter
 from app.firebase_setup import current_time, db
 from app.models import ActorRole, Status, Transaction, TransactionType
 from app.pay._utils import app_logger
-from app.utils import settings
+from app.utils import document_id, settings
+
+
+def resolve_host_user_ref(trip):
+    """Return 'users/<uid>' for the host who should receive a trip's host-side transfer.
+
+    The property's owner is the source of truth for who hosts a booking; `trip['host']`
+    is a denormalised copy kept only as a fallback. Never derive this from the trip's
+    `userRef`, which is the guest who booked.
+
+    Returns None when no host can be determined, so the caller can refuse to write a
+    transaction addressed to nobody.
+    """
+    # Read through to_dict(): DocumentSnapshot.get() raises KeyError on an absent field,
+    # and neither propertyRef nor host is guaranteed to be present.
+    trip_data = trip.to_dict() or {}
+
+    property_id = document_id(trip_data.get('propertyRef'))
+    if property_id:
+        prop = db.collection('properties').document(property_id).get()
+        if prop.exists:
+            owner_id = document_id((prop.to_dict() or {}).get('userRef'))
+            if owner_id:
+                return f'users/{owner_id}'
+
+    host_id = document_id(trip_data.get('host'))
+    if host_id:
+        return f'users/{host_id}'
+
+    return None
+
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
@@ -46,10 +76,11 @@ def get_document_from_ref(ref):
     :param ref:
     :return:
     """
-    collection_id, document_id = ref.split('/')
-    app_logger.info('Getting document from collection %s with ID %s', collection_id, document_id)
+    # Named doc_id, not document_id, so it does not shadow the imported helper.
+    collection_id, doc_id = ref.split('/')
+    app_logger.info('Getting document from collection %s with ID %s', collection_id, doc_id)
     try:
-        document = db.collection(collection_id).document(document_id).get()
+        document = db.collection(collection_id).document(doc_id).get()
         return document
     except Exception as e:
         app_logger.error('An error occurred in get_document_from_ref for %s: %s', ref, str(e))
@@ -299,12 +330,22 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             db.collection('transactions').add(client_transaction)
 
             # transaction from platform to host
+            host_user_ref = resolve_host_user_ref(trip)
+            if host_user_ref is None:
+                # Skip rather than raise. The card has already been charged above, and the
+                # enclosing handler would mark the dispute failed and return 500 — which
+                # invites a retry, and with no Stripe idempotency key that double-charges
+                # the guest. A missing host row is recoverable; a double charge is not.
+                app_logger.error(
+                    'Cannot resolve a host for trip %s; extra-charge host transaction not written',
+                    trip_ref,
+                )
+                return response
+
             host_transaction = Transaction(
                 actorRef=f'users/{settings.platform_user_id}',
                 actorRole=ActorRole.platform,
-                receiverRef=trip.get('propertyRef').id
-                if hasattr(trip.get('propertyRef'), 'id')
-                else str(trip.get('propertyRef')),
+                receiverRef=host_user_ref,
                 receiverRole=ActorRole.host,
                 transferId=None,
                 status=Status.in_escrow,
