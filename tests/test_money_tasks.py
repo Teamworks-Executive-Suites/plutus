@@ -152,6 +152,44 @@ class TestEscrowRelease(MoneyTaskTestCase):
         create.assert_called_once()
 
 
+class TestRefundMergeBranch(MoneyTaskTestCase):
+    """A refunded trip can have no escrowed host rows left to merge.
+
+    Production trip CY2lYiVEW4QsaJkheheO is exactly this: 3 refund transactions and 0
+    in_escrow host transactions, reached through the single in_escrow row whose
+    receiverRole is 'platform'. The merge branch indexes host_transactions[0]
+    unconditionally, so it raises IndexError and takes the whole run down with it.
+    """
+
+    def _refunded_trip_with_no_escrowed_host_rows(self):
+        self._add_host_user()
+        self._add_completed_trip('trip_1', days_ago=20)
+        self._add_transaction('txn_platform', 'trip_1', receiverRole=ActorRole.platform)
+        self._add_transaction(
+            'txn_refund', 'trip_1', type=TransactionType.refund, status=Status.completed, grossFeeCents=0
+        )
+
+    def test_does_not_crash_when_there_is_nothing_left_to_merge(self):
+        self._refunded_trip_with_no_escrowed_host_rows()
+
+        with patch(TRANSFER_CREATE) as create:
+            process_transactions()
+
+        create.assert_not_called()
+
+    def test_tolerates_missing_gross_fees_when_merging(self):
+        self._add_host_user()
+        self._add_completed_trip('trip_1', days_ago=20)
+        self._add_transaction('txn_host', 'trip_1', grossFeeCents=None)
+        self._add_transaction(
+            'txn_refund', 'trip_1', type=TransactionType.refund, status=Status.completed, grossFeeCents=None
+        )
+
+        transfer = MagicMock(id='tr_abc123')
+        with patch(TRANSFER_CREATE, return_value=transfer):
+            process_transactions()  # must not raise TypeError on None
+
+
 class TestTripRefShapes(MoneyTaskTestCase):
     """`tripRef` is not the `str` that models.py declares.
 

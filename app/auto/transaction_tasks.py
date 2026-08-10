@@ -118,9 +118,20 @@ def process_transactions():
                                     receiver_id,
                                 )
 
+                    elif not host_transactions:
+                        # A refunded trip can have no escrowed host rows left to merge —
+                        # they may already have settled, or never existed. There is
+                        # nothing to pay and no receiver to derive, so leave it alone
+                        # rather than indexing an empty list and killing the whole run.
+                        app_logger.info(
+                            'Trip %s is refunded with no escrowed host transactions; nothing to merge', trip_id
+                        )
+
                     else:
-                        total_owed = sum(t.get('grossFeeCents') for t in host_transactions) - sum(
-                            t.get('grossFeeCents') for t in refund_transactions
+                        # Fees can be absent on older documents; treat a missing amount as
+                        # zero rather than raising mid-merge.
+                        total_owed = sum((t.get('grossFeeCents') or 0) for t in host_transactions) - sum(
+                            (t.get('grossFeeCents') or 0) for t in refund_transactions
                         )
 
                         host_fee, guest_fee, net_fee = calculate_fees(total_owed)
