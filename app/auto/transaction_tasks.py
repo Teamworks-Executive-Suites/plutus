@@ -5,7 +5,7 @@ import logfire
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.auto._utils import app_logger, trip_document_id
+from app.auto._utils import app_logger, document_id
 from app.firebase_setup import db
 from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
@@ -35,9 +35,9 @@ def process_transactions():
         for transaction in transactions:
             transaction_doc = db.collection('transactions').document(transaction.id).get()
             # Keep the stored value for querying and re-writing, and a normalised id for
-            # document lookups and de-duplication. See trip_document_id for why.
+            # document lookups and de-duplication. See document_id for why.
             trip_ref = transaction_doc.get('tripRef')
-            trip_id = trip_document_id(trip_ref)
+            trip_id = document_id(trip_ref)
 
             if trip_id is None:
                 app_logger.error('Transaction %s has an unusable tripRef, skipping', transaction.id)
@@ -84,11 +84,21 @@ def process_transactions():
 
                     if not refund_transactions:
                         for host_transaction in host_transactions:
-                            receiver_ref = host_transaction.get('receiverRef')
-                            user = db.collection('users').document(receiver_ref.split('/')[1]).get()
-                            stripe_account_id = user.get('stripeAccountID')
+                            receiver_id = document_id(host_transaction.get('receiverRef'))
+                            if receiver_id is None:
+                                app_logger.error(
+                                    'Transaction %s has an unusable receiverRef, skipping', host_transaction.id
+                                )
+                                continue
 
-                            if stripe_account_id:
+                            user = db.collection('users').document(receiver_id).get()
+                            stripe_account_id = user.get('stripeAccountID') if user.exists else None
+
+                            if receiver_id == settings.platform_user_id:
+                                # The platform is its own host and holds no Connect account;
+                                # there is nothing to transfer, so just settle the row.
+                                host_transaction.reference.update({'status': Status.completed})
+                            elif stripe_account_id:
                                 try:
                                     transfer = stripe.Transfer.create(
                                         amount=host_transaction.get('hostFeeCents'),
@@ -102,12 +112,10 @@ def process_transactions():
                                     )
                                 except Exception as e:
                                     app_logger.error('Failed to create transfer: %s', str(e))
-                            elif host_transaction.get('receiverRef') == f'users/{settings.platform_user_id}':
-                                host_transaction.reference.update({'status': Status.completed})
                             else:
                                 app_logger.error(
                                     'No Stripe account ID for user %s, unable to process transfer,',
-                                    host_transaction.get('receiverRef'),
+                                    receiver_id,
                                 )
 
                     else:
@@ -138,11 +146,13 @@ def process_transactions():
                         for t in host_transactions:
                             t.reference.update({'status': Status.merged})
 
-                        receiver_ref = new_transaction_data['receiverRef']
-                        user = db.collection('users').document(receiver_ref.split('/')[1]).get()
-                        stripe_account_id = user.get('stripeAccountID')
+                        receiver_id = document_id(new_transaction_data['receiverRef'])
+                        user = db.collection('users').document(receiver_id).get() if receiver_id else None
+                        stripe_account_id = user.get('stripeAccountID') if user and user.exists else None
 
-                        if stripe_account_id:
+                        if receiver_id == settings.platform_user_id:
+                            new_transaction_ref.update({'status': Status.completed})
+                        elif stripe_account_id:
                             try:
                                 transfer = stripe.Transfer.create(
                                     amount=new_transaction_data['hostFeeCents'],

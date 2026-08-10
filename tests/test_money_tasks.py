@@ -178,6 +178,72 @@ class TestTripRefShapes(MoneyTaskTestCase):
         create = self._run_escrow_with_trip_ref('trips/trip_1')
         create.assert_called_once()
 
+    def _run_escrow_with_receiver_ref(self, receiver_ref):
+        self._add_host_user()
+        self._add_completed_trip('trip_1', days_ago=20)
+        self._add_transaction('txn_1', 'trip_1', receiverRef=receiver_ref)
+
+        transfer = MagicMock(id='tr_abc123')
+        with patch(TRANSFER_CREATE, return_value=transfer) as create:
+            process_transactions()
+        return create
+
+    def test_escrow_release_handles_a_document_reference_receiver_ref(self):
+        create = self._run_escrow_with_receiver_ref(MOCK_DB.collection('users').document(HOST_UID))
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs['destination'], STRIPE_ACCOUNT)
+
+    def test_escrow_release_handles_a_bare_id_receiver_ref(self):
+        create = self._run_escrow_with_receiver_ref(HOST_UID)
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs['destination'], STRIPE_ACCOUNT)
+
+    def test_escrow_release_handles_a_path_string_receiver_ref(self):
+        create = self._run_escrow_with_receiver_ref(HOST_REF)
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs['destination'], STRIPE_ACCOUNT)
+
+
+class TestPlatformOwnedEscrow(MoneyTaskTestCase):
+    """The platform is its own host here, and holds no Stripe Connect account.
+
+    113 of the 141 escrowed host transactions pay settings.platform_user_id, which has
+    no stripeAccountID. Those must settle without a transfer — you do not pay yourself
+    through Connect — rather than logging 'no Stripe account' forever.
+    """
+
+    PLATFORM_UID = 'platform_uid'
+
+    def _run(self, receiver_ref):
+        self.db.collection('users').document(self.PLATFORM_UID).set({})  # no stripeAccountID
+        self._add_completed_trip('trip_1', days_ago=20)
+        self._add_transaction('txn_1', 'trip_1', receiverRef=receiver_ref)
+
+        with patch.object(settings, 'platform_user_id', self.PLATFORM_UID):
+            with patch(TRANSFER_CREATE) as create:
+                process_transactions()
+        return create
+
+    def test_settles_without_a_transfer_when_receiver_ref_is_a_document_reference(self):
+        create = self._run(MOCK_DB.collection('users').document(self.PLATFORM_UID))
+        create.assert_not_called()
+        txn = self.db.collection('transactions').document('txn_1').get().to_dict()
+        self.assertEqual(txn['status'], Status.completed)
+
+    def test_settles_without_a_transfer_when_receiver_ref_is_a_path_string(self):
+        create = self._run(f'users/{self.PLATFORM_UID}')
+        create.assert_not_called()
+        txn = self.db.collection('transactions').document('txn_1').get().to_dict()
+        self.assertEqual(txn['status'], Status.completed)
+
+    def test_a_non_platform_host_without_stripe_is_left_in_escrow(self):
+        create = self._run(MOCK_DB.collection('users').document('some_other_host'))
+        create.assert_not_called()
+        txn = self.db.collection('transactions').document('txn_1').get().to_dict()
+        self.assertEqual(txn['status'], Status.in_escrow)
+
+
+class TestTripRefShapesContinued(MoneyTaskTestCase):
     def _run_payout_with_trip_ref(self, trip_ref):
         self._add_completed_trip('trip_1', days_ago=20)
         self._add_transaction('txn_1', trip_ref, status=Status.completed, netFeeCents=1200)

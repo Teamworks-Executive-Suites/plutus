@@ -3,22 +3,28 @@ import logging
 app_logger = logging.getLogger('plutus.auto')
 
 
-def trip_document_id(trip_ref):
-    """Return the bare `trips/` document id for a stored `tripRef` value.
+def document_id(ref):
+    """Return the bare document id for a stored Firestore reference field.
 
-    `Transaction.tripRef` is declared `str` in models.py, but production data holds a
-    DocumentReference on the large majority of transactions and a 'trips/<id>' path
-    string on the rest. Neither can be handed to `.document()` — a DocumentReference
-    raises TypeError and a path string raises ValueError ("A document must have an even
-    number of path elements") — so every caller must normalise first.
+    `Transaction.tripRef` and `Transaction.receiverRef` are both declared `str` in
+    models.py, but production data holds three different shapes for each:
 
-    Returns None when the value is missing or an unrecognised type, letting the caller
-    skip that transaction rather than crash the whole scheduled run.
+        tripRef      DocumentReference 297 / 'trips/<id>'  22 / bare id   0   (of 319)
+        receiverRef  DocumentReference 297 / 'users/<id>'   8 / bare id  14   (of 319)
+
+    Passing these on unchanged breaks in different ways. `.document()` raises TypeError
+    on a DocumentReference and ValueError on a path string, while the old
+    `ref.split('/')[1]` idiom raises AttributeError on a DocumentReference and
+    IndexError on a bare id — none of them inside a try, so a single such document
+    killed the whole scheduled run.
+
+    Returns None when the value is missing or an unrecognised type, so callers can skip
+    that transaction instead of crashing.
     """
-    if trip_ref is None:
+    if ref is None:
         return None
-    if hasattr(trip_ref, 'id'):
-        return trip_ref.id
-    if isinstance(trip_ref, str) and trip_ref:
-        return trip_ref.rsplit('/', 1)[-1]
+    if hasattr(ref, 'id'):
+        return ref.id
+    if isinstance(ref, str) and ref:
+        return ref.rsplit('/', 1)[-1]
     return None
