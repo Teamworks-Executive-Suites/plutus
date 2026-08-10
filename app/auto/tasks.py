@@ -1,4 +1,7 @@
 import base64
+import hashlib
+import hmac
+import json
 from datetime import datetime, timedelta, timezone
 
 import logfire
@@ -99,7 +102,46 @@ def send_reminder_sms(trip_doc, property_doc, time: int):
             send_sms(host_num, f'Reminder: Your booking {trip_doc.id} starts in {time} hours. View here: {property_link}')
 
 
-def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, to_host: bool = False):
+def build_review_url(trip_doc, property_doc) -> str:
+    """
+    Signed, expiring link inviting a guest to review the room they booked.
+
+    The marketing site cannot tell a real guest from anyone with a URL --
+    bookings live in Firestore and that tier holds no Firebase credentials.
+    So we sign here, where the booking is known to be real and complete, and
+    the site verifies the signature. An unsigned URL cannot produce a review,
+    which is what makes the resulting rating markup defensible.
+
+    Must stay in step with createReviewToken/verifyReviewToken in the site's
+    src/lib/reviews.ts -- same payload keys, same base64url, same HMAC.
+
+    Returns '' when no secret is configured, so a missing key degrades to no
+    review link rather than to an emailed link that always fails.
+    """
+    secret = settings.review_link_secret
+    if not secret:
+        return ''
+
+    expires = int((datetime.now(timezone.utc) + timedelta(days=30)).timestamp())
+    payload = {
+        't': trip_doc.reference.id,
+        'p': property_doc.reference.id,
+        'e': expires,
+    }
+    # separators without spaces: the signature covers these exact bytes, and
+    # Python's default ', ' would not match what the site produces.
+    raw = json.dumps(payload, separators=(',', ':')).encode()
+    encoded = base64.urlsafe_b64encode(raw).decode().rstrip('=')
+    signature = base64.urlsafe_b64encode(
+        hmac.new(secret.encode(), encoded.encode(), hashlib.sha256).digest()
+    ).decode().rstrip('=')
+
+    return f'{settings.marketing_url}/review/{encoded}.{signature}'
+
+
+def sendgrid_email(
+    trip_doc, property_doc, template_id: str, time: int = None, to_host: bool = False, review_url: str = None
+):
     """
     Function to send an email using SendGrid API.
     """
@@ -155,6 +197,13 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
         if time:
             data['personalizations'][0]['dynamic_template_data']['time'] = time
 
+        # Passed through for the template to use, not sent as a new message.
+        # The guest completion email already goes out; adding the review ask
+        # is a SendGrid template edit, so enabling it needs no deploy and
+        # introduces no additional contact with customers.
+        if review_url:
+            data['personalizations'][0]['dynamic_template_data']['review_url'] = review_url
+
         # Send the request
         response = requests.post(url, headers=headers, json=data)
 
@@ -169,7 +218,13 @@ def send_complete_email(trip_doc, property_doc):
         guest_complete_email_template_id = 'd-335808be895a413497459fbb3a311a39'
 
         sendgrid_email(trip_doc, property_doc, host_complete_email_template_id, to_host=True)
-        sendgrid_email(trip_doc, property_doc, guest_complete_email_template_id, to_host=False)
+        sendgrid_email(
+            trip_doc,
+            property_doc,
+            guest_complete_email_template_id,
+            to_host=False,
+            review_url=build_review_url(trip_doc, property_doc),
+        )
 
 
 def send_reminder_email(trip_doc, property_doc, time: int):

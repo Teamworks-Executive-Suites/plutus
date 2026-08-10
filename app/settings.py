@@ -13,6 +13,12 @@ class Settings(BaseSettings):
 
     url: str = 'http://localhost:8000'
     app_url: str = 'https://app.bookteamworks.com'
+    marketing_url: str = 'https://bookteamworks.com'
+
+    # Shared with the marketing site, which verifies the review links signed
+    # here. Both sides must hold the same value or every emailed link fails.
+    # Empty disables review links entirely rather than emailing broken ones.
+    review_link_secret: str = ''
 
     buffer_time: int = 30
 
