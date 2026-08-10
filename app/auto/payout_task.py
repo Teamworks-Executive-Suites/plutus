@@ -1,9 +1,11 @@
+from datetime import datetime, timezone
+
 import logfire
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.auto._utils import app_logger
-from app.firebase_setup import current_time, db
+from app.firebase_setup import db
 from app.models import Status
 
 
@@ -20,10 +22,17 @@ def process_platform_payout():
             processed_trip_refs = set()
             total_balance = 0
             transaction_ids = []
+            included_transactions = []
 
             for transaction in transactions_ref:
                 transaction_doc = db.collection('transactions').document(transaction.id).get()
                 transaction_data = transaction_doc.to_dict()
+
+                # Already settled in an earlier payout. Without this the query re-selects
+                # every completed transaction on every hourly run and pays it again.
+                if transaction_data.get('paidOut'):
+                    continue
+
                 trip_ref_obj = transaction_doc.get('tripRef')
                 if hasattr(trip_ref_obj, 'id'):
                     trip_ref = trip_ref_obj.id
@@ -40,6 +49,7 @@ def process_platform_payout():
                         net_fee_cents = transaction_data.get('netFeeCents', 0)
                         total_balance += net_fee_cents
                         transaction_ids.append(transaction_doc.id)
+                        included_transactions.append(transaction_doc.reference)
                         processed_trip_refs.add(trip_ref)
                     except Exception as e:
                         app_logger.error('Error processing transaction %s: %s', transaction.id, str(e))
@@ -58,11 +68,16 @@ def process_platform_payout():
                     payout_data = {
                         'status': Status.completed,
                         'amountCents': total_balance,
-                        'processedAt': current_time,
+                        'processedAt': datetime.now(timezone.utc),
                         'stripePayoutId': payout.id,
                         'transactionIds': transaction_ids,
                     }
                     db.collection('payouts').add(payout_data)
+
+                    # Only after Stripe accepted the payout, so a failure leaves the
+                    # transactions eligible for the next run rather than stranding them.
+                    for reference in included_transactions:
+                        reference.update({'paidOut': True, 'payoutId': payout.id})
 
                 except Exception as e:
                     app_logger.error('Failed to create platform payout: %s', str(e))

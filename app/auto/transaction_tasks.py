@@ -1,11 +1,12 @@
 import os
+from datetime import datetime, timezone
 
 import logfire
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.auto._utils import app_logger
-from app.firebase_setup import current_time, db
+from app.firebase_setup import db
 from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
 from app.utils import settings
@@ -17,14 +18,21 @@ def process_transactions():
     with logfire.span('process_transactions'):
         app_logger.info('Starting cron job to process transactions in escrow')
 
-        transactions_ref = (
+        # Materialise the stream before counting it: a Firestore stream is a one-shot
+        # generator, so logging len(list(...)) on it would leave nothing left to iterate.
+        transactions = list(
             db.collection('transactions').where(filter=FieldFilter('status', '==', Status.in_escrow)).stream()
         )
-        app_logger.info('Found %d transactions in escrow', len(list(transactions_ref)))
+        app_logger.info('Found %d transactions in escrow', len(transactions))
+
+        # Read the clock per run. This task runs hourly inside a long-lived process, so a
+        # module-level timestamp would freeze at process start and no trip completed after
+        # deploy would ever clear the 10-day hold.
+        now = datetime.now(timezone.utc)
 
         processed_trip_refs = set()
 
-        for transaction in transactions_ref:
+        for transaction in transactions:
             transaction_doc = db.collection('transactions').document(transaction.id).get()
             trip_ref = transaction_doc.get('tripRef')
 
@@ -38,13 +46,16 @@ def process_transactions():
                 trip_data = trip.to_dict()
                 complete_date = trip_data.get('completeDate')
                 app_logger.info('Checking trip %s, complete_date: %s', trip_ref, complete_date)
-                if complete_date and (current_time - complete_date).days >= 10:
+                if complete_date and (now - complete_date).days >= 10:
                     app_logger.info('Trip %s is complete and eligible for processing', trip_ref)
 
+                    # Escrowed only: a trip can carry host transactions that already
+                    # transferred, and those must not be paid or merged a second time.
                     host_transactions_ref = (
                         db.collection('transactions')
                         .where(filter=FieldFilter('tripRef', '==', trip_ref))
                         .where(filter=FieldFilter('receiverRole', '==', ActorRole.host))
+                        .where(filter=FieldFilter('status', '==', Status.in_escrow))
                         .stream()
                     )
 
@@ -76,7 +87,7 @@ def process_transactions():
                                         amount=host_transaction.get('hostFeeCents'),
                                         currency='usd',
                                         destination=stripe_account_id,
-                                        transfer_group=trip_ref.id,
+                                        transfer_group=trip_ref,
                                     )
                                     app_logger.info('Transfer created: %s', transfer)
                                     host_transaction.reference.update(
