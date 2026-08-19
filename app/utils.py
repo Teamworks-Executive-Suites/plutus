@@ -31,3 +31,18 @@ def document_id(ref):
     if isinstance(ref, str) and ref:
         return ref.rsplit('/', 1)[-1]
     return None
+
+
+def snapshot_field(snapshot, name, default=None):
+    """Read an optional field from a DocumentSnapshot without raising.
+
+    DocumentSnapshot.get() raises KeyError when the field is absent from a document
+    that exists, which is the wrong behaviour for a field that is legitimately
+    optional. `stripeAccountID` is absent on every user who has never onboarded to
+    Stripe Connect — including the platform user, which is precisely the case the
+    settle-in-place branch exists to handle. Reading it with .get() therefore killed
+    the whole escrow run on its first eligible row.
+    """
+    if snapshot is None or not getattr(snapshot, 'exists', False):
+        return default
+    return (snapshot.to_dict() or {}).get(name, default)
