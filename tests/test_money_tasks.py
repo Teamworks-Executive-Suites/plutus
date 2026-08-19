@@ -253,7 +253,13 @@ class TestPlatformOwnedEscrow(MoneyTaskTestCase):
     PLATFORM_UID = 'platform_uid'
 
     def _run(self, receiver_ref):
-        self.db.collection('users').document(self.PLATFORM_UID).set({})  # no stripeAccountID
+        # A real user document with other fields but no stripeAccountID. Emphatically
+        # NOT set({}): MockFirestore reports an empty document as exists=False, which
+        # short-circuits the branch under test and hides the KeyError that
+        # DocumentSnapshot.get raises for an absent field on a document that does exist.
+        self.db.collection('users').document(self.PLATFORM_UID).set(
+            {'display_name': 'Teamworks', 'isAdmin': True, 'isHost': True}
+        )
         self._add_completed_trip('trip_1', days_ago=20)
         self._add_transaction('txn_1', 'trip_1', receiverRef=receiver_ref)
 

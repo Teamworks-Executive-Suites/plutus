@@ -9,7 +9,7 @@ from app.auto._utils import app_logger, document_id
 from app.firebase_setup import db
 from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
-from app.utils import settings
+from app.utils import settings, snapshot_field
 
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
@@ -92,7 +92,7 @@ def process_transactions():
                                 continue
 
                             user = db.collection('users').document(receiver_id).get()
-                            stripe_account_id = user.get('stripeAccountID') if user.exists else None
+                            stripe_account_id = snapshot_field(user, 'stripeAccountID')
 
                             if receiver_id == settings.platform_user_id:
                                 # The platform is its own host and holds no Connect account;
@@ -159,7 +159,7 @@ def process_transactions():
 
                         receiver_id = document_id(new_transaction_data['receiverRef'])
                         user = db.collection('users').document(receiver_id).get() if receiver_id else None
-                        stripe_account_id = user.get('stripeAccountID') if user and user.exists else None
+                        stripe_account_id = snapshot_field(user, 'stripeAccountID')
 
                         if receiver_id == settings.platform_user_id:
                             new_transaction_ref.update({'status': Status.completed})
