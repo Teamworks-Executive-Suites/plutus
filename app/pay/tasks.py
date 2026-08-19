@@ -4,7 +4,7 @@ from datetime import timedelta
 import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.firebase_setup import current_time, db
+from app.firebase_setup import db, utc_now
 from app.models import ActorRole, Status, Transaction, TransactionType
 from app.pay._utils import app_logger
 from app.utils import document_id, settings
@@ -178,8 +178,8 @@ def handle_refund(trip_ref, amount, actor_ref):
         transferId=None,
         status=Status.completed,
         type=TransactionType.refund,
-        createdAt=current_time,
-        processedAt=current_time,
+        createdAt=utc_now(),
+        processedAt=utc_now(),
         notes='Refund processed on plutus',
         guestFeeCents=0,
         hostFeeCents=0,
@@ -203,8 +203,8 @@ def handle_refund(trip_ref, amount, actor_ref):
         transferId=None,
         status=Status.in_escrow,
         type=TransactionType.refund,
-        createdAt=current_time,
-        processedAt=current_time,
+        createdAt=utc_now(),
+        processedAt=utc_now(),
         notes='Refund processed on plutus',
         guestFeeCents=0,
         hostFeeCents=0,
@@ -314,8 +314,8 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 transferId=None,
                 status=Status.completed,
                 type=TransactionType.payment,
-                createdAt=current_time,
-                processedAt=current_time,
+                createdAt=utc_now(),
+                processedAt=utc_now(),
                 notes='Extra charge processed on plutus',
                 guestFeeCents=0,
                 hostFeeCents=0,
@@ -350,8 +350,8 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 transferId=None,
                 status=Status.in_escrow,
                 type=TransactionType.payment,
-                createdAt=current_time,
-                processedAt=current_time,
+                createdAt=utc_now(),
+                processedAt=utc_now(),
                 notes='Extra charge processed on plutus',
                 guestFeeCents=guest_fee,
                 hostFeeCents=host_fee,
@@ -422,8 +422,11 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
     app_logger.info('Cancellation policy: %s', cancellation_policy)
 
     trip_begin_time = trip.get('tripBeginDateTime')
-    trip_begin_time = trip_begin_time.astimezone(current_time.tzinfo)
-    time_difference = trip_begin_time - current_time  # time from now until trip starts
+    # One reading, used for both the conversion and the subtraction: two calls would
+    # compare the booking against two slightly different instants.
+    now = utc_now()
+    trip_begin_time = trip_begin_time.astimezone(now.tzinfo)
+    time_difference = trip_begin_time - now  # time from now until trip starts
 
     payment_intent_ids = trip.get('stripePaymentIntents')
     if not payment_intent_ids:
@@ -517,8 +520,8 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
         transferId=None,
         status=Status.completed,
         type=TransactionType.refund,
-        createdAt=current_time,
-        processedAt=current_time,
+        createdAt=utc_now(),
+        processedAt=utc_now(),
         notes='Refund processed on plutus',
         guestFeeCents=0,
         hostFeeCents=0,
