@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from pytz import timezone
 
 from app.cal._utils import app_logger
-from app.firebase_setup import current_time, db
+from app.firebase_setup import db, utc_now
 from app.models import CancelledGCalEvent, Date, GCalEvent, TripData
 from app.utils import settings
 
@@ -223,7 +223,7 @@ def convert_event_to_trip_data(event: GCalEvent, property_doc_ref: Any) -> TripD
 
         # Creating the TripData instance
         trip_data = TripData(
-            tripCreated=current_time,
+            tripCreated=utc_now(),
             isExternal=is_external,
             isInquiry=False,
             propertyRef=property_doc_ref,
