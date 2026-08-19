@@ -6,7 +6,7 @@ import stripe
 from fastapi.testclient import TestClient
 from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
-from app.firebase_setup import MOCK_DB, current_time
+from app.firebase_setup import MOCK_DB, utc_now
 from app.main import app
 from app.utils import settings
 
@@ -399,7 +399,11 @@ class StripeCancelRefund(TestCase):
         self.mock_firestore.collection('trips').document('fake_trip_ref').update({'stripePaymentIntents': [pi.id]})
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=1)
+        # Comfortably more than 24 hours, not exactly 24. The policy boundary is
+        # `>= timedelta(hours=24)`, and the code under test reads the clock a moment
+        # after this line runs, so an exact 24 hours lands just under the boundary.
+        # This only passed before because both sides shared one frozen timestamp.
+        trip_begin_datetime = utc_now() + timedelta(days=1, minutes=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -464,7 +468,11 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=1)
+        # Comfortably more than 24 hours, not exactly 24. The policy boundary is
+        # `>= timedelta(hours=24)`, and the code under test reads the clock a moment
+        # after this line runs, so an exact 24 hours lands just under the boundary.
+        # This only passed before because both sides shared one frozen timestamp.
+        trip_begin_datetime = utc_now() + timedelta(days=1, minutes=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -531,7 +539,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(hours=5)
+        trip_begin_datetime = utc_now() + timedelta(hours=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -601,7 +609,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=8)
+        trip_begin_datetime = utc_now() + timedelta(days=8)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -671,7 +679,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=5)
+        trip_begin_datetime = utc_now() + timedelta(days=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -741,7 +749,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(hours=5)
+        trip_begin_datetime = utc_now() + timedelta(hours=5)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -811,7 +819,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=31)
+        trip_begin_datetime = utc_now() + timedelta(days=31)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -881,7 +889,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=8)
+        trip_begin_datetime = utc_now() + timedelta(days=8)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -951,7 +959,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=2)
+        trip_begin_datetime = utc_now() + timedelta(days=2)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1021,7 +1029,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=92)
+        trip_begin_datetime = utc_now() + timedelta(days=92)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1091,7 +1099,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=40)
+        trip_begin_datetime = utc_now() + timedelta(days=40)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1161,7 +1169,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=20)
+        trip_begin_datetime = utc_now() + timedelta(days=20)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1231,7 +1239,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=20)
+        trip_begin_datetime = utc_now() + timedelta(days=20)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1283,11 +1291,9 @@ class StripeCancelRefund(TestCase):
             confirm=True,
         )
 
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'stripePaymentIntents': [pi.id]}
-        )
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'stripePaymentIntents': [pi.id]})
 
-        trip_begin_datetime = current_time + timedelta(days=2)
+        trip_begin_datetime = utc_now() + timedelta(days=2)
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
             {'tripBeginDateTime': trip_begin_datetime}
@@ -1326,11 +1332,9 @@ class StripeCancelRefund(TestCase):
             confirm=True,
         )
 
-        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
-            {'stripePaymentIntents': [pi.id]}
-        )
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update({'stripePaymentIntents': [pi.id]})
 
-        trip_begin_datetime = current_time + timedelta(days=10)
+        trip_begin_datetime = utc_now() + timedelta(days=10)
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
         self.mock_firestore.collection('trips').document('fake_trip_ref').update(
             {'tripBeginDateTime': trip_begin_datetime}
@@ -1388,7 +1392,7 @@ class StripeCancelRefund(TestCase):
         )
 
         # Create a datetime object
-        trip_begin_datetime = current_time + timedelta(days=20)
+        trip_begin_datetime = utc_now() + timedelta(days=20)
 
         # Convert the datetime object to a DatetimeWithNanoseconds object
         trip_begin_datetime = DatetimeWithNanoseconds.fromtimestamp(trip_begin_datetime.timestamp())
@@ -1569,8 +1573,8 @@ class StripeTransactions(TestCase):
     #         transferId='',
     #         status=Status.completed,
     #         type=TransactionType.payment,
-    #         createdAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
-    #         processedAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
+    #         createdAt=DatetimeWithNanoseconds.fromtimestamp(utc_now().timestamp()),
+    #         processedAt=DatetimeWithNanoseconds.fromtimestamp(utc_now().timestamp()),
     #         notes='Test transaction from guest to platform',
     #         grossAmountCents=1099,
     #         guestFeeCents=0,
@@ -1591,8 +1595,8 @@ class StripeTransactions(TestCase):
     #         transferId='',
     #         status=Status.in_escrow,
     #         type=TransactionType.transfer,
-    #         createdAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
-    #         processedAt=DatetimeWithNanoseconds.fromtimestamp(current_time.timestamp()),
+    #         createdAt=DatetimeWithNanoseconds.fromtimestamp(utc_now().timestamp()),
+    #         processedAt=DatetimeWithNanoseconds.fromtimestamp(utc_now().timestamp()),
     #         notes='Test transaction from host to platform',
     #         grossAmountCents=1099,
     #         guestFeeCents=0,
