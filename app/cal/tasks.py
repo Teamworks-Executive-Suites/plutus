@@ -20,6 +20,40 @@ creds = service_account.Credentials.from_service_account_info(
     settings.firebase_credentials, scopes=['https://www.googleapis.com/auth/calendar']
 )
 
+# Fields the Google Calendar is authoritative for on a trip that already exists in
+# Firestore. Booking state (isInquiry, isOffer, upcoming, payment) is owned by the app.
+CALENDAR_OWNED_FIELDS = ('tripBeginDateTime', 'tripEndDateTime', 'tripDate', 'eventId', 'eventSummary')
+
+
+def is_eligible_for_event_backfill(trip_data: dict) -> bool:
+    """Whether the automatic sweep may create a calendar event for this trip.
+
+    Only trips that actually hold the room qualify. Inquiries and offers are still
+    awaiting host acceptance or guest payment; giving them an event puts an unpaid
+    slot on the property's calendar, and the resulting sync used to feed it back in
+    as a confirmed booking. Events for accepted offers are created deliberately by
+    the app via create_or_update_event_from_trip, not by this sweep.
+    """
+    if trip_data.get('cancelTrip'):
+        return False
+    if trip_data.get('isBlocked'):
+        # Host-blocked time holds the room without being a booking.
+        return True
+    return trip_data.get('isInquiry') is False and trip_data.get('isOffer') is False
+
+
+def calendar_event_id_for_trip(trip_id: str) -> str:
+    """Deterministic Google Calendar event ID for a trip.
+
+    Deriving the ID from the trip makes events().insert idempotent: two concurrent
+    syncs collide on the same ID (409) instead of creating two events for one booking,
+    which previously also produced a phantom duplicate trip on the next sync.
+
+    Google requires base32hex, so the trip ID is hex-encoded ('trip' and hex digits
+    are all within the permitted a-v0-9 range).
+    """
+    return 'trip' + trip_id.encode('utf-8').hex()
+
 
 def renew_notification_channel(calendar_id, channel_id, channel_type, channel_address):
     service = build('calendar', 'v3', credentials=creds)
@@ -235,9 +269,14 @@ def handle_validated_event(event: GCalEvent, property_doc_ref: Any):
 
 def update_existing_trip(trip_ref, trip_data: TripData, event: GCalEvent):
     """
-    Update an existing trip in the Firestore database from the Google Calendar event,
+    Update an existing trip in the Firestore database from the Google Calendar event.
+
+    Only CALENDAR_OWNED_FIELDS are written. Writing the whole TripData used to clobber
+    isInquiry (and reset tripCreated to the worker's start time), which silently promoted
+    unpaid inquiries into confirmed bookings.
     """
-    trip_ref.reference.update(trip_data.dict())
+    updates = {field: getattr(trip_data, field) for field in CALENDAR_OWNED_FIELDS}
+    trip_ref.reference.update(updates)
     app_logger.info('Updated trip for event: %s, trip ref: %s', event.id, trip_ref.id)
 
 
@@ -345,14 +384,18 @@ def create_events_for_future_trips(property_doc_id: str):
         for trip in future_trips:
             trip_data = trip.to_dict()
             app_logger.info('Trip data: %s', trip)
-            if 'eventId' not in trip_data:
-                # Call create_or_update_event_from_trip to create the event
-                app_logger.info('Creating event for trip: %s', trip.reference)
-                document_ref_str = 'properties/' + property_doc_id
-                trip_ref_str = 'trips/' + trip.id
-                create_or_update_event_from_trip(document_ref_str, trip_ref_str)
-            else:
+            if 'eventId' in trip_data:
                 app_logger.info('Event already exists for trip: %s', trip.reference)
+                continue
+            if not is_eligible_for_event_backfill(trip_data):
+                # Inquiries, offers awaiting payment and cancelled trips do not hold the room.
+                app_logger.info('Trip is not eligible for a calendar event, skipping: %s', trip.reference)
+                continue
+            # Call create_or_update_event_from_trip to create the event
+            app_logger.info('Creating event for trip: %s', trip.reference)
+            document_ref_str = 'properties/' + property_doc_id
+            trip_ref_str = 'trips/' + trip.id
+            create_or_update_event_from_trip(document_ref_str, trip_ref_str)
 
 
 def create_or_update_event_from_trip(property_ref, trip_ref):
@@ -425,9 +468,21 @@ def create_or_update_event_from_trip(property_ref, trip_ref):
                             calendarId=calendar_id, eventId=trip_data['eventId'], body=main_event_data
                         ).execute()
                     else:
-                        event = service.events().insert(calendarId=calendar_id, body=main_event_data).execute()
-                        app_logger.info('Created main event: %s', event['id'])
-                        trip_doc.reference.update({'eventId': event['id']})
+                        # Derive the ID from the trip so a concurrent call collides here
+                        # rather than creating a second event for the same booking.
+                        event_id = calendar_event_id_for_trip(trip_document_id)
+                        main_event_data['id'] = event_id
+                        try:
+                            service.events().insert(calendarId=calendar_id, body=main_event_data).execute()
+                            app_logger.info('Created main event: %s', event_id)
+                        except HttpError as exc:
+                            if exc.resp.status != 409:
+                                raise
+                            app_logger.info('Event %s already exists, adopting it for trip: %s', event_id, trip_ref)
+                            service.events().update(
+                                calendarId=calendar_id, eventId=event_id, body=main_event_data
+                            ).execute()
+                        trip_doc.reference.update({'eventId': event_id})
 
                 else:
                     app_logger.error('User document does not exist for: %s', trip_data['userRef'])
