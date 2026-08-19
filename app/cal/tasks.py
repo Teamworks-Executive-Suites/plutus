@@ -245,8 +245,28 @@ def process_event(event: Union[GCalEvent, CancelledGCalEvent], property_doc_ref:
 
 
 def handle_cancelled_event(event: CancelledGCalEvent):
+    """Cancel the trip behind a deleted calendar event — but only if the calendar owns it.
+
+    External entries (Peerspace and similar) exist only on the remote calendar, so an
+    event disappearing there genuinely means the booking is gone.
+
+    A Teamworks booking is the opposite. It also carries an eventId, because
+    create_or_update_event_from_trip publishes one, so matching on eventId alone let a
+    host tidying up their Google Calendar cancel a booking a guest had paid for. Nothing
+    on this path issues a refund: the money stays taken and the room is released.
+    Cancelling a real booking has to go through the refund flow, not a calendar webhook.
+    """
     existing_trips = db.collection('trips').where(filter=FieldFilter('eventId', '==', event.id)).get()
     for trip in existing_trips:
+        # Absent means not external. Defaulting the other way would cancel bookings.
+        if not (trip.to_dict() or {}).get('isExternal'):
+            app_logger.warning(
+                'Calendar event %s was cancelled but trip %s is a Teamworks booking; leaving it alone. '
+                'Cancel it through the refund flow if that is intended.',
+                event.id,
+                trip.id,
+            )
+            continue
         trip.reference.update({'cancelTrip': True, 'eventId': ''})
         app_logger.info('Marked trip %s as cancelled for cancelled event: %s', trip.id, event.id)
 
@@ -521,34 +541,6 @@ def delete_event_from_trip(property_ref, trip_ref):
                 service.events().delete(calendarId=calendar_id, eventId=trip_data['eventId']).execute()
             else:
                 app_logger.error('Trip document does not exist for: %s', trip_ref)
-                raise HttpError
-        else:
-            app_logger.error('Property document does not exist for: %s', property_ref)
-            raise HttpError
-
-
-def delete_trip_from_event(property_ref, event_id):
-    """
-    Delete a trip associated with an event from the Firestore database
-    """
-    with logfire.span('delete_trip_from_event'):
-        app_logger.info('Deleting trip associated with event: %s , property: %s', event_id, property_ref)
-        # Fetch the specific property document
-        collection_id, document_id = property_ref.split('/')
-        property_doc = db.collection(collection_id).document(document_id).get()
-
-        if property_doc.exists:
-            app_logger.info('Property document exists for event: %s', property_ref)
-
-            # Fetch the specific trip document associated with the event id
-            trip_ref = db.collection('trips').where(filter=FieldFilter('eventId', '==', event_id)).get()
-
-            if trip_ref:
-                # Delete the trip document from Firestore
-                trip_ref[0].reference.delete()
-                app_logger.info('Trip document successfully deleted: %s', trip_ref[0].id)
-            else:
-                app_logger.error('Trip document does not exist for event: %s', event_id)
                 raise HttpError
         else:
             app_logger.error('Property document does not exist for: %s', property_ref)

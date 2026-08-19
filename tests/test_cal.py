@@ -18,11 +18,17 @@ settings.testing = True
 from app.cal.tasks import (  # noqa: E402
     calendar_event_id_for_trip,
     create_or_update_event_from_trip,
+    handle_cancelled_event,
     is_eligible_for_event_backfill,
     update_existing_trip,
 )
 from app.firebase_setup import MOCK_DB  # noqa: E402
-from app.models import TripData  # noqa: E402
+from tests._common import enable_field_filter_support  # noqa: E402
+
+# MockFirestore does not implement the keyword `filter=` form of where() that the
+# production code uses.
+enable_field_filter_support()
+from app.models import CancelledGCalEvent, TripData  # noqa: E402
 
 BEGIN = datetime(2026, 8, 18, 15, 0, tzinfo=timezone.utc)
 END = datetime(2026, 8, 19, 0, 0, tzinfo=timezone.utc)
@@ -251,3 +257,50 @@ class TestCreateEventFromTrip(TestCase):
         server_error = HttpError(httplib2.Response({'status': 500}), b'backend error')
         with self.assertRaises(HttpError):
             self._run(insert_error=server_error)
+
+
+class TestHandleCancelledEvent(TestCase):
+    """Deleting a Google Calendar event must not cancel a paid booking.
+
+    handle_cancelled_event matched purely on eventId. Real Teamworks bookings carry an
+    eventId — create_or_update_event_from_trip puts one there — so a host tidying up
+    their Google Calendar could set cancelTrip on a booking a guest had paid for. No
+    refund is issued on that path: the money simply stays taken while the room is
+    released. 178 paid bookings in production carry an eventId.
+
+    External calendar entries (Peerspace and similar) are the opposite case. The remote
+    calendar is the only source of truth for those, so a cancelled event there does mean
+    the booking is gone.
+    """
+
+    def setUp(self):
+        self.db = MOCK_DB
+        for doc in list(self.db.collection('trips').stream()):
+            doc.reference.delete()
+
+    def _add_trip(self, trip_id, **fields):
+        data = {'eventId': 'evt_1', 'cancelTrip': False}
+        data.update(fields)
+        self.db.collection('trips').document(trip_id).set(data)
+
+    @staticmethod
+    def _cancelled_event():
+        return CancelledGCalEvent(kind='calendar#event', etag='"1"', id='evt_1', status='cancelled')
+
+    def test_an_external_booking_is_cancelled(self):
+        self._add_trip('ext_1', isExternal=True)
+        handle_cancelled_event(self._cancelled_event())
+        self.assertTrue(self.db.collection('trips').document('ext_1').get().to_dict()['cancelTrip'])
+
+    def test_a_paid_internal_booking_is_left_alone(self):
+        self._add_trip('paid_1', isExternal=False, stripePaymentIntents=['pi_1'], tripCost=705)
+        handle_cancelled_event(self._cancelled_event())
+        trip = self.db.collection('trips').document('paid_1').get().to_dict()
+        self.assertFalse(trip['cancelTrip'], 'a paid booking was cancelled with no refund')
+        self.assertEqual(trip['eventId'], 'evt_1', 'the link to the event was cleared')
+
+    def test_an_internal_booking_without_isExternal_set_is_left_alone(self):
+        # Absent means not external. Defaulting the other way would cancel bookings.
+        self._add_trip('legacy_1')
+        handle_cancelled_event(self._cancelled_event())
+        self.assertFalse(self.db.collection('trips').document('legacy_1').get().to_dict()['cancelTrip'])
