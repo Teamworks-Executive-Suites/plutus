@@ -14,6 +14,7 @@ from app.auto.payout_task import process_platform_payout
 from app.auto.tasks import auto_complete_and_notify
 from app.auto.transaction_tasks import process_transactions
 from app.auto.version_tasks import auto_update_cloud_version
+from app.bot.views import bot_router
 from app.cal.views import cal_router
 from app.cal.webhooks import cal_webhook_router
 from app.logging import config
@@ -80,3 +81,4 @@ app.include_router(admin_router)
 app.include_router(cal_router)
 app.include_router(cal_webhook_router)
 app.include_router(stripe_router)
+app.include_router(bot_router)
