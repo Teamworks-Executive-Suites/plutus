@@ -67,6 +67,9 @@ class OffSessionPaymentMethodTest(TestCase):
         self.assertEqual(result['paymentIntentId'], 'pi_1')
         pm_list.assert_not_called()
         self.assertEqual(create.call_args.kwargs['payment_method'], 'pm_default')
+        # A human description, not a blank dashboard row (reported).
+        self.assertIn('guest@example.com', create.call_args.kwargs['description'])
+        self.assertIn('booked directly', create.call_args.kwargs['description'])
 
     def test_falls_back_to_the_attached_card_when_no_default(self):
         # The regression case: no invoice-settings default, but a card is

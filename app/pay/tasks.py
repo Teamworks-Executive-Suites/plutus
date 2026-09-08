@@ -620,6 +620,11 @@ def process_off_session_payment(customer_id, amount, currency, trip_ref, guest_e
             payment_method=default_pm,
             off_session=True,
             confirm=True,
+            # A human description, so this charge is not a blank row in the
+            # Stripe dashboard the way it was reported. The trip metadata is
+            # already below for machine lookup; this is for the person
+            # reading the payments list.
+            description=f'Teamworks booking (booked directly) for {guest_email}',
             metadata={
                 'trip_ref': trip_ref,
                 'guest_email': guest_email,
