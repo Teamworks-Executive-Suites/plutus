@@ -573,11 +573,40 @@ def process_off_session_payment(customer_id, amount, currency, trip_ref, guest_e
         stripe_customer = customers.data[0]
         app_logger.info('Found Stripe customer: %s', stripe_customer.id)
 
-        # Get customer's default payment method
+        # Resolve a card to charge.
+        #
+        # The invoice-settings default is preferred, but relying on it alone is
+        # why "book directly" reported "No payment method on file" for guests
+        # who plainly had a card saved: attaching a PaymentMethod (which the
+        # interactive PaymentSheet checkout does) does NOT make it the
+        # customer's invoice_settings.default_payment_method — that is a
+        # separate, explicit setting, and nothing in either codebase ever set
+        # it. So the default was essentially always empty, and this endpoint
+        # failed for every real guest while the ordinary booking flow (which
+        # uses the PaymentMethod directly) worked.
+        #
+        # Fall back to the customer's most-recently-attached card, which is the
+        # same saved card checkout leaves behind.
         default_pm = stripe_customer.invoice_settings.default_payment_method
 
         if not default_pm:
-            app_logger.error('No default payment method for customer: %s', stripe_customer.id)
+            payment_methods = stripe.PaymentMethod.list(
+                customer=stripe_customer.id,
+                type='card',
+            )
+            if payment_methods.data:
+                # Stripe returns these newest-first; the most recent card is the
+                # closest thing to "the card they last used".
+                default_pm = payment_methods.data[0].id
+                app_logger.info(
+                    'No invoice-settings default for %s; falling back to '
+                    'attached card %s',
+                    stripe_customer.id,
+                    default_pm,
+                )
+
+        if not default_pm:
+            app_logger.error('No payment method on file for customer: %s', stripe_customer.id)
             return {
                 'status': 'failed',
                 'error': 'No payment method on file',
