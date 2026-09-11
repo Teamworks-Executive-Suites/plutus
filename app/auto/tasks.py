@@ -5,16 +5,30 @@ import logfire
 import requests
 from google.cloud.firestore_v1 import FieldFilter
 
-from app.auto._utils import app_logger
+from app.auto._utils import app_logger, document_id
 from app.firebase_setup import db
 from app.utils import settings
 
 
 def get_contact_details(trip_doc, property_doc):
-    """Get host and guest contact details from already-fetched trip/property docs."""
+    """Get host and guest contact details from already-fetched trip/property docs.
+
+    Both refs go through `document_id`, which is the only thing that copes with
+    all three shapes these fields hold. This function used to read the two refs
+    with two DIFFERENT assumptions on adjacent lines — `.id` on the property's,
+    which raises AttributeError on a path string, and a raw pass to
+    `.document()` on the trip's, which raises ValueError on anything that is not
+    a string. The Flutter app writes `trips.userRef` as a DocumentReference, so
+    the second one raised on essentially every trip.
+
+    That raise was not contained to the SMS: in the completion cron the SMS and
+    the completion email share a try block, so it took the email with it and
+    logged 'Failed to complete trip' for a trip that had completed fine.
+    """
     with logfire.span('get_contact_details'):
-        host_doc = db.collection('users').document(property_doc.get('userRef').id).get()
-        if not host_doc.exists:
+        host_id = document_id(property_doc.get('userRef'))
+        host_doc = db.collection('users').document(host_id).get() if host_id else None
+        if host_doc is None or not host_doc.exists:
             app_logger.error('Host document does not exist for property: %s', property_doc.id)
             return None, None
 
@@ -23,8 +37,9 @@ def get_contact_details(trip_doc, property_doc):
         else:
             host_numbers = None
 
-        guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
-        if not guest_doc.exists:
+        guest_id = document_id(trip_doc.get('userRef'))
+        guest_doc = db.collection('users').document(guest_id).get() if guest_id else None
+        if guest_doc is None or not guest_doc.exists:
             app_logger.error('Guest document does not exist for trip: %s', trip_doc.id)
             return None, None
 
@@ -116,11 +131,24 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
             'Authorization': f'Bearer {api_key}',
         }
 
-        # Host Doc
-        host_doc = db.collection('users').document(property_doc.get('userRef').id).get()
+        # Both refs hold three shapes; `document_id` is the only reader that
+        # copes with all of them. This was `.id` on one line and a raw pass to
+        # `.document()` on the next — the same split assumption that broke the
+        # SMS path, so the email was failing on the same trips for the same
+        # reason.
+        host_id = document_id(property_doc.get('userRef'))
+        guest_id = document_id(trip_doc.get('userRef'))
+        if not host_id or not guest_id:
+            app_logger.error(
+                'Cannot address email for trip %s: host=%s guest=%s', trip_doc.id, host_id, guest_id
+            )
+            return
 
-        # Guest Doc
-        guest_doc = db.collection('users').document(trip_doc.get('userRef')).get()
+        host_doc = db.collection('users').document(host_id).get()
+        guest_doc = db.collection('users').document(guest_id).get()
+        if not host_doc.exists or not guest_doc.exists:
+            app_logger.error('Missing user document for trip %s; not sending email', trip_doc.id)
+            return
 
         if to_host:
             to_email = host_doc.get('email')
@@ -219,17 +247,30 @@ def auto_complete_and_notify():
                     continue
 
                 with logfire.span(f'Completing trip: {trip.id}'):
+                    # One try per thing that can fail independently, matching the
+                    # reminder branch below. They used to share a block, so a
+                    # raise in the SMS took the completion EMAIL with it and then
+                    # logged 'Failed to complete trip' for a trip that had in
+                    # fact completed — the state change is the first statement
+                    # and had already committed.
                     try:
                         trip.reference.update(
                             {'complete': True, 'completeDate': now, 'upcoming': False}
                         )
                         app_logger.info('Trip %s marked as complete', trip.id)
-
-                        complete_trip_sms(trip, property_doc)
-                        send_complete_email(trip, property_doc)
-
                     except Exception as e:
                         app_logger.error('Failed to complete trip %s: %s', trip.id, e)
+                        continue
+
+                    try:
+                        complete_trip_sms(trip, property_doc)
+                    except Exception as e:
+                        app_logger.error('Trip %s completed but its SMS failed: %s', trip.id, e)
+
+                    try:
+                        send_complete_email(trip, property_doc)
+                    except Exception as e:
+                        app_logger.error('Trip %s completed but its email failed: %s', trip.id, e)
 
         # --- Reminders: upcoming trips starting within the next 25 hours ---
         with logfire.span('reminder_query'):
