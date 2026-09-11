@@ -49,6 +49,14 @@ def process_transactions():
 
             trip = db.collection('trips').document(trip_id).get()
 
+            # A test booking writes the same in_escrow host transaction as a real one,
+            # so without this the platform transfers real money to a host for a booking
+            # nobody paid for. Checked before the completion branch so it never reaches
+            # stripe.Transfer.create at all.
+            if trip.exists and (trip.to_dict() or {}).get('isTest'):
+                app_logger.info('Skipping test booking %s', trip_id)
+                continue
+
             if trip.exists and trip.get('complete'):
                 trip_data = trip.to_dict()
                 complete_date = trip_data.get('completeDate')
