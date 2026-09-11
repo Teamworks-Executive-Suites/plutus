@@ -26,7 +26,14 @@ def get_contact_details(trip_doc, property_doc):
     logged 'Failed to complete trip' for a trip that had completed fine.
     """
     with logfire.span('get_contact_details'):
-        host_id = document_id(property_doc.get('userRef'))
+        # Read through to_dict(): DocumentSnapshot.get() raises KeyError on an
+        # ABSENT field, and `userRef` genuinely is absent — 34 of 40 live trips
+        # have none, because the booking funnel writes a draft before anyone
+        # signs in. Same reason `resolve_host_user_ref` does it this way.
+        trip_data = trip_doc.to_dict() or {}
+        property_data = property_doc.to_dict() or {}
+
+        host_id = document_id(property_data.get('userRef'))
         host_doc = db.collection('users').document(host_id).get() if host_id else None
         if host_doc is None or not host_doc.exists:
             app_logger.error('Host document does not exist for property: %s', property_doc.id)
@@ -37,7 +44,7 @@ def get_contact_details(trip_doc, property_doc):
         else:
             host_numbers = None
 
-        guest_id = document_id(trip_doc.get('userRef'))
+        guest_id = document_id(trip_data.get('userRef'))
         guest_doc = db.collection('users').document(guest_id).get() if guest_id else None
         if guest_doc is None or not guest_doc.exists:
             app_logger.error('Guest document does not exist for trip: %s', trip_doc.id)
@@ -136,8 +143,13 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
         # `.document()` on the next — the same split assumption that broke the
         # SMS path, so the email was failing on the same trips for the same
         # reason.
-        host_id = document_id(property_doc.get('userRef'))
-        guest_id = document_id(trip_doc.get('userRef'))
+        # Through to_dict() for the same reason as get_contact_details: .get()
+        # raises KeyError on an absent field, and userRef is often absent.
+        trip_data = trip_doc.to_dict() or {}
+        property_data = property_doc.to_dict() or {}
+
+        host_id = document_id(property_data.get('userRef'))
+        guest_id = document_id(trip_data.get('userRef'))
         if not host_id or not guest_id:
             app_logger.error(
                 'Cannot address email for trip %s: host=%s guest=%s', trip_doc.id, host_id, guest_id

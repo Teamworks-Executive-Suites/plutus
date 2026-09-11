@@ -107,6 +107,69 @@ class TestGetContactDetails(TestCase):
         self.assertIsNone(guest_number)
 
 
+class StrictSnapshot:
+    """A DocumentSnapshot that behaves like the REAL client, not the mock.
+
+    `DocumentSnapshot.get()` raises KeyError when the field is absent
+    (`field_path.get_nested_value`), while MockFirestore returns None. That
+    difference is not cosmetic: 34 of 40 live trips have no `userRef` at all,
+    because the booking funnel writes a draft before anyone signs in. A test
+    written against the mock's leniency passes on code that raises in
+    production — which is exactly what happened to the first version of this
+    suite.
+    """
+
+    def __init__(self, doc_id, data):
+        self.id = doc_id
+        self._data = data
+        self.reference = None
+
+    def to_dict(self):
+        return dict(self._data)
+
+    def get(self, field_path):
+        if field_path not in self._data:
+            raise KeyError(f"'{field_path}' is not contained in the data")
+        return self._data[field_path]
+
+    @property
+    def exists(self):
+        return True
+
+
+class TestAbsentRefsAgainstRealSnapshotBehaviour(TestCase):
+    """Neither notification function may reach for a possibly-absent field
+    with `.get()`. Both must read through `to_dict()`."""
+
+    def setUp(self):
+        MOCK_DB.reset()
+        MOCK_DB.collection('users').document(HOST_UID).set(
+            {'smsOptIn': True, 'phone_numbers': ['+15550000001'], 'email': 'host@example.com'}
+        )
+
+    def test_sms_survives_a_trip_with_no_userRef(self):
+        trip = StrictSnapshot('trip_1', {'tripBeginDateTime': None})
+        prop = StrictSnapshot('prop_1', {'userRef': f'users/{HOST_UID}'})
+        host_numbers, guest_number = get_contact_details(trip, prop)
+        self.assertIsNone(guest_number)
+
+    def test_email_survives_a_trip_with_no_userRef(self):
+        trip = StrictSnapshot('trip_1', {})
+        prop = StrictSnapshot('prop_1', {'userRef': f'users/{HOST_UID}'})
+
+        def explode(*_a, **_k):
+            raise AssertionError('should not have tried to send')
+
+        with patch.object(tasks.requests, 'post', explode):
+            tasks.sendgrid_email(trip, prop, 'template-1', to_host=True)
+
+    def test_sms_survives_a_property_with_no_userRef(self):
+        trip = StrictSnapshot('trip_1', {'userRef': f'users/{GUEST_UID}'})
+        prop = StrictSnapshot('prop_1', {})
+        host_numbers, guest_number = get_contact_details(trip, prop)
+        self.assertIsNone(host_numbers)
+
+
 class TestCompletionNotificationIsolation(TestCase):
     """A trip's completion email must not depend on its SMS succeeding.
 
