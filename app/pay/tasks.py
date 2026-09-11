@@ -10,6 +10,34 @@ from app.pay._utils import app_logger
 from app.utils import document_id, settings
 
 
+def user_ref_path(value):
+    """Return 'users/<uid>' for any of the three shapes a ref field holds.
+
+    `Transaction.actorRef`/`receiverRef` are declared `str`, and the ledger is
+    read by matching on them — so what is written has to be one predictable
+    shape. Two call sites were not:
+
+      * `f'users/{trip.get("userRef")}'` interpolates a DocumentReference
+        OBJECT, storing 'users/' followed by its repr.
+      * `trip.get('userRef').id` stores a bare id with no 'users/' prefix.
+
+    Neither matches any query of any shape, so `transaction_tasks` logs
+    'unusable receiverRef, skipping' and the row is passed over — which for a
+    host-side transfer means the host is never paid for it.
+
+    Returns '' when no id can be determined, and says so in the log. NOT None:
+    these rows are written AFTER Stripe has already moved the money, so raising
+    here would leave the refund done with no ledger row at all — worse than a
+    row the reader skips. '' is also unmistakably "unknown", where the old
+    'users/' looked like a path and resolved to nothing.
+    """
+    uid = document_id(value)
+    if not uid:
+        app_logger.warning('Could not resolve a user ref from %r; writing an empty one', value)
+        return ''
+    return f'users/{uid}'
+
+
 def resolve_host_user_ref(trip):
     """Return 'users/<uid>' for the host who should receive a trip's host-side transfer.
 
@@ -171,9 +199,9 @@ def handle_refund(trip_ref, amount, actor_ref):
     # transaction from platform to client
 
     client_transaction = Transaction(
-        actorRef=f'users/{actor_ref}',
+        actorRef=user_ref_path(actor_ref),
         actorRole=ActorRole.platform,
-        receiverRef=f'users/{trip.get("userRef")}',
+        receiverRef=user_ref_path(trip.to_dict().get('userRef')),
         receiverRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
@@ -196,7 +224,7 @@ def handle_refund(trip_ref, amount, actor_ref):
     # transaction from host to platform
 
     host_transaction = Transaction(
-        actorRef=f'users/{actor_ref}',
+        actorRef=user_ref_path(actor_ref),
         actorRole=ActorRole.host,
         receiverRef='platform',
         receiverRole=ActorRole.platform,
@@ -307,9 +335,9 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
             # create the transactions for the extra charge
             # transaction from client to platform
             client_transaction = Transaction(
-                actorRef=f'users/{actor_ref}',
+                actorRef=user_ref_path(actor_ref),
                 actorRole=ActorRole.client,
-                receiverRef=f'users/{settings.platform_user_id}',
+                receiverRef=user_ref_path(settings.platform_user_id),
                 receiverRole=ActorRole.platform,
                 transferId=None,
                 status=Status.completed,
@@ -343,7 +371,7 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
                 return response
 
             host_transaction = Transaction(
-                actorRef=f'users/{settings.platform_user_id}',
+                actorRef=user_ref_path(settings.platform_user_id),
                 actorRole=ActorRole.platform,
                 receiverRef=host_user_ref,
                 receiverRole=ActorRole.host,
@@ -513,9 +541,9 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
 
     # create a refund transaction document
     transaction = Transaction(
-        actorRef=f'users/{actor_ref}',
+        actorRef=user_ref_path(actor_ref),
         actorRole=ActorRole.host,
-        receiverRef=trip.get('userRef').id if hasattr(trip.get('userRef'), 'id') else str(trip.get('userRef')),
+        receiverRef=user_ref_path(trip.to_dict().get('userRef')),
         receiverRole=ActorRole.client,
         transferId=None,
         status=Status.completed,
