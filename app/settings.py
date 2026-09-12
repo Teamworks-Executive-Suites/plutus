@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     t_from_number: str = ''
     t_messaging_service_sid: str = ''
 
+    # SendGrid
+    #
+    # Declared with a default like every other credential here. It was the one
+    # that was not, and `extra='allow'` hid that: it resolved from a developer's
+    # .env and raised AttributeError anywhere without one — CI, and any
+    # environment where the variable had been missed. An unset key should mean
+    # "cannot send", not a crash inside the completion cron.
+    sendgrid_api_key: str = ''
+
     platform_user_id: str = 'ovd8KQBXVpdw1n0H3AXlKN7AHDr2'
 
     # Firebase Creds

@@ -131,6 +131,12 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
 
         # SendGrid API Key
         api_key = settings.sendgrid_api_key
+        if not api_key:
+            # Calling SendGrid with no credential gets a 401 and a stack trace
+            # in the logs that looks like an outage. Saying so plainly is more
+            # use to whoever has to work out why nobody got an email.
+            app_logger.error('No SendGrid API key configured; not sending email for trip %s', trip_doc.id)
+            return
 
         # Headers for the request
         headers = {
