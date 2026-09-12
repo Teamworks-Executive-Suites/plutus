@@ -10,10 +10,12 @@
 [tool.ruff.lint]
     extend-select = ['I']
 
-[tool.pytest]
-    testpaths = ['tests']
-
 [tool.pytest.ini_options]
+    # `testpaths` lived under a bare [tool.pytest] table, which pytest has never
+    # read -- so it was dead config, and collection was falling back to scanning
+    # the whole rootdir. pytest 9 stopped tolerating the two tables side by side
+    # and refuses to start at all; CI pins 7.4.4, so it only bit locally.
+    testpaths = ['tests']
     addopts = '--tb=native'
 
 [tool.logfire]
