@@ -26,10 +26,21 @@ row or because repairing it would be a guess:
 
   * 'users/'                      the uid is simply gone
   * 'users/<DocumentReference …>' an f-string captured a repr, not a path
-  * an id that resolves to a PROPERTY rather than a user — a receiver that is
-    not a person is a different bug, and quietly rewriting it would hide it
 
 Nothing here invents an identity. A row it cannot prove, it does not touch.
+
+## --resolve-property-owners
+
+One row type IS recoverable but is held back behind its own flag: a
+`receiverRef` holding a PROPERTY id, written by the pre-fix extra-charge path,
+which stored the property instead of the property's owner. `transaction_tasks`
+logs 'unusable receiverRef, skipping' for it, so the host is never paid.
+
+The repair uses the same derivation the FIXED writer now uses
+(`resolve_host_user_ref`: property -> userRef -> owner uid), and still proves
+the owner is a real user before addressing money to them. It is opt-in because
+it changes WHO a row pays rather than how that person is spelled -- a shape fix
+is arithmetic, this one is a decision.
 """
 
 import argparse
@@ -53,7 +64,27 @@ COLLECTION_FOR = {'actorRef': 'users', 'receiverRef': 'users', 'tripRef': 'trips
 SINGULAR = {'users': 'user', 'trips': 'trip', 'properties': 'property'}
 
 
-def proposed(field, value):
+def property_owner_id(property_id):
+    """The uid that owns a property, or None.
+
+    Same derivation `resolve_host_user_ref` in app/pay/tasks.py now uses: the
+    property's `userRef` is the source of truth for who hosts a booking. That
+    function is the fixed version of the code that wrote the broken rows, so
+    repairing with it reproduces what the writer would emit today.
+    """
+    prop = db.collection('properties').document(property_id).get()
+    if not prop.exists:
+        return None
+    owner = (prop.to_dict() or {}).get('userRef')
+    owner_id = getattr(owner, 'id', None) or (
+        owner.rsplit('/', 1)[-1] if isinstance(owner, str) else None)
+    if not owner_id:
+        return None
+    # Prove the owner is a real user before addressing money to them.
+    return owner_id if db.collection('users').document(owner_id).get().exists else None
+
+
+def proposed(field, value, resolve_property_owners=False):
     """What this value should become, or (None, reason) if it must not be touched."""
     if not isinstance(value, str):
         return None, None                      # a DocumentReference is fine as it is
@@ -74,6 +105,18 @@ def proposed(field, value):
             return f'{want}/{value}', None
         for other in ('users', 'trips', 'properties'):
             if other != want and db.collection(other).document(value).get().exists:
+                # A receiverRef holding a PROPERTY id is the pre-fix extra-charge
+                # writer: it stored the property instead of the property's owner.
+                # The identity is recoverable, but recovering it is a different
+                # act from fixing a prefix -- it decides WHO gets paid -- so it
+                # stays behind its own flag rather than riding along with the
+                # shape repairs.
+                if (other == 'properties' and want == 'users'
+                        and field == 'receiverRef' and resolve_property_owners):
+                    owner_id = property_owner_id(value)
+                    if owner_id:
+                        return f'users/{owner_id}', None
+                    return None, 'property has no resolvable owner'
                 return None, f'id resolves to a {SINGULAR[other]}, not a {SINGULAR[want]}'
         return None, 'id resolves to nothing'
 
@@ -84,6 +127,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--apply', action='store_true', help='write the repairs (default: dry run)')
     ap.add_argument('--limit', type=int, default=5000)
+    ap.add_argument(
+        '--resolve-property-owners', action='store_true',
+        help="also repair a receiverRef holding a PROPERTY id, by looking up that "
+             "property's owner. Off by default: this decides who gets paid, which "
+             "is a different act from fixing a prefix.")
     args = ap.parse_args()
 
     repairs, skipped, scanned = [], [], 0
@@ -92,7 +140,7 @@ def main():
         scanned += 1
         data = doc.to_dict() or {}
         for field in REF_FIELDS:
-            new, reason = proposed(field, data.get(field))
+            new, reason = proposed(field, data.get(field), args.resolve_property_owners)
             if new:
                 repairs.append((doc.id, field, data[field], new))
             elif reason:
