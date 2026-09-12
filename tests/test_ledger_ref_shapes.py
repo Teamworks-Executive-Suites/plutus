@@ -70,20 +70,31 @@ class TestLedgerRefShapes(TestCase):
     def test_the_check_can_actually_fail(self):
         """Proof the detector works, so a green run above means something.
 
-        A source-shape test that has never been seen failing is indistinguishable
-        from one whose pattern simply does not match anything.
+        Calls `_literal_ref_assignments` against a temporary file rather than
+        reimplementing the AST walk. A proof-of-life that shares no code with
+        the assertion it backs only proves the COPY works -- it stays green
+        while the real detector rots, which is the failure it exists to rule
+        out.
         """
-        tree = ast.parse("Transaction(receiverRef='platform', actorRole=x)")
-        found = [kw.arg for node in ast.walk(tree)
-                 if isinstance(node, ast.Call)
-                 for kw in node.keywords
-                 if kw.arg in REF_FIELDS and isinstance(kw.value, (ast.Constant, ast.JoinedStr))]
-        self.assertEqual(found, ['receiverRef'])
+        found = self._scan("Transaction(receiverRef='platform', actorRole=x)")
+        self.assertEqual(len(found), 1)
+        self.assertIn("receiverRef='platform'", found[0])
 
     def test_the_check_catches_the_f_string_shape_too(self):
-        tree = ast.parse('Transaction(receiverRef=f"users/{trip.get(\'userRef\')}")')
-        found = [kw.arg for node in ast.walk(tree)
-                 if isinstance(node, ast.Call)
-                 for kw in node.keywords
-                 if kw.arg in REF_FIELDS and isinstance(kw.value, ast.JoinedStr)]
-        self.assertEqual(found, ['receiverRef'])
+        found = self._scan('Transaction(receiverRef=f"users/{trip}")')
+        self.assertEqual(len(found), 1)
+        self.assertIn('receiverRef', found[0])
+
+    def test_the_check_does_not_fire_on_a_proper_call(self):
+        # Or it would be green for the wrong reason: a detector that flags
+        # everything passes its own proof-of-life and fails the real file.
+        self.assertEqual(self._scan('Transaction(receiverRef=user_ref_path(x))'), [])
+
+    def _scan(self, source):
+        """Run the real detector over `source`, via a file under app/."""
+        tmp = APP / '_ledger_ref_shapes_probe.py'
+        tmp.write_text(source)
+        try:
+            return [b for b in _literal_ref_assignments() if '_probe' in b]
+        finally:
+            tmp.unlink()
