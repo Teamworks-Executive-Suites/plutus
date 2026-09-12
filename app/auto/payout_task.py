@@ -14,9 +14,26 @@ def process_platform_payout():
         app_logger.info('Starting task to process platform payout')
 
         try:
-            # Query all transactions excluding those in escrow
+            # Select what is genuinely payable, by NAMING it.
+            #
+            # This was `status != in_escrow`, which is wrong twice over:
+            #
+            #  * `!=` skips documents where the field is ABSENT, so a row
+            #    written without a status is never swept and its money sits
+            #    forever. The same missing-field trap as the booking tabs.
+            #  * it admits `merged` and `failed`. A merged row is escrow that a
+            #    refund folded into a replacement, still carrying its PRE-refund
+            #    netFeeCents; a failed row is money that never moved. Neither is
+            #    owed to anyone, and the per-trip dedup below meant a refunded
+            #    trip contributed whichever row the stream happened to yield
+            #    first — the stale one or the real one, unpredictably.
+            #
+            # `completed` is the only status that means "this transfer happened
+            # and the platform's cut is on its balance".
             transactions_ref = (
-                db.collection('transactions').where(filter=FieldFilter('status', '!=', Status.in_escrow)).stream()
+                db.collection('transactions')
+                .where(filter=FieldFilter('status', '==', Status.completed))
+                .stream()
             )
 
             processed_trip_refs = set()
