@@ -1,6 +1,7 @@
 import os
 from datetime import timedelta
 from unittest import TestCase
+from unittest.mock import MagicMock, patch
 
 import stripe
 from fastapi.testclient import TestClient
@@ -8,6 +9,7 @@ from google.api_core.datetime_helpers import DatetimeWithNanoseconds
 
 from app.firebase_setup import MOCK_DB, utc_now
 from app.main import app
+from app.pay.tasks import process_refund
 from app.utils import settings
 
 # Set settings.testing to True before importing app/firebase_setup.py
@@ -1632,3 +1634,98 @@ class StripeTransactions(TestCase):
     #
     #
     #     # check
+
+
+class RefundFailuresAreNotCounted(TestCase):
+    """A refund Stripe refused must not be reported as money returned.
+
+    `process_refund`'s result was discarded by both callers, so a refund that
+    raised (balance_insufficient, charge_already_refunded, a network error) or
+    came back 'failed'/'pending' still incremented total_refunded, still wrote a
+    Status.completed refund row, and still answered 200 'Refund processed
+    successfully.'. The booking was then cancelled and the guest told their
+    money was on the way, with Stripe having moved nothing.
+
+    These drive the real endpoint with `stripe.Refund.create` patched, because
+    the failure cannot be produced against the Stripe test API on demand — and
+    a refund path that has never been observed failing is one nobody knows the
+    behaviour of.
+    """
+
+    def setUp(self) -> None:
+        self.client = TestClient(app)
+        self.fake_firestore = FakeFirestore()
+        self.customer = get_or_create_customer('test_refund_fail@example.com', 'Ricky Bobby')
+        settings.testing = True
+        self.headers = {'Authorization': f'Bearer {settings.test_token}'}
+        self.mock_firestore = MOCK_DB
+        self.mock_firestore.collection('trips').document('fake_trip_ref').set(
+            self.fake_firestore.db['trips']['fake_trip_ref']
+        )
+        self.mock_firestore.collection('properties').document('fake_property_ref').set(
+            self.fake_firestore.db['properties']['fake_property_ref']
+        )
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'propertyRef': 'fake_property_ref'}
+        )
+
+    def _charged_trip(self, amount=1099):
+        pi = stripe.PaymentIntent.create(
+            amount=amount,
+            currency='usd',
+            customer=self.customer.id,
+            payment_method='pm_card_visa',
+            off_session=True,
+            confirm=True,
+        )
+        trip = self.mock_firestore.collection('trips').document('fake_trip_ref').get()
+        intents = trip.get('stripePaymentIntents')
+        intents.append(pi.id)
+        self.mock_firestore.collection('trips').document('fake_trip_ref').update(
+            {'stripePaymentIntents': intents}
+        )
+        return pi
+
+    def test_a_refund_stripe_raises_on_is_not_counted(self):
+        self._charged_trip()
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099, 'actor_ref': 'users/fake_user_ref'}
+
+        with patch('app.pay.tasks.stripe.Refund.create', side_effect=Exception('balance_insufficient')):
+            r = self.client.post('/refund', headers=self.headers, json=data)
+
+        body = r.json()
+        self.assertEqual(body['total_refunded'], 0, 'nothing was refunded, so nothing may be reported')
+        self.assertNotEqual(body['status'], 200, 'a failed refund must not answer 200')
+        self.assertEqual(body['status'], 206)
+
+    def test_a_refund_stripe_declines_without_raising_is_not_counted(self):
+        # Stripe answers 200 with status 'failed' -- no exception at all.
+        self._charged_trip()
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099, 'actor_ref': 'users/fake_user_ref'}
+
+        declined = MagicMock()
+        declined.status = 'failed'
+        with patch('app.pay.tasks.stripe.Refund.create', return_value=declined):
+            r = self.client.post('/refund', headers=self.headers, json=data)
+
+        body = r.json()
+        self.assertEqual(body['total_refunded'], 0)
+        self.assertEqual(body['status'], 206)
+        self.assertEqual(body['refund_details'], [], 'a refund that did not happen has no detail row')
+
+    def test_process_refund_never_returns_a_truthy_failure(self):
+        # It used to return f'An error occurred: {e}' -- a non-empty string, so
+        # `if process_refund(...)` read the error path as success.
+        with patch('app.pay.tasks.stripe.Refund.create', side_effect=Exception('nope')):
+            result = process_refund('ch_whatever', 100)
+        self.assertIs(result, False)
+        self.assertFalse(result)
+
+    def test_a_succeeding_refund_is_still_counted(self):
+        # The guard must not have closed the working path.
+        self._charged_trip()
+        data = {'trip_ref': 'trips/fake_trip_ref', 'amount': 1099, 'actor_ref': 'users/fake_user_ref'}
+        r = self.client.post('/refund', headers=self.headers, json=data)
+        body = r.json()
+        self.assertEqual(body['status'], 200)
+        self.assertEqual(body['total_refunded'], 1099)

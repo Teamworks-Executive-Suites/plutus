@@ -126,11 +126,18 @@ def get_dispute_by_trip_ref(trip_ref):
 
 
 def process_refund(charge_id, amount):
-    """
-    Process a refund for a given charge.
-    :param charge_id:
-    :param amount:
-    :return:
+    """Refund one charge. True only if Stripe actually moved the money.
+
+    ALWAYS a bool. It used to return `f'An error occurred: {e}'` on the
+    exception path — a non-empty string, which is TRUTHY, so the one thing a
+    caller would naturally write (`if process_refund(...)`) read a failure as a
+    success. Both callers happened to discard the value entirely, which is its
+    own bug, but the moment either started checking it the error path would
+    have been the one that looked fine.
+
+    Stripe can also answer without raising: `pending`, `failed`, or
+    `requires_action` are all non-exceptional replies where no money has
+    reached the guest. Only 'succeeded' counts.
     """
     try:
         refund = stripe.Refund.create(
@@ -141,7 +148,7 @@ def process_refund(charge_id, amount):
         return refund.status == 'succeeded'
     except Exception as e:
         app_logger.error('An error occurred in process_refund: %s', str(e))
-        return f'An error occurred: {str(e)}'
+        return False
 
 
 def handle_refund(trip_ref, amount, actor_ref):
@@ -184,7 +191,30 @@ def handle_refund(trip_ref, amount, actor_ref):
                 continue
 
             refund_amount = min(remaining_refund, refundable_amount)
-            process_refund(charge.id, refund_amount)
+
+            # Only money Stripe actually moved is counted.
+            #
+            # This return value used to be discarded, so a refund Stripe
+            # REFUSED — balance_insufficient, charge_already_refunded, a
+            # network error, or simply a 'failed' status — still incremented
+            # total_refunded, still wrote a Status.completed refund row, and
+            # still answered 200 'Refund processed successfully.'. Every caller
+            # was then correct by its own rules and still wrong: the booking was
+            # cancelled, `isRefunded` set, and the guest emailed to say their
+            # money was on its way, while Stripe had moved nothing.
+            #
+            # Counting it properly needs no new status code. 200 vs 206 already
+            # keys off `remaining_refund`, so a refund that fails now reports
+            # 206 with total_refunded 0 — which is true, and which the callers
+            # that test for 200 already treat as failure.
+            if not process_refund(charge.id, refund_amount):
+                app_logger.error(
+                    'Stripe did not refund %s on charge %s for trip %s; not counting it',
+                    refund_amount,
+                    charge.id,
+                    trip_ref,
+                )
+                continue
 
             refund_details.append(
                 {
@@ -526,8 +556,10 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
                     refund_amount = 0
                     refund_reason = f'Cancellation policy not recognized: {cancellation_policy} - no refund - please contact support'
 
-            if refund_amount > 0:
-                process_refund(charge.id, refund_amount)
+            # Same as handle_refund: count only what Stripe actually moved.
+            # A cancellation whose refund Stripe refused was reporting the full
+            # policy amount as refunded and cancelling the booking anyway.
+            if refund_amount > 0 and process_refund(charge.id, refund_amount):
                 refund_details.append(
                     {
                         'refunded_amount': refund_amount,
@@ -537,6 +569,20 @@ def process_cancel_refund(trip_ref, full_refund=False, actor_ref=None):
                     }
                 )
                 total_refunded += refund_amount
+            elif refund_amount > 0:
+                app_logger.error(
+                    'Stripe did not refund %s on charge %s; not counting it',
+                    refund_amount,
+                    charge.id,
+                )
+                refund_details.append(
+                    {
+                        'refunded_amount': 0,
+                        'reason': f'{refund_reason} - but the refund did not go through',
+                        'charge_id': charge.id,
+                        'payment_intent_id': payment_intent_id,
+                    }
+                )
             else:
                 refund_details.append(
                     {
