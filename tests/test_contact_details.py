@@ -160,7 +160,10 @@ class TestAbsentRefsAgainstRealSnapshotBehaviour(TestCase):
         def explode(*_a, **_k):
             raise AssertionError('should not have tried to send')
 
-        with patch.object(tasks.requests, 'post', explode):
+        # Key present on purpose: the send must be stopped by the UNREADABLE
+        # REF, not by a missing credential.
+        with patch.object(tasks.settings, 'sendgrid_api_key', 'test-key'), \
+             patch.object(tasks.requests, 'post', explode):
             tasks.sendgrid_email(trip, prop, 'template-1', to_host=True)
 
     def test_sms_survives_a_property_with_no_userRef(self):
@@ -272,7 +275,12 @@ class TestEmailRefShapes(TestCase):
             return FakeResponse()
 
         trip, prop = self._docs(trip_user_ref, property_user_ref)
-        with patch.object(tasks.requests, 'post', capture):
+        # A key must be present, because sendgrid_email now refuses to send
+        # without one. Without this the "unresolvable ref sends nothing" test
+        # would pass for the WRONG REASON on any machine lacking the variable —
+        # proving the credential was missing rather than the ref logic worked.
+        with patch.object(tasks.settings, 'sendgrid_api_key', 'test-key'), \
+             patch.object(tasks.requests, 'post', capture):
             tasks.sendgrid_email(trip, prop, 'template-1', to_host=to_host)
         return seen.get('to')
 
@@ -295,3 +303,32 @@ class TestEmailRefShapes(TestCase):
 
     def test_an_unresolvable_ref_sends_nothing_rather_than_emailing_none(self):
         self.assertIsNone(self._addressee(None, f'users/{HOST_UID}', to_host=True))
+
+
+class TestMissingSendgridKey(TestCase):
+    """An unset SendGrid key must refuse, not crash.
+
+    `sendgrid_api_key` was never declared in Settings and resolved only from a
+    developer's .env, so it raised AttributeError anywhere without one — inside
+    the completion cron, which before today shared a try block with the trip's
+    own state write.
+    """
+
+    def setUp(self):
+        MOCK_DB.reset()
+
+    def test_no_key_means_no_send_and_no_crash(self):
+        trip = StrictSnapshot('trip_1', {'userRef': f'users/{GUEST_UID}'})
+        prop = StrictSnapshot('prop_1', {'userRef': f'users/{HOST_UID}'})
+
+        def explode(*_a, **_k):
+            raise AssertionError('called SendGrid with no credential')
+
+        with patch.object(tasks.settings, 'sendgrid_api_key', ''), \
+             patch.object(tasks.requests, 'post', explode):
+            tasks.sendgrid_email(trip, prop, 'template-1', to_host=True)
+
+    def test_the_setting_exists_even_with_no_env(self):
+        # The actual regression: the attribute must be declared, not inherited
+        # from whatever happens to be in a .env.
+        assert hasattr(tasks.settings, 'sendgrid_api_key')
