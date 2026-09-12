@@ -6,7 +6,7 @@ import stripe
 from google.cloud.firestore_v1 import FieldFilter
 
 from app.auto._utils import app_logger, document_id
-from app.firebase_setup import db
+from app.firebase_setup import db, utc_now
 from app.models import ActorRole, Status, TransactionType
 from app.pay.tasks import calculate_fees
 from app.utils import settings, snapshot_field
@@ -136,6 +136,21 @@ def process_transactions():
 
                         host_fee, guest_fee, net_fee = calculate_fees(total_owed)
 
+                        # `createdAt` and `processedAt` are not optional.
+                        #
+                        # Every transaction surface in the app orders by
+                        # createdAt, and a Firestore orderBy SKIPS documents
+                        # that lack the field — the same trap as an equality
+                        # filter. This row replaces the host's escrowed rows
+                        # and is the one that carries the real Stripe transfer,
+                        # so without them the payout for every refunded trip
+                        # would be invisible to the host who received it, while
+                        # the rows it superseded are marked `merged` and
+                        # filtered out.
+                        #
+                        # Never fired in production: no transaction currently
+                        # carries `mergedTransactions`, so this path has not
+                        # run yet. Fixed before it does.
                         new_transaction_data = {
                             'actorRef': transaction.get('actorRef'),
                             'actorRole': transaction.get('actorRole'),
@@ -143,6 +158,8 @@ def process_transactions():
                             'receiverRole': ActorRole.host,
                             'status': Status.in_escrow,
                             'type': TransactionType.transfer,
+                            'createdAt': utc_now(),
+                            'processedAt': utc_now(),
                             'grossFeeCents': total_owed,
                             'guestFeeCents': guest_fee,
                             'hostFeeCents': host_fee,

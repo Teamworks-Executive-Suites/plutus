@@ -304,3 +304,70 @@ class TestHandleCancelledEvent(TestCase):
         self._add_trip('legacy_1')
         handle_cancelled_event(self._cancelled_event())
         self.assertFalse(self.db.collection('trips').document('legacy_1').get().to_dict()['cancelTrip'])
+
+
+class BackfillSkipsNothingItShouldSend(TestCase):
+    """The backfill must see host blocks, which carry no `isExternal`.
+
+    `create_events_for_future_trips` filtered the query on
+    `isExternal == False`. A Firestore equality filter never matches a document
+    where the field is ABSENT, and neither client writes `isExternal` on a host
+    block — production has six blocked trips and three lack it entirely. So the
+    `isBlocked` branch of is_eligible_for_event_backfill was unreachable from
+    the backfill, and a host who blocked out a fortnight and then connected
+    their Google Calendar had none of it pushed across.
+
+    The check now lives in the predicate, where an absent field means "not
+    external" rather than "skip this document".
+    """
+
+    def test_a_host_block_with_no_isExternal_is_eligible(self):
+        # Exactly the shape host_block_time_widget.dart writes.
+        block = {
+            'isBlocked': True,
+            'isInquiry': False,
+            'isOffer': False,
+            'tripReason': 'Renovations',
+        }
+        self.assertNotIn('isExternal', block)
+        self.assertTrue(is_eligible_for_event_backfill(block))
+
+    def test_a_block_explicitly_marked_not_external_is_eligible(self):
+        self.assertTrue(
+            is_eligible_for_event_backfill(
+                {'isBlocked': True, 'isInquiry': False, 'isOffer': False, 'isExternal': False}
+            )
+        )
+
+    def test_an_externally_synced_trip_is_never_pushed_back(self):
+        # The rule the old query was reaching for, and it still holds.
+        self.assertFalse(
+            is_eligible_for_event_backfill(
+                {'isExternal': True, 'isInquiry': False, 'isOffer': False}
+            )
+        )
+
+    def test_an_external_block_is_still_not_pushed_back(self):
+        # isExternal is checked BEFORE isBlocked, or a synced block would be
+        # echoed to the calendar it came from.
+        self.assertFalse(
+            is_eligible_for_event_backfill(
+                {'isExternal': True, 'isBlocked': True, 'isInquiry': False, 'isOffer': False}
+            )
+        )
+
+    def test_a_cancelled_block_is_not_eligible(self):
+        self.assertFalse(
+            is_eligible_for_event_backfill({'isBlocked': True, 'cancelTrip': True})
+        )
+
+    def test_the_query_no_longer_filters_on_isExternal(self):
+        # The defect was in the QUERY, which no unit test reaches. If the
+        # filter comes back, every host block silently stops syncing again.
+        import inspect
+
+        from app.cal import tasks
+
+        src = inspect.getsource(tasks.create_events_for_future_trips)
+        self.assertNotIn("'isExternal'", src)
+        self.assertIn("'propertyRef'", src)

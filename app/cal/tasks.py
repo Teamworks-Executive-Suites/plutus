@@ -36,6 +36,18 @@ def is_eligible_for_event_backfill(trip_data: dict) -> bool:
     """
     if trip_data.get('cancelTrip'):
         return False
+    # A trip that CAME FROM the calendar must not be pushed back to it. This
+    # used to be a `FieldFilter('isExternal', '==', False)` on the query, which
+    # skipped every document missing the field -- and host block-time writes no
+    # `isExternal` at all, in either client. Production has six blocked trips
+    # and three of them lack it, so the isBlocked branch below was unreachable
+    # from the backfill: a host who blocked out a fortnight and then connected
+    # their Google Calendar got none of it.
+    #
+    # `is True`, not truthy: absent means "not external", which is the whole
+    # point of moving it here.
+    if trip_data.get('isExternal') is True:
+        return False
     if trip_data.get('isBlocked'):
         # Host-blocked time holds the room without being a booking.
         return True
@@ -386,12 +398,14 @@ def create_events_for_future_trips(property_doc_id: str):
             app_logger.error('Property document does not exist for: %s', property_doc_id)
             raise HTTPException(status_code=404, detail='Property not found')
 
-        # Query for all documents where 'propertyRef' matches the given property_ref, 'isExternal' is False,
-        # 'eventId' does not exist, and 'tripBeginDateTime' is in the future
+        # Property and an inequality on the window, and nothing else. Every
+        # other condition is decided by is_eligible_for_event_backfill below.
+        #
+        # The `isExternal == False` filter that used to be here dropped every
+        # document without the field, which is every host block ever written.
         future_trips = (
             db.collection('trips')
             .where(filter=FieldFilter('propertyRef', '==', property_doc.reference))
-            .where(filter=FieldFilter('isExternal', '==', False))
             .where(filter=FieldFilter('tripBeginDateTime', '>', now))
             .stream()
         )
