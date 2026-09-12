@@ -226,7 +226,15 @@ def handle_refund(trip_ref, amount, actor_ref):
     host_transaction = Transaction(
         actorRef=user_ref_path(actor_ref),
         actorRole=ActorRole.host,
-        receiverRef='platform',
+        # The literal 'platform' was a fourth shape for a field that already had
+        # three, and it matched no query of any shape. The row two hundred lines
+        # down describes the same receiver -- receiverRole is ActorRole.platform
+        # in both -- and writes the path, so this one now does too.
+        #
+        # repair_ledger_refs.py normalises 'platform' to exactly this value, so
+        # leaving the writer alone would have meant re-running the migration
+        # forever against rows this function had just created.
+        receiverRef=user_ref_path(settings.platform_user_id),
         receiverRole=ActorRole.platform,
         transferId=None,
         status=Status.in_escrow,
