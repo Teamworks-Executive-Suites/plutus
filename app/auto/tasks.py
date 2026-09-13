@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import logfire
 import requests
-from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1 import ArrayUnion, FieldFilter
 from pytz import timezone as timezone_of
 
 from app.auto._utils import app_logger, document_id
@@ -386,9 +386,31 @@ def auto_complete_and_notify():
 
                 time_difference = trip_dict['tripBeginDateTime'] - now
 
+                # Which reminders this trip has already had.
+                #
+                # The 24-hour window is TWO HOURS WIDE (23h to 25h) on an
+                # HOURLY cron, so a trip sits inside it on two consecutive runs
+                # and both parties were texted and emailed twice. The 1-hour
+                # window is an hour wide, which is exactly the cadence — so it
+                # fires once when the schedule is punctual and twice when it
+                # drifts, which is worse than either.
+                #
+                # Widening or narrowing the windows only moves the problem: a
+                # window that cannot double-fire also cannot survive a missed
+                # run. What fixes it is remembering, so the record of having
+                # sent is what the next run reads.
+                sent = trip_dict.get('remindersSent') or []
+
                 with logfire.span(f'Reminder check for trip {trip.id}: starts in {time_difference}'):
                     # 24-hour reminder
-                    if timedelta(hours=23) < time_difference < timedelta(hours=25):
+                    if timedelta(hours=23) < time_difference < timedelta(hours=25) and '24h' not in sent:
+                        # Marked BEFORE sending, not after. A send that raises
+                        # is caught and logged below, and a reminder that went
+                        # out and then failed to record would go out again on
+                        # the next run — the very thing this is here to stop.
+                        # Losing one reminder to a crash is better than sending
+                        # it twice every hour.
+                        trip.reference.update({'remindersSent': ArrayUnion(['24h'])})
                         try:
                             send_reminder_sms(trip, property_doc, 24)
                         except Exception as e:
@@ -400,7 +422,11 @@ def auto_complete_and_notify():
                             app_logger.error('Failed to send 24h reminder email for trip %s: %s', trip.id, e)
 
                     # 1-hour reminder (30min window each side to match hourly schedule)
-                    if timedelta(minutes=30) < time_difference < timedelta(hours=1, minutes=30):
+                    if (
+                        timedelta(minutes=30) < time_difference < timedelta(hours=1, minutes=30)
+                        and '1h' not in sent
+                    ):
+                        trip.reference.update({'remindersSent': ArrayUnion(['1h'])})
                         try:
                             send_reminder_sms(trip, property_doc, 1)
                         except Exception as e:
