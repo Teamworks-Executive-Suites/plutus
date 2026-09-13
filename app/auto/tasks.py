@@ -284,6 +284,22 @@ def auto_complete_and_notify():
             for trip in completion_trips:
                 trip_dict = trip.to_dict()
 
+                # A cancelled booking is not a booking.
+                #
+                # Cancelling writes `cancelTrip: true` and leaves `upcoming`
+                # alone — `upcoming` means "live", not "paid", and nothing
+                # clears it. This query filters on `upcoming` and never looked
+                # at `cancelTrip`, so a guest who cancelled still got "your trip
+                # is tomorrow", and after the end time the completion branch
+                # marked the trip `complete` and asked both parties to review
+                # a stay that never happened.
+                #
+                # Read through the dict, where an absent field is None and so
+                # falsy — a trip written before the flag existed is not
+                # cancelled, and `DocumentSnapshot.get()` would raise on it.
+                if trip_dict.get('cancelTrip', False):
+                    continue
+
                 if trip_dict.get('isExternal', False) or trip_dict.get('isBlocked', False):
                     continue
 
@@ -338,6 +354,22 @@ def auto_complete_and_notify():
 
             for trip in reminder_trips:
                 trip_dict = trip.to_dict()
+
+                # A cancelled booking is not a booking.
+                #
+                # Cancelling writes `cancelTrip: true` and leaves `upcoming`
+                # alone — `upcoming` means "live", not "paid", and nothing
+                # clears it. This query filters on `upcoming` and never looked
+                # at `cancelTrip`, so a guest who cancelled still got "your trip
+                # is tomorrow", and after the end time the completion branch
+                # marked the trip `complete` and asked both parties to review
+                # a stay that never happened.
+                #
+                # Read through the dict, where an absent field is None and so
+                # falsy — a trip written before the flag existed is not
+                # cancelled, and `DocumentSnapshot.get()` would raise on it.
+                if trip_dict.get('cancelTrip', False):
+                    continue
 
                 if trip_dict.get('isExternal', False) or trip_dict.get('isBlocked', False):
                     continue
