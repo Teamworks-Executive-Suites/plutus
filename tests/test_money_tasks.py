@@ -13,9 +13,10 @@ from app.utils import settings  # noqa: E402
 settings.testing = True
 
 from app.auto.payout_task import process_platform_payout  # noqa: E402
-from app.auto.transaction_tasks import process_transactions  # noqa: E402
+from app.auto.transaction_tasks import cents_from, process_transactions  # noqa: E402
 from app.firebase_setup import MOCK_DB  # noqa: E402
 from app.models import ActorRole, Status, TransactionType  # noqa: E402
+from app.pay.tasks import calculate_fees  # noqa: E402
 from tests._common import enable_document_reference_equality, enable_field_filter_support  # noqa: E402
 
 enable_field_filter_support()
@@ -371,3 +372,141 @@ class TestPlatformPayout(MoneyTaskTestCase):
 
         txn = self.db.collection('transactions').document('txn_1').get().to_dict()
         self.assertFalse(txn.get('paidOut', False))
+
+
+class RealSnapshot:
+    """A DocumentSnapshot double that behaves like the Firestore SDK's.
+
+    MockFirestore's `.get()` returns None for a missing field. The real one
+    RAISES KeyError. That difference is why `snapshot.get('x') or 0` looked
+    safe in tests and killed the escrow-release run in production, so the tests
+    below use this rather than the mock.
+    """
+
+    def __init__(self, data):
+        self._data = dict(data)
+
+    def to_dict(self):
+        return dict(self._data)
+
+    def get(self, field_path):
+        if field_path not in self._data:
+            raise KeyError(field_path)
+        return self._data[field_path]
+
+
+class CentsFrom(TestCase):
+    def test_reads_the_field(self):
+        self.assertEqual(cents_from(RealSnapshot({'grossFeeCents': 50000}), 'grossFeeCents'), 50000)
+
+    def test_a_missing_field_is_zero_rather_than_a_crash(self):
+        # The whole point. Three live refund rows written by the app carry no
+        # grossFeeCents at all; `.get()` on those raises and takes the entire
+        # escrow-release run with it.
+        snapshot = RealSnapshot({'refundAmountCents': 25000})
+        with self.assertRaises(KeyError):
+            snapshot.get('grossFeeCents')
+        self.assertEqual(cents_from(snapshot, 'grossFeeCents'), 0)
+
+    def test_falls_back_to_the_other_spelling(self):
+        # The app writes refundAmountCents, Plutus writes refundedAmountCents.
+        app_row = RealSnapshot({'refundAmountCents': 25000})
+        plutus_row = RealSnapshot({'grossFeeCents': 0, 'refundedAmountCents': 71200})
+        self.assertEqual(cents_from(app_row, 'refundedAmountCents', 'refundAmountCents'), 25000)
+        self.assertEqual(cents_from(plutus_row, 'refundedAmountCents', 'refundAmountCents'), 71200)
+
+    def test_a_zero_falls_through_to_the_next_name(self):
+        # Plutus writes grossFeeCents 0 AND the real figure alongside it, so a
+        # zero must not be taken as the answer while another name carries money.
+        row = RealSnapshot({'refundedAmountCents': 0, 'refundAmountCents': 25000})
+        self.assertEqual(cents_from(row, 'refundedAmountCents', 'refundAmountCents'), 25000)
+
+    def test_no_matching_name_is_zero(self):
+        self.assertEqual(cents_from(RealSnapshot({'other': 1}), 'grossFeeCents'), 0)
+
+
+class TestRefundedTripMerge(MoneyTaskTestCase):
+    """A refunded booking must not pay the host the full amount.
+
+    The merge subtracted `grossFeeCents` from the refund rows, and every refund
+    row carries grossFeeCents 0 — the money is in refundedAmountCents. So the
+    subtraction was always zero and the host was paid in full. One live row has
+    grossFeeCents 0 against refundedAmountCents 71200.
+    """
+
+    def _add_refund(self, txn_id, trip_ref, **overrides):
+        data = {
+            'actorRef': 'users/platform',
+            'actorRole': ActorRole.platform,
+            'receiverRef': 'users/client_uid',
+            'receiverRole': ActorRole.client,
+            'status': Status.completed,
+            'type': TransactionType.refund,
+            'tripRef': trip_ref,
+            'grossFeeCents': 0,
+            'refundedAmountCents': 0,
+        }
+        data.update(overrides)
+        self.db.collection('transactions').document(txn_id).set(data)
+
+    def test_a_refund_reduces_what_the_host_is_paid(self):
+        self._add_host_user()
+        self._add_completed_trip('trip_r', days_ago=20)
+        self._add_transaction('txn_host', 'trip_r', grossFeeCents=10000)
+        # Plutus's shape: the money is in refundedAmountCents, gross is 0.
+        self._add_refund('txn_refund', 'trip_r', refundedAmountCents=2500)
+
+        with patch(TRANSFER_CREATE, return_value=MagicMock(id='tr_1')) as create:
+            process_transactions()
+
+        create.assert_called_once()
+        paid = create.call_args.kwargs['amount']
+        # The host's cut of 7500, not of 10000. Asserted against calculate_fees
+        # rather than a hardcoded number, so the fee rate stays its business.
+        #
+        # An earlier version of this said `assertLess(paid, 10000)` and passed
+        # WITH the bug present — the host's cut is a fraction of the total
+        # either way, so the assertion could not tell 7500 from 10000. Checked
+        # by restoring the bug and watching it stay green.
+        self.assertEqual(paid, calculate_fees(7500)[0])
+        self.assertNotEqual(paid, calculate_fees(10000)[0])
+        full = self.db.collection('transactions').document('txn_host').get().to_dict()
+        self.assertEqual(full['status'], Status.merged)
+
+    def test_a_refund_written_by_the_APP_also_reduces_it(self):
+        # The app spells it refundAmountCents and writes no grossFeeCents at
+        # all. Three live rows look like this, and reading them with
+        # DocumentSnapshot.get() raised KeyError and killed the whole run.
+        self._add_host_user()
+        self._add_completed_trip('trip_a', days_ago=20)
+        self._add_transaction('txn_host_a', 'trip_a', grossFeeCents=10000)
+        self.db.collection('transactions').document('txn_refund_a').set({
+            'actorRef': 'users/platform',
+            'actorRole': ActorRole.platform,
+            'receiverRef': 'users/client_uid',
+            'receiverRole': ActorRole.client,
+            'status': Status.completed,
+            'type': TransactionType.refund,
+            'tripRef': 'trip_a',
+            'refundAmountCents': 2500,
+        })
+
+        with patch(TRANSFER_CREATE, return_value=MagicMock(id='tr_2')) as create:
+            process_transactions()
+
+        create.assert_called_once()
+        self.assertEqual(create.call_args.kwargs['amount'], calculate_fees(7500)[0])
+
+    def test_a_refund_larger_than_escrow_pays_nothing_rather_than_negative(self):
+        # calculate_fees on a negative would hand Stripe a negative transfer.
+        self._add_host_user()
+        self._add_completed_trip('trip_big', days_ago=20)
+        self._add_transaction('txn_host_big', 'trip_big', grossFeeCents=10000)
+        self._add_refund('txn_refund_big', 'trip_big', refundedAmountCents=50000)
+
+        with patch(TRANSFER_CREATE, return_value=MagicMock(id='tr_3')) as create:
+            process_transactions()
+
+        # Owed clamps to 0, so the host's cut is 0 — never a negative transfer.
+        if create.called:
+            self.assertEqual(create.call_args.kwargs['amount'], 0)

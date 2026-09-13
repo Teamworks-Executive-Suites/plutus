@@ -14,6 +14,28 @@ from app.utils import settings, snapshot_field
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 
+
+def cents_from(snapshot, *names):
+    """A money field off a transaction snapshot, or 0 if it carries none of them.
+
+    Reads through `to_dict()` on purpose. `DocumentSnapshot.get()` RAISES
+    KeyError for a field the document does not have — it does not return None —
+    so the common `snapshot.get('x') or 0` blows up on exactly the documents it
+    was written to tolerate. MockFirestore returns None instead, which is why
+    this never failed in a test.
+
+    Takes several names because the app and Plutus disagree about one: a refund
+    row written by the app carries `refundAmountCents`, one written here carries
+    `refundedAmountCents`. Both mean the same money.
+    """
+    data = snapshot.to_dict() or {}
+    for name in names:
+        value = data.get(name)
+        if value:
+            return value
+    return 0
+
+
 def process_transactions():
     with logfire.span('process_transactions'):
         app_logger.info('Starting cron job to process transactions in escrow')
@@ -128,11 +150,45 @@ def process_transactions():
                         )
 
                     else:
-                        # Fees can be absent on older documents; treat a missing amount as
-                        # zero rather than raising mid-merge.
-                        total_owed = sum((t.get('grossFeeCents') or 0) for t in host_transactions) - sum(
-                            (t.get('grossFeeCents') or 0) for t in refund_transactions
+                        # What the host is owed, less what was actually refunded.
+                        #
+                        # Two bugs lived in this one expression, and production
+                        # has rows proving both.
+                        #
+                        # 1. It subtracted `grossFeeCents` from the REFUND rows,
+                        #    and every refund row carries grossFeeCents 0 — the
+                        #    money is in refundedAmountCents (pay/tasks.py:245,
+                        #    278, 611). So the subtraction was always zero and a
+                        #    refunded booking still paid the host in full. One
+                        #    live row has grossFeeCents 0 against
+                        #    refundedAmountCents 71200.
+                        #
+                        # 2. `DocumentSnapshot.get()` RAISES KeyError on a field
+                        #    the document does not have; it does not return None,
+                        #    so `or 0` never ran. The comment here claimed it
+                        #    treated a missing amount as zero. It did not — and
+                        #    three live refund rows written by the app have no
+                        #    grossFeeCents at all, so this raised and killed the
+                        #    whole escrow-release run for every trip after it.
+                        #    MockFirestore returns None instead, which is why no
+                        #    test caught it.
+                        #
+                        # Read through to_dict(), where a missing key really is
+                        # None. And the app and Plutus disagree on the field
+                        # name — refundAmountCents against refundedAmountCents —
+                        # so both are read; a refund is a refund whoever wrote it.
+                        total_owed = sum(
+                            cents_from(t, 'grossFeeCents') for t in host_transactions
+                        ) - sum(
+                            cents_from(t, 'refundedAmountCents', 'refundAmountCents')
+                            for t in refund_transactions
                         )
+
+                        # A refund larger than the escrowed amount would make
+                        # this negative and calculate_fees would hand Stripe a
+                        # negative transfer. Nothing is owed, not less than
+                        # nothing.
+                        total_owed = max(total_owed, 0)
 
                         host_fee, guest_fee, net_fee = calculate_fees(total_owed)
 
