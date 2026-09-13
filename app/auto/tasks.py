@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 import logfire
 import requests
 from google.cloud.firestore_v1 import FieldFilter
+from pytz import timezone as timezone_of
 
 from app.auto._utils import app_logger, document_id
 from app.firebase_setup import db
@@ -121,6 +122,29 @@ def send_reminder_sms(trip_doc, property_doc, time: int):
             send_sms(host_num, f'Reminder: Your booking {trip_doc.id} starts in {time} hours. View here: {property_link}')
 
 
+
+def local_time_for_email(value, property_timezone):
+    """A booking time as the guest and host would say it, not as UTC.
+
+    Trip times are stored UTC; the property's IANA zone lives on the property.
+    This f-stringed the raw value, so a 9:00 AM Los Angeles booking arrived in
+    both inboxes as `2026-07-15 16:00:00+00:00` — seven hours out, in a format
+    nobody reads, on the one email that tells someone when to turn up.
+
+    Falls back to the raw value rather than raising: an email with an ugly time
+    beats no email at all, and this runs after the booking is already made.
+    """
+    if value is None:
+        return ''
+    if not property_timezone:
+        return f'{value}'
+    try:
+        return value.astimezone(timezone_of(property_timezone)).strftime('%a %d %b %Y, %I:%M %p')
+    except Exception as err:  # noqa: BLE001 - never fail an email over formatting
+        app_logger.warning('Could not render %s in %s: %s', value, property_timezone, err)
+        return f'{value}'
+
+
 def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, to_host: bool = False):
     """
     Function to send an email using SendGrid API.
@@ -179,17 +203,29 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
                 {
                     'to': [{'email': f'{to_email}'}],
                     'dynamic_template_data': {
-                        'office_name': f"{property_doc.get('propertyName')}",
+                        'office_name': f"{property_data.get('propertyName')}",
                         'guest_name': f"{guest_doc.get('display_name')}",
-                        'property_image': f"{property_doc.get('mainImage')[0]}",
-                        'start_date_time': f"{trip_doc.get('tripBeginDateTime')}",
-                        'end_date_time': f"{trip_doc.get('tripEndDateTime')}",
-                        'base_price': f"${trip_doc.get('tripBaseTotal')}",
-                        'addons_price': f"${trip_doc.get('tripAddonTotal')}",
-                        'cleaning_fee': f"${property_doc.get('cleaningFee')}",
-                        'total_price': f"${trip_doc.get('tripCost')}",
+                        'property_image': f"{(property_data.get('mainImage') or [''])[0]}",
+                        # In the PROPERTY's timezone, and read from the dicts.
+                        #
+                        # These f-stringed the raw UTC value, so a 9:00 AM Los
+                        # Angeles booking arrived in both inboxes as
+                        # `2026-07-15 16:00:00+00:00`. And `.get()` on a
+                        # DocumentSnapshot raises KeyError on an absent field —
+                        # the same trap that broke the SMS path — while the
+                        # dicts above return None.
+                        'start_date_time': local_time_for_email(
+                            trip_data.get('tripBeginDateTime'), property_data.get('timezone')
+                        ),
+                        'end_date_time': local_time_for_email(
+                            trip_data.get('tripEndDateTime'), property_data.get('timezone')
+                        ),
+                        'base_price': f"${trip_data.get('tripBaseTotal')}",
+                        'addons_price': f"${trip_data.get('tripAddonTotal')}",
+                        'cleaning_fee': f"${property_data.get('cleaningFee')}",
+                        'total_price': f"${trip_data.get('tripCost')}",
                         'trip_ref': f'{trip_doc.reference}',
-                        'image_url': f"{property_doc.get('mainImage')[0]}",
+                        'image_url': f"{(property_data.get('mainImage') or [''])[0]}",
                     },
                 }
             ],
