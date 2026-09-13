@@ -431,12 +431,39 @@ def process_extra_charge(trip_ref, dispute_ref, actor_ref):
 
             db.collection('transactions').add(host_transaction)
         except Exception as e:
-            # Update dispute status to failed if transaction creation fails
-            dispute.reference.update({'status': 'failed'})
-            response['status'] = 500
-            response['message'] = 'An unexpected error occurred while processing the extra charge.'
+            # The CARD HAS ALREADY BEEN CHARGED. Everything in this try runs
+            # after `PaymentIntent.create(..., confirm=True)` succeeded, the
+            # dispute was marked completed and the intent was appended to the
+            # trip. Only the ledger rows failed.
+            #
+            # This used to overwrite the dispute back to `status: 'failed'` and
+            # answer 500. Both were lies in the direction that costs money: the
+            # dispute said no charge happened when one had, and a 500 is what
+            # the app shows the host as "try again" — so the guest's card was
+            # charged a second time for the same broken chair, and the first
+            # charge was invisible because its dispute said failed.
+            #
+            # The dispute stays `completed`, because it is. The response stays
+            # 200, because the caller asked whether the charge went through and
+            # it did — and because any non-200 here invites exactly the retry
+            # that must not happen. The missing ledger rows are a platform
+            # problem, flagged in the payload and shouted in the log, not
+            # something a host can fix by pressing the button again.
+            app_logger.error(
+                'Extra charge %s was TAKEN but its ledger rows failed to write for trip %s: %s. '
+                'The money moved; the transactions collection is incomplete and needs repairing by hand.',
+                extra_charge_pi.id,
+                trip_ref,
+                str(e),
+            )
+            response['status'] = 200
+            response['message'] = (
+                'The extra charge was collected, but the payment record could not be written. '
+                'Do not retry — Teamworks support has been alerted.'
+            )
+            response['details']['payment_intent'] = extra_charge_pi
+            response['details']['ledger_incomplete'] = True
             response['details']['error_message'] = str(e)
-            app_logger.error('An unexpected error occurred while processing the extra charge: %s', str(e))
             return response
 
         return response
