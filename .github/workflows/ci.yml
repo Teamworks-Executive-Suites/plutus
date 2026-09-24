@@ -38,6 +38,14 @@ jobs:
           make install
           pip freeze
 
+    # Runs BEFORE the tests: a missing import is a faster, clearer failure
+    # than whichever test happens to touch that module first.
+    #
+    # `lint-check`, not `lint` — see the Makefile for why formatting is not
+    # gated yet.
+    - name: lint
+      run: make lint-check
+
     - name: test
       run: make test
 

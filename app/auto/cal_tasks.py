@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 
 import logfire
-from fastapi import HTTPException
 from googleapiclient.errors import HttpError
 
 from app.auto._utils import app_logger
