@@ -41,12 +41,21 @@ class _StubEvent:
 
 
 def _confirmed_booking(**overrides):
+    """A trip that has actually been paid for.
+
+    `upcoming` is the only field here that says so, and it is the one this
+    fixture used to omit — which made "a confirmed booking" and "an abandoned
+    checkout" the same dict, and let the suite certify the bug below as correct.
+    """
     trip = {
         'isExternal': False,
         'isInquiry': False,
         'isOffer': False,
         'cancelTrip': False,
         'isBlocked': False,
+        'isTest': False,
+        'isTempEditTrip': False,
+        'upcoming': True,
     }
     trip.update(overrides)
     return trip
@@ -62,6 +71,12 @@ class TestIsCalendarEligible(TestCase):
 
     def test_confirmed_booking_is_eligible(self):
         self.assertTrue(is_eligible_for_event_backfill(_confirmed_booking()))
+
+    def test_the_fixture_really_is_a_paid_booking(self):
+        # Pins the fixture itself. Everything below reads "not eligible BECAUSE
+        # of the override"; that is only true while the baseline is eligible for
+        # a reason of its own, and the reason is payment.
+        self.assertTrue(_confirmed_booking()['upcoming'])
 
     def test_inquiry_is_not_eligible(self):
         self.assertFalse(is_eligible_for_event_backfill(_confirmed_booking(isInquiry=True)))
@@ -80,6 +95,70 @@ class TestIsCalendarEligible(TestCase):
     def test_missing_flags_default_to_not_eligible(self):
         # A half-written trip doc must not be given a calendar event.
         self.assertFalse(is_eligible_for_event_backfill({}))
+
+    def test_unpaid_draft_is_not_eligible(self):
+        # The booking funnel writes a priced trip document before it charges the
+        # card, and deliberately leaves it behind when payment fails or the guest
+        # walks away. `upcoming` is what separates that draft from the booking
+        # above; nothing else on the document does.
+        self.assertFalse(is_eligible_for_event_backfill(_confirmed_booking(upcoming=False)))
+
+    def test_draft_with_upcoming_absent_is_not_eligible(self):
+        draft = _confirmed_booking()
+        del draft['upcoming']
+        self.assertFalse(is_eligible_for_event_backfill(draft))
+
+    def test_test_account_booking_is_not_eligible(self):
+        # Same rule the app applies to the slot grid: a test booking never takes
+        # a room off sale, and the host's calendar is a room being off sale.
+        self.assertFalse(is_eligible_for_event_backfill(_confirmed_booking(isTest=True)))
+
+    def test_temp_edit_copy_is_not_eligible(self):
+        # The scratch copy the edit flow writes mid-negotiation. Every tab query
+        # in the app filters it; so does this.
+        self.assertFalse(is_eligible_for_event_backfill(_confirmed_booking(isTempEditTrip=True)))
+
+
+class TestSuite14PhantomBookings(TestCase):
+    """Regression guard for the five phantom events on Suite 14, 6 Oct 2026.
+
+    Two accounts created minutes apart walked the booking funnel five times on
+    22 Sep and never paid — no transaction row of any kind exists against any of
+    the five trips. Each document was left behind as a draft, which is by design.
+
+    On 24 Sep a push-channel renewal ran `create_events_for_future_trips`, and
+    because the eligibility gate read every flag EXCEPT the one that records
+    payment, all five were published to the host's real Google Calendar two
+    seconds apart. Suite 14 then read as solid 8am-5pm to the host and to every
+    channel consuming that calendar, while the app — which asks `tripHoldsRoom`,
+    and knows a draft holds nothing — still had the day for sale.
+    """
+
+    def _draft_as_written_by_the_funnel(self):
+        # Field-for-field the shape of trips/mLeU1r0RvXiWmP8SELe6.
+        return {
+            'cancelTrip': False,
+            'complete': False,
+            'isBlocked': False,
+            'isExternal': False,
+            'isInquiry': False,
+            'isOffer': False,
+            'isRefunded': False,
+            'isTempEditTrip': False,
+            'isTest': False,
+            'tripCost': 980,
+            'upcoming': False,
+        }
+
+    def test_the_draft_that_reached_the_calendar_is_not_eligible(self):
+        self.assertFalse(is_eligible_for_event_backfill(self._draft_as_written_by_the_funnel()))
+
+    def test_the_same_trip_once_paid_is_eligible(self):
+        # The gate has to stay open for the booking this draft would have become,
+        # or the fix trades phantom events for missing ones.
+        paid = self._draft_as_written_by_the_funnel()
+        paid['upcoming'] = True
+        self.assertTrue(is_eligible_for_event_backfill(paid))
 
 
 class TestCalendarEventIdForTrip(TestCase):
@@ -341,11 +420,7 @@ class BackfillSkipsNothingItShouldSend(TestCase):
 
     def test_an_externally_synced_trip_is_never_pushed_back(self):
         # The rule the old query was reaching for, and it still holds.
-        self.assertFalse(
-            is_eligible_for_event_backfill(
-                {'isExternal': True, 'isInquiry': False, 'isOffer': False}
-            )
-        )
+        self.assertFalse(is_eligible_for_event_backfill({'isExternal': True, 'isInquiry': False, 'isOffer': False}))
 
     def test_an_external_block_is_still_not_pushed_back(self):
         # isExternal is checked BEFORE isBlocked, or a synced block would be
@@ -357,9 +432,7 @@ class BackfillSkipsNothingItShouldSend(TestCase):
         )
 
     def test_a_cancelled_block_is_not_eligible(self):
-        self.assertFalse(
-            is_eligible_for_event_backfill({'isBlocked': True, 'cancelTrip': True})
-        )
+        self.assertFalse(is_eligible_for_event_backfill({'isBlocked': True, 'cancelTrip': True}))
 
     def test_the_query_no_longer_filters_on_isExternal(self):
         # The defect was in the QUERY, which no unit test reaches. If the

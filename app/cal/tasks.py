@@ -28,30 +28,78 @@ CALENDAR_OWNED_FIELDS = ('tripBeginDateTime', 'tripEndDateTime', 'tripDate', 'ev
 def is_eligible_for_event_backfill(trip_data: dict) -> bool:
     """Whether the automatic sweep may create a calendar event for this trip.
 
-    Only trips that actually hold the room qualify. Inquiries and offers are still
-    awaiting host acceptance or guest payment; giving them an event puts an unpaid
-    slot on the property's calendar, and the resulting sync used to feed it back in
-    as a confirmed booking. Events for accepted offers are created deliberately by
-    the app via create_or_update_event_from_trip, not by this sweep.
+    Two separate questions, asked in order, and kept visibly separate because only
+    the second one is shared with the app:
+
+      1. **Direction.** Did this record come FROM the calendar? If so it is never
+         pushed back, whatever else it says about itself.
+      2. **Occupancy.** Does this trip hold the room? That is not a calendar
+         question at all -- it is the same question the booking grid, the search
+         badge and host block-time ask, and the app answers it in one place.
+
+    Question 2 mirrors `tripHoldsRoom(OccupancyQuestion.guestBooking)` in the
+    Flutter repo (lib/custom_code/trip_occupancy.dart). **Keep the two in step.**
+    This function used to answer it independently and got it wrong: it accepted
+    anything that was not an inquiry and not an offer, which is also the shape of
+    an abandoned checkout -- the funnel writes a priced trip document before the
+    card is charged and deliberately leaves it behind on failure (see the comment
+    on the Close button in confirmation_widget.dart: deleting a record the guest
+    may in fact have been charged for is the worse error). Five such drafts on
+    Suite 14 were published to the host's real Google Calendar by a channel
+    renewal on 2026-09-24, showing the room solid 8am-5pm while the app itself
+    still had the day for sale. `upcoming` is the flag that separates the two,
+    and it was the one flag this function did not read.
+
+    The deliberate divergence from the Flutter predicate is the `isBlocked`
+    branch: there, blocked-and-inquiry is not occupied, because the inquiry test
+    returns first. Here a host block reaches the calendar regardless, which is the
+    whole point of the sweep for block time. Recorded in the divergence register
+    (docs/business-rules-graph.html, section 10) rather than silently copied.
+
+    `isExternal` is not part of question 2 and means the opposite thing in each:
+    to the app an external booking very much holds the room; here it only marks a
+    record the calendar already owns.
     """
-    if trip_data.get('cancelTrip'):
-        return False
-    # A trip that CAME FROM the calendar must not be pushed back to it. This
-    # used to be a `FieldFilter('isExternal', '==', False)` on the query, which
-    # skipped every document missing the field -- and host block-time writes no
-    # `isExternal` at all, in either client. Production has six blocked trips
-    # and three of them lack it, so the isBlocked branch below was unreachable
-    # from the backfill: a host who blocked out a fortnight and then connected
-    # their Google Calendar got none of it.
+    # 1. Direction.
+    #
+    # This used to be a `FieldFilter('isExternal', '==', False)` on the query,
+    # which skipped every document missing the field -- and host block-time
+    # writes no `isExternal` at all, in either client. Production has six blocked
+    # trips and three of them lack it, so the isBlocked branch below was
+    # unreachable from the backfill: a host who blocked out a fortnight and then
+    # connected their Google Calendar got none of it.
     #
     # `is True`, not truthy: absent means "not external", which is the whole
     # point of moving it here.
     if trip_data.get('isExternal') is True:
         return False
+
+    # 2. Occupancy.
+    if trip_data.get('cancelTrip'):
+        return False
+    # A booking made by a test account never takes a room off sale -- the booking
+    # page writes to production Firestore, so the only way to exercise the real
+    # flow is to do it for real. The same rule the app applies to the slot grid
+    # applies to the host's calendar: one forgotten test trip must not read as a
+    # room that is gone.
+    if trip_data.get('isTest'):
+        return False
+    # The scratch copy the edit flow writes while changes are being negotiated.
+    # Every tab query in the app filters it out; it is not a booking anyone holds.
+    if trip_data.get('isTempEditTrip'):
+        return False
     if trip_data.get('isBlocked'):
         # Host-blocked time holds the room without being a booking.
         return True
-    return trip_data.get('isInquiry') is False and trip_data.get('isOffer') is False
+    # An inquiry is a question nobody has answered and an offer is a quote nobody
+    # has paid.
+    if trip_data.get('isInquiry') or trip_data.get('isOffer'):
+        return False
+    # What is left has to be positively committed. `upcoming` goes true only once
+    # payment lands, so a trip without it is a draft, and a draft has taken
+    # nothing. `is True`, not truthy, and no default: a half-written document is
+    # not a booking.
+    return trip_data.get('upcoming') is True
 
 
 def calendar_event_id_for_trip(trip_id: str) -> str:
