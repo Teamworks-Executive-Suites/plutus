@@ -115,12 +115,15 @@ def send_reminder_sms(trip_doc, property_doc, time: int):
 
     # Send SMS to host and guest
     if guest_number:
-        send_sms(guest_number, f'Reminder: Your booking {trip_doc.id} starts in {time} hours. View here: {property_link}')
+        send_sms(
+            guest_number, f'Reminder: Your booking {trip_doc.id} starts in {time} hours. View here: {property_link}'
+        )
 
     if host_numbers:
         for host_num in host_numbers:
-            send_sms(host_num, f'Reminder: Your booking {trip_doc.id} starts in {time} hours. View here: {property_link}')
-
+            send_sms(
+                host_num, f'Reminder: Your booking {trip_doc.id} starts in {time} hours. View here: {property_link}'
+            )
 
 
 def local_time_for_email(value, property_timezone):
@@ -146,6 +149,17 @@ def local_time_for_email(value, property_timezone):
 
 
 def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, to_host: bool = False):
+    """DEAD as of the SES migration. Nothing in app/ calls this any more.
+
+    Kept, unused, until send_booking_email has run in production for a while:
+    the replacement has never executed from a cron, and deleting the only other
+    implementation the same day it ships would leave nothing to fall back to.
+    Its tests in tests/test_contact_details.py go with it when it goes.
+
+    It could not have worked anyway — the SendGrid account has had zero sending
+    credits and a hard limit since May — but the addressing logic below is the
+    part worth not throwing away in a hurry.
+    """
     """
     Function to send an email using SendGrid API.
     """
@@ -181,9 +195,7 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
         host_id = document_id(property_data.get('userRef'))
         guest_id = document_id(trip_data.get('userRef'))
         if not host_id or not guest_id:
-            app_logger.error(
-                'Cannot address email for trip %s: host=%s guest=%s', trip_doc.id, host_id, guest_id
-            )
+            app_logger.error('Cannot address email for trip %s: host=%s guest=%s', trip_doc.id, host_id, guest_id)
             return
 
         host_doc = db.collection('users').document(host_id).get()
@@ -245,22 +257,54 @@ def sendgrid_email(trip_doc, property_doc, template_id: str, time: int = None, t
         app_logger.info('Response: %s', response.text)
 
 
+def send_booking_email(trip_doc, event: str, time: int | None = None):
+    """Ask the website to send the emails for a booking event.
+
+    Plutus holds no mail credential and no template ids. It names an event and
+    a trip; the route reads the trip back, resolves both addresses itself and
+    decides which templates go to whom. One implementation of "what does a
+    booking confirmation say", shared with the site and the app.
+
+    This replaced `sendgrid_email`, which built a SendGrid payload by hand —
+    addresses, template id, every variable — and had never delivered a message:
+    the SendGrid account has had zero sending credits since May, so every one of
+    these posts was answered and discarded.
+
+    Failure is logged and swallowed. This is called from the completion and
+    reminder crons, and marking a trip complete matters more than telling
+    someone about it; an exception here would abandon the rest of the sweep.
+    """
+    if not settings.email_service_secret:
+        app_logger.error('EMAIL_SERVICE_SECRET is not set; cannot send %s for %s', event, trip_doc.id)
+        return
+
+    payload = {'event': event, 'tripId': trip_doc.id}
+    if time is not None:
+        payload['params'] = {'time': str(time)}
+
+    try:
+        r = requests.post(
+            f'{settings.site_url}/api/email',
+            json=payload,
+            headers={'x-email-service-secret': settings.email_service_secret},
+            timeout=20,
+        )
+        if r.status_code != 200:
+            app_logger.error('Email route answered %s for %s %s: %s', r.status_code, event, trip_doc.id, r.text[:200])
+            return
+        app_logger.info('Sent %s for trip %s: %s', event, trip_doc.id, r.text[:200])
+    except requests.RequestException as e:
+        app_logger.error('Could not reach the email route for %s %s: %s', event, trip_doc.id, e)
+
+
 def send_complete_email(trip_doc, property_doc):
     with logfire.span('send_complete_email'):
-        host_complete_email_template_id = 'd-f1698bb27e5c44f982478f61e9f5a2eb'
-        guest_complete_email_template_id = 'd-335808be895a413497459fbb3a311a39'
-
-        sendgrid_email(trip_doc, property_doc, host_complete_email_template_id, to_host=True)
-        sendgrid_email(trip_doc, property_doc, guest_complete_email_template_id, to_host=False)
+        send_booking_email(trip_doc, 'booking-complete')
 
 
 def send_reminder_email(trip_doc, property_doc, time: int):
     with logfire.span('send_reminder_email'):
-        host_reminder_email_template_id = 'd-02adfc13d954429a9e053fba47e9ab60'
-        guest_reminder_email_template_id = 'd-5c55d84eb81543819ff8d6aeba12c1e0'
-
-        sendgrid_email(trip_doc, property_doc, host_reminder_email_template_id, time, to_host=True)
-        sendgrid_email(trip_doc, property_doc, guest_reminder_email_template_id, time, to_host=False)
+        send_booking_email(trip_doc, 'booking-reminder', time)
 
 
 def auto_complete_and_notify():
@@ -324,9 +368,7 @@ def auto_complete_and_notify():
                     # fact completed — the state change is the first statement
                     # and had already committed.
                     try:
-                        trip.reference.update(
-                            {'complete': True, 'completeDate': now, 'upcoming': False}
-                        )
+                        trip.reference.update({'complete': True, 'completeDate': now, 'upcoming': False})
                         app_logger.info('Trip %s marked as complete', trip.id)
                     except Exception as e:
                         app_logger.error('Failed to complete trip %s: %s', trip.id, e)
@@ -422,10 +464,7 @@ def auto_complete_and_notify():
                             app_logger.error('Failed to send 24h reminder email for trip %s: %s', trip.id, e)
 
                     # 1-hour reminder (30min window each side to match hourly schedule)
-                    if (
-                        timedelta(minutes=30) < time_difference < timedelta(hours=1, minutes=30)
-                        and '1h' not in sent
-                    ):
+                    if timedelta(minutes=30) < time_difference < timedelta(hours=1, minutes=30) and '1h' not in sent:
                         trip.reference.update({'remindersSent': ArrayUnion(['1h'])})
                         try:
                             send_reminder_sms(trip, property_doc, 1)

@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     # "cannot send", not a crash inside the completion cron.
     sendgrid_api_key: str = ''
 
+    # Transactional email now goes through the website's /api/email route,
+    # which sends via Amazon SES. Plutus holds no mail credential of its own and
+    # no template ids: it names an event and a trip, and the route decides the
+    # rest. See app/auto/tasks.py send_booking_email.
+    #
+    # Empty means this cron cannot send, which is logged loudly rather than
+    # crashing the job — the completion and reminder work either side of the
+    # email matters more than the email.
+    email_service_secret: str = ''
+    site_url: str = 'https://bookteamworks.com'
+
     platform_user_id: str = 'ovd8KQBXVpdw1n0H3AXlKN7AHDr2'
 
     # Firebase Creds
