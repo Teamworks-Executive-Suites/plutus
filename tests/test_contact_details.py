@@ -45,9 +45,7 @@ class TestGetContactDetails(TestCase):
         MOCK_DB.collection('users').document(HOST_UID).set(
             {'smsOptIn': True, 'phone_numbers': ['+15550000001', '+15550000002']}
         )
-        MOCK_DB.collection('users').document(GUEST_UID).set(
-            {'smsOptIn': True, 'phone_numbers': ['+15550000003']}
-        )
+        MOCK_DB.collection('users').document(GUEST_UID).set({'smsOptIn': True, 'phone_numbers': ['+15550000003']})
 
     def _docs(self, trip_user_ref, property_user_ref):
         MOCK_DB.collection('properties').document('prop_1').set({'userRef': property_user_ref})
@@ -92,9 +90,7 @@ class TestGetContactDetails(TestCase):
 
     def test_opted_out_users_get_no_number(self):
         """smsOptIn gates the number, and must keep doing so after the fix."""
-        MOCK_DB.collection('users').document(GUEST_UID).set(
-            {'smsOptIn': False, 'phone_numbers': ['+15550000003']}
-        )
+        MOCK_DB.collection('users').document(GUEST_UID).set({'smsOptIn': False, 'phone_numbers': ['+15550000003']})
         trip, prop = self._docs(f'users/{GUEST_UID}', f'users/{HOST_UID}')
         host_numbers, guest_number = get_contact_details(trip, prop)
         self.assertEqual(host_numbers, ['+15550000001', '+15550000002'])
@@ -153,19 +149,6 @@ class TestAbsentRefsAgainstRealSnapshotBehaviour(TestCase):
         host_numbers, guest_number = get_contact_details(trip, prop)
         self.assertIsNone(guest_number)
 
-    def test_email_survives_a_trip_with_no_userRef(self):
-        trip = StrictSnapshot('trip_1', {})
-        prop = StrictSnapshot('prop_1', {'userRef': f'users/{HOST_UID}'})
-
-        def explode(*_a, **_k):
-            raise AssertionError('should not have tried to send')
-
-        # Key present on purpose: the send must be stopped by the UNREADABLE
-        # REF, not by a missing credential.
-        with patch.object(tasks.settings, 'sendgrid_api_key', 'test-key'), \
-             patch.object(tasks.requests, 'post', explode):
-            tasks.sendgrid_email(trip, prop, 'template-1', to_host=True)
-
     def test_sms_survives_a_property_with_no_userRef(self):
         trip = StrictSnapshot('trip_1', {'userRef': f'users/{GUEST_UID}'})
         prop = StrictSnapshot('prop_1', {})
@@ -183,12 +166,8 @@ class TestCompletionNotificationIsolation(TestCase):
 
     def setUp(self):
         MOCK_DB.reset()
-        MOCK_DB.collection('users').document(HOST_UID).set(
-            {'smsOptIn': True, 'phone_numbers': ['+15550000001']}
-        )
-        MOCK_DB.collection('users').document(GUEST_UID).set(
-            {'smsOptIn': True, 'phone_numbers': ['+15550000003']}
-        )
+        MOCK_DB.collection('users').document(HOST_UID).set({'smsOptIn': True, 'phone_numbers': ['+15550000001']})
+        MOCK_DB.collection('users').document(GUEST_UID).set({'smsOptIn': True, 'phone_numbers': ['+15550000003']})
         prop = MOCK_DB.collection('properties').document('prop_1')
         prop.set({'userRef': f'users/{HOST_UID}', 'timezone': 'America/Los_Angeles'})
         MOCK_DB.collection('trips').document('trip_1').set(
@@ -211,9 +190,7 @@ class TestCompletionNotificationIsolation(TestCase):
         def record_email(*_args, **_kwargs):
             sent['email'] = True
 
-        with patch.object(tasks, 'complete_trip_sms', boom), patch.object(
-            tasks, 'send_complete_email', record_email
-        ):
+        with patch.object(tasks, 'complete_trip_sms', boom), patch.object(tasks, 'send_complete_email', record_email):
             tasks.auto_complete_and_notify()
 
         self.assertTrue(sent['email'], 'the email was skipped because the SMS raised')
@@ -221,114 +198,54 @@ class TestCompletionNotificationIsolation(TestCase):
         self.assertTrue(trip.get('complete'), 'the trip should still be marked complete')
 
 
+class TestMissingEmailSecret(TestCase):
+    """An unset email secret must refuse, not crash and not post.
 
-class TestEmailRefShapes(TestCase):
-    """The email path had the identical split assumption as the SMS path.
-
-    `sendgrid_email` read `property_doc.get('userRef').id` on one line and
-    passed `trip_doc.get('userRef')` straight to `.document()` on the next, so
-    it failed on exactly the trips the SMS failed on. Both notification
-    channels were broken by one mistake written twice.
-    """
-
-    def setUp(self):
-        MOCK_DB.reset()
-        MOCK_DB.collection('users').document(HOST_UID).set(
-            {'email': 'host@example.com', 'display_name': 'Hosty'}
-        )
-        MOCK_DB.collection('users').document(GUEST_UID).set(
-            {'email': 'guest@example.com', 'display_name': 'Guesty'}
-        )
-
-    def _docs(self, trip_user_ref, property_user_ref):
-        MOCK_DB.collection('properties').document('prop_1').set(
-            {
-                'userRef': property_user_ref,
-                'propertyName': 'Suite 103',
-                'mainImage': ['https://example.com/a.jpg'],
-                'cleaningFee': 50,
-            }
-        )
-        MOCK_DB.collection('trips').document('trip_1').set(
-            {
-                'userRef': trip_user_ref,
-                'tripBeginDateTime': datetime.now(timezone.utc),
-                'tripEndDateTime': datetime.now(timezone.utc),
-                'tripBaseTotal': 100,
-                'tripAddonTotal': 0,
-                'tripCost': 150,
-            }
-        )
-        return (
-            MOCK_DB.collection('trips').document('trip_1').get(),
-            MOCK_DB.collection('properties').document('prop_1').get(),
-        )
-
-    def _addressee(self, trip_user_ref, property_user_ref, to_host):
-        seen = {}
-
-        class FakeResponse:
-            text = 'ok'
-
-        def capture(url, headers=None, json=None):
-            seen['to'] = json['personalizations'][0]['to'][0]['email']
-            return FakeResponse()
-
-        trip, prop = self._docs(trip_user_ref, property_user_ref)
-        # A key must be present, because sendgrid_email now refuses to send
-        # without one. Without this the "unresolvable ref sends nothing" test
-        # would pass for the WRONG REASON on any machine lacking the variable —
-        # proving the credential was missing rather than the ref logic worked.
-        with patch.object(tasks.settings, 'sendgrid_api_key', 'test-key'), \
-             patch.object(tasks.requests, 'post', capture):
-            tasks.sendgrid_email(trip, prop, 'template-1', to_host=to_host)
-        return seen.get('to')
-
-    def test_document_references_address_the_right_people(self):
-        """What the Flutter app writes. This raised before the fix."""
-        trip_ref = MOCK_DB.collection('users').document(GUEST_UID)
-        prop_ref = MOCK_DB.collection('users').document(HOST_UID)
-        self.assertEqual(self._addressee(trip_ref, prop_ref, to_host=True), 'host@example.com')
-        self.assertEqual(self._addressee(trip_ref, prop_ref, to_host=False), 'guest@example.com')
-
-    def test_path_strings_address_the_right_people(self):
-        self.assertEqual(
-            self._addressee(f'users/{GUEST_UID}', f'users/{HOST_UID}', to_host=True),
-            'host@example.com',
-        )
-        self.assertEqual(
-            self._addressee(f'users/{GUEST_UID}', f'users/{HOST_UID}', to_host=False),
-            'guest@example.com',
-        )
-
-    def test_an_unresolvable_ref_sends_nothing_rather_than_emailing_none(self):
-        self.assertIsNone(self._addressee(None, f'users/{HOST_UID}', to_host=True))
-
-
-class TestMissingSendgridKey(TestCase):
-    """An unset SendGrid key must refuse, not crash.
-
-    `sendgrid_api_key` was never declared in Settings and resolved only from a
-    developer's .env, so it raised AttributeError anywhere without one — inside
-    the completion cron, which before today shared a try block with the trip's
-    own state write.
+    Inherited from the SendGrid era, where `sendgrid_api_key` was undeclared
+    and raised AttributeError inside the completion cron. The credential has
+    changed — email now goes through the website's route — but the property
+    worth keeping is the same one: a missing credential stops the email and
+    leaves the trip's own state write alone.
     """
 
     def setUp(self):
         MOCK_DB.reset()
 
-    def test_no_key_means_no_send_and_no_crash(self):
+    def test_no_secret_means_no_post_and_no_crash(self):
         trip = StrictSnapshot('trip_1', {'userRef': f'users/{GUEST_UID}'})
-        prop = StrictSnapshot('prop_1', {'userRef': f'users/{HOST_UID}'})
 
         def explode(*_a, **_k):
-            raise AssertionError('called SendGrid with no credential')
+            raise AssertionError('called the email route with no credential')
 
-        with patch.object(tasks.settings, 'sendgrid_api_key', ''), \
-             patch.object(tasks.requests, 'post', explode):
-            tasks.sendgrid_email(trip, prop, 'template-1', to_host=True)
+        with patch.object(tasks.settings, 'email_service_secret', ''), patch.object(tasks.requests, 'post', explode):
+            tasks.send_booking_email(trip, 'booking-complete')
+
+    def test_a_present_secret_does_post(self):
+        # The negative above is only meaningful if the positive sends.
+        trip = StrictSnapshot('trip_1', {'userRef': f'users/{GUEST_UID}'})
+        calls = []
+
+        class Resp:
+            status_code = 200
+            text = '{"sent":[]}'
+
+        def record(url, **kwargs):
+            calls.append((url, kwargs.get('json'), kwargs.get('headers', {})))
+            return Resp()
+
+        with patch.object(tasks.settings, 'email_service_secret', 's3cret'), patch.object(
+            tasks.requests, 'post', record
+        ):
+            tasks.send_booking_email(trip, 'booking-complete')
+
+        self.assertEqual(len(calls), 1)
+        url, body, headers = calls[0]
+        self.assertTrue(url.endswith('/api/email'))
+        self.assertEqual(body['event'], 'booking-complete')
+        self.assertEqual(body['tripId'], 'trip_1')
+        self.assertEqual(headers.get('x-email-service-secret'), 's3cret')
 
     def test_the_setting_exists_even_with_no_env(self):
         # The actual regression: the attribute must be declared, not inherited
         # from whatever happens to be in a .env.
-        assert hasattr(tasks.settings, 'sendgrid_api_key')
+        assert hasattr(tasks.settings, 'email_service_secret')
