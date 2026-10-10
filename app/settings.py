@@ -29,6 +29,10 @@ class Settings(BaseSettings):
 
     g_calendar_resource_id: str = 'zaI1vco_ZDFf7n_oBTclPGvx6Zk'
 
+    # Chatbot data endpoints. Scoped token, not the master token — the caller is a
+    # public-facing site and the master token can move money.
+    bot_token: str = ''
+
     # Firebase Remote Config
     host_fee: float = 0.15
     guest_fee: float = 0.05
