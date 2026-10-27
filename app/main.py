@@ -10,9 +10,7 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from app.admin.views import admin_router
 from app.auth.views import auth_router
 from app.auto.payout_task import process_platform_payout
-from app.auto.tasks import auto_complete_and_notify
 from app.auto.transaction_tasks import process_transactions
-from app.auto.version_tasks import auto_update_cloud_version
 from app.cal.views import cal_router
 from app.cal.webhooks import cal_webhook_router
 from app.logging import config
@@ -39,13 +37,19 @@ async def lifespan(app: FastAPI):
 
     scheduler = BackgroundScheduler()
     for job, hours in (
-        (auto_complete_and_notify, 1),
+        # auto_complete_and_notify (hourly) moved to AWS on 2026-10-27: the
+        # PlutusCompleteAndRemind schedule in the bookteamworks website repo.
         (process_transactions, 1),
         (process_platform_payout, 1),
         # auto_check_and_renew_channels (every 12h) moved to AWS on 2026-10-27:
         # the PlutusRenewCalendarChannels schedule in the bookteamworks website
         # repo. Running both would open two new channels per room per sweep.
-        (auto_update_cloud_version, 1),
+        # auto_update_cloud_version is retired, not moved. It never published
+        # anything: it read the SERVER Remote Config template, where
+        # CloudVersion does not exist, and template.set() + load() writes
+        # nothing. Had it worked, CloudVersion v2.2.0 against the app's
+        # hard-coded AppVersion v2.1.21 would have sent every user to the
+        # Update Now screen.
     ):
         scheduler.add_job(
             job,

@@ -18,10 +18,8 @@ from unittest.mock import DEFAULT, MagicMock, patch
 sys.path.insert(0, '.')
 
 JOB_NAMES = (
-    'auto_complete_and_notify',
     'process_transactions',
     'process_platform_payout',
-    'auto_update_cloud_version',
 )
 
 
