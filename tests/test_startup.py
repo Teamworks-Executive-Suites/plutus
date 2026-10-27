@@ -21,7 +21,6 @@ JOB_NAMES = (
     'auto_complete_and_notify',
     'process_transactions',
     'process_platform_payout',
-    'auto_check_and_renew_channels',
     'auto_update_cloud_version',
 )
 

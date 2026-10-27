@@ -9,7 +9,6 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.admin.views import admin_router
 from app.auth.views import auth_router
-from app.auto.cal_tasks import auto_check_and_renew_channels
 from app.auto.payout_task import process_platform_payout
 from app.auto.tasks import auto_complete_and_notify
 from app.auto.transaction_tasks import process_transactions
@@ -43,7 +42,9 @@ async def lifespan(app: FastAPI):
         (auto_complete_and_notify, 1),
         (process_transactions, 1),
         (process_platform_payout, 1),
-        (auto_check_and_renew_channels, 12),
+        # auto_check_and_renew_channels (every 12h) moved to AWS on 2026-10-27:
+        # the PlutusRenewCalendarChannels schedule in the bookteamworks website
+        # repo. Running both would open two new channels per room per sweep.
         (auto_update_cloud_version, 1),
     ):
         scheduler.add_job(
