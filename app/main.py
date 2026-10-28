@@ -9,8 +9,6 @@ from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 from app.admin.views import admin_router
 from app.auth.views import auth_router
-from app.auto.payout_task import process_platform_payout
-from app.auto.transaction_tasks import process_transactions
 from app.cal.views import cal_router
 from app.cal.webhooks import cal_webhook_router
 from app.logging import config
@@ -39,8 +37,10 @@ async def lifespan(app: FastAPI):
     for job, hours in (
         # auto_complete_and_notify (hourly) moved to AWS on 2026-10-27: the
         # PlutusCompleteAndRemind schedule in the bookteamworks website repo.
-        (process_transactions, 1),
-        (process_platform_payout, 1),
+        # process_transactions and process_platform_payout (hourly) moved to AWS
+        # on 2026-10-28: PlutusReleaseEscrow and PlutusPlatformPayout in the
+        # bookteamworks website repo. They move money; never schedule a copy
+        # here again -- tests/test_startup.py fails if anything is scheduled.
         # auto_check_and_renew_channels (every 12h) moved to AWS on 2026-10-27:
         # the PlutusRenewCalendarChannels schedule in the bookteamworks website
         # repo. Running both would open two new channels per room per sweep.
